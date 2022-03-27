@@ -22,7 +22,10 @@ from Problems.SoftbotProblem import BaseSoftbotProblem
 sub.call("cp ../evosoro/" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
 
-def runBodyBrain(runs : int, pop_size : int, max_gens : int, seeds_json : str, analytics_json : str, objective_dict : ObjectiveDict, softbot_problem_cls : BaseSoftbotProblem, genotype_cls : Genotype, phenotype_cls : Phenotype):
+def runBodyBrain(runs : int, pop_size : int, max_gens : int, seeds_json : str, 
+                analytics_json : str, objective_dict : ObjectiveDict, 
+                softbot_problem_cls : BaseSoftbotProblem, 
+                genotype_cls : Genotype, phenotype_cls : Phenotype):
     runToSeedMapping = readFromJson(seeds_json)
     runToAnalyticsMapping = readFromJson(analytics_json)
 
