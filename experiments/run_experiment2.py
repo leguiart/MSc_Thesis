@@ -37,15 +37,17 @@ from functools import partial
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.core.population import Population
 
-from Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
-from General.Constants import *
-from Problems.Variation import DummySoftbotCrossover, SoftbotMutation
-from General.Utils import readFromJson, writeToJson, countFileLines, readFirstJson, save_json, QD_Analytics
+from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
+from Constants import *
+from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
+from evosoro_pymoo.Operators.Mutation import SoftbotMutation
+from Analytics.Utils import readFromJson, save_json, writeToJson, countFileLines, readFirstJson, QD_Analytics
 sys.path.append(os.getcwd() + "/..")# Appending repo's root dir in the python path to enable subsequent imports
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
-from evosoro.softbot import Population as SoftbotPopulation, Genotype, Phenotype
-from Problems.SoftbotProblem import QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem, BodyBrainGenotypeIndirect2, SimplePhenotypeIndirect
+from evosoro.softbot import Population as SoftbotPopulation
+from evosoro_pymoo.Problems.SoftbotProblem import QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem
+from Genotypes import BodyBrainGenotypeIndirect2, SimplePhenotypeIndirect
 from BodyBrainCommon import runBodyBrain
 
 sub.call("cp ../evosoro/" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
