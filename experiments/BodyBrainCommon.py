@@ -19,8 +19,8 @@ from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.softbot import Population as SoftbotPopulation, Genotype, Phenotype
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
 
-
-sub.call("cp ../evosoro/" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+sub.call("rm ./voxelyze", shell=True)
+sub.call("cp ../" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
 
 def runBodyBrain(runs : int, pop_size : int, max_gens : int, seeds_json : str, 

@@ -7,7 +7,7 @@ from pymoo.core.algorithm import Algorithm
 
 
 
-sys.path.append(os.getcwd() + "/..")
+# sys.path.append(os.getcwd() + "/..")
 from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
 from evosoro.tools.algorithms import Optimizer
 

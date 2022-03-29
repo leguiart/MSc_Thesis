@@ -7,7 +7,7 @@ import numpy as np
 
 from pymoo.core.mutation import Mutation
 
-sys.path.append(os.getcwd() + "/..")
+# sys.path.append(os.getcwd() + "/..")
 #from evosoro.tools.mutation import create_new_children_through_mutation
 
 class SoftbotMutation(Mutation):

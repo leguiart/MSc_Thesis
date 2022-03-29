@@ -7,9 +7,9 @@ import sys
 from pymoo.core.callback import Callback
 from pymoo.factory import get_performance_indicator
 
-from .Constants import *
-sys.path.append(os.getcwd() + "/..")
-from Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
+from Constants import *
+# sys.path.append(os.getcwd() + "/..")
+from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
 
 
 def setRandomSeed(seed):

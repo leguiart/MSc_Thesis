@@ -7,7 +7,7 @@ import sys
 import math
 from pymoo.core.problem import Problem
 from Constants import *
-sys.path.append(os.getcwd() + "/../..")
+# sys.path.append(os.getcwd() + "/../..")
 from evosoro.networks import CPPN
 from evosoro.softbot import Genotype, Phenotype
 from evosoro.tools.utils import count_occurrences, make_material_tree, rescaled_positive_sigmoid

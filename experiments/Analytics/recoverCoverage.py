@@ -1,7 +1,7 @@
 import sys
 import json
 
-from General.Utils import save_json
+from Utils import save_json
 # sys.path.append(os.getcwd() + "/..")
 
 def computeCoverage(qd_history):
