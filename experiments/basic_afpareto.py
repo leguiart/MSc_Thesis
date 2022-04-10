@@ -36,7 +36,7 @@ import os
 import sys
 
 # Appending repo's root dir in the python path to enable subsequent imports
-sys.path.append(os.getcwd() + "/..")
+# sys.path.append(os.getcwd() + "/..")
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.networks import CPPN
 from evosoro.softbot import Genotype, Phenotype, Population

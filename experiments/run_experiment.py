@@ -169,7 +169,7 @@ def main(argv):
 
         # Initializing a population of SoftBots
         my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
-        pop = Population.new("X", my_pop)
+        Population.new("X", my_pop)
 
         #Setting up Softbot optimization problem
         softbot_problem = softbot_problem_cls(sim, env, SAVE_POPULATION_EVERY, run_dir, run_name + str(run + 1), MAX_EVAL_TIME, TIME_TO_TRY_AGAIN, SAVE_LINEAGES, objective_dict)

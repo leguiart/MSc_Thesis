@@ -10,7 +10,7 @@ class EvaluatorInterface(metaclass=abc.ABCMeta):
 @EvaluatorInterface.register
 class IEvaluator:
 
-    def evaluate(self, X : list) -> list:
+    def evaluate(self, X : list, *args, **kwargs) -> list:
         """Evaluates phenotypes of the elements of a list of individuals with a certain fitness metric
         X : list
             List of objects which contain a fitness metric and a phenotype
