@@ -42,8 +42,7 @@ class BaseSoftbotProblem(Problem):
         # self.curr_env_idx = 0
         # self.objective_dict = objective_dict
         # self.best_fit_so_far = objective_dict[0]["worst_value"]
-        # self.n_gen = 1
-        self.evaluators = [physics_evaluator]
+        self.evaluators = {"physics" : physics_evaluator}
 
     def _evaluate(self, x, out, *args, **kwargs):
         # for x_i in x:
@@ -71,7 +70,7 @@ class BaseSoftbotProblem(Problem):
         raise NotImplementedError
 
     def _doEvaluations(self, X : List[SoftBot]):
-        for evaluator in self.evaluators:
+        for _, evaluator in self.evaluators.items():
             X = evaluator.evaluate(X)
         return X
 
@@ -91,8 +90,8 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
 
     #def __init__(self, physics_evaluator : BasePhysicsEvaluator, sim, env, save_vxa_every, directory, name, max_eval_time, time_to_try_again, save_lineages, objective_dict):
     def __init__(self, physics_evaluator : BasePhysicsEvaluator):
-        super().__init__(physics_evaluator, n_var=1, n_obj=1, n_constr=0)
-        self.evaluators += [NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty")]
+        super().__init__(physics_evaluator, n_var=1, n_obj=1, n_constr=4)
+        self.evaluators["unaligned_novelty"] = NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty")
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:
         return [-x.fitness]
@@ -104,8 +103,8 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
 class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BasePhysicsEvaluator):
-        super().__init__(physics_evaluator, n_var=1, n_obj=2, n_constr=0)
-        self.evaluators += [NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty")]
+        super().__init__(physics_evaluator, n_var=1, n_obj=2, n_constr=4)
+        self.evaluators["unaligned_novelty"] = NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty")
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:
         return [-x.fitness, -x.unaligned_novelty]
@@ -117,10 +116,10 @@ class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 class MNSLCSoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BasePhysicsEvaluator):
-        super().__init__(physics_evaluator, n_var=1, n_obj=3, n_constr=0)
-        self.evaluators += [NoveltyEvaluator(aligned_distance_metric, "aligned_novelty"), 
-                            NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", "unaligned_neighbors"),
-                            NSLCQuality()]
+        super().__init__(physics_evaluator, n_var=1, n_obj=3, n_constr=4)
+        self.evaluators.update({"aligned_novelty" : NoveltyEvaluator(aligned_distance_metric, "aligned_novelty"), 
+                            "unaligned_novelty" : NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", "unaligned_neighbors"),
+                            "nslc_quality" : NSLCQuality()})
         # self.aligned_novelty_evaluator = NoveltyEvaluator(aligned_distance_metric, "aligned_novelty")
         # self.unaligned_novelty_evaluator = NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", "unaligned_neighbors")
 

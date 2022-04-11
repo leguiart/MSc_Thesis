@@ -39,6 +39,7 @@ from pymoo.core.population import Population
 
 from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
 from Constants import *
+from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import SoftbotMutation
 from Analytics.Utils import readFromJson, save_json, writeToJson, countFileLines, readFirstJson, QD_Analytics
@@ -81,6 +82,7 @@ def main(argv):
     genotype_cls = BodyBrainGenotypeIndirect
     phenotype_cls = SimplePhenotypeIndirect
     softbot_problem_cls = None
+    physics_sim_cls = None
     # Creating an objectives dictionary
     objective_dict = ObjectiveDict()
 
@@ -109,6 +111,8 @@ def main(argv):
                             output_node_name="material")
                             
     objective_dict.add_objective(name="unaligned_novelty", maximize=True, tag=None)
+
+    physics_sim_cls = VoxelyzePhysicsEvaluator
 
     if experiment == "SO":
         seeds_json = SEEDS_JSON_SO
@@ -172,9 +176,10 @@ def main(argv):
         Population.new("X", my_pop)
 
         #Setting up Softbot optimization problem
-        softbot_problem = softbot_problem_cls(sim, env, SAVE_POPULATION_EVERY, run_dir, run_name + str(run + 1), MAX_EVAL_TIME, TIME_TO_TRY_AGAIN, SAVE_LINEAGES, objective_dict)
+        physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_dir, run_name + str(run + 1), objective_dict, MAX_EVAL_TIME, TIME_TO_TRY_AGAIN, SAVE_LINEAGES)
+        softbot_problem = softbot_problem_cls(physics_sim)
 
-        # Setting up our optimization
+        # Setting up optimization algorithm
         algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), mutation=SoftbotMutation(), crossover=DummySoftbotCrossover(), eliminate_duplicates=False)
         algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
         analytics = QD_Analytics(run + 1, experiment)
