@@ -83,7 +83,8 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
     def evaluate(self, pop):
         start_time = time.time()
         num_evaluated_this_gen = 0
-        ids_to_analyze = []
+        # ids_to_analyze = []
+        ids_softbot_map = {}
 
         for pymoo_ind in pop:
             ind = pymoo_ind[0].X
@@ -111,18 +112,19 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
 
             # otherwise evaluate with voxelyze
             else:
-                num_evaluated_this_gen += 1
                 # pop.total_evaluations += 1
-                ids_to_analyze += [ind.id]
-
-                sub.Popen("./voxelyze  -f " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id,
-                        shell=True)
+                # ids_to_analyze += [ind.id]
+                if ind.id not in ids_softbot_map:
+                    num_evaluated_this_gen += 1
+                    ids_softbot_map[ind.id] = ind
+                    sub.Popen("./voxelyze  -f " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id,
+                            shell=True)
 
         self.print_log.message("Launched {0} voxelyze calls, out of {1} individuals".format(num_evaluated_this_gen, len(pop)))
 
         num_evals_finished = 0
         all_done = False
-        already_analyzed_ids = []
+        already_analyzed_ids = {}
         redo_attempts = 1
 
         fitness_eval_start_time = time.time()
@@ -141,98 +143,176 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
             if time_waiting_for_fitness > len(pop) * self.time_to_try_again * redo_attempts:
                 # try to redo any self.simulations that crashed
                 redo_attempts += 1
-                non_analyzed_ids = [idx for idx in ids_to_analyze if idx not in already_analyzed_ids]
+                non_analyzed_ids = [idx for idx in ids_softbot_map.keys() if idx not in already_analyzed_ids]
                 print ("Rerunning voxelyze for: ", non_analyzed_ids)
                 for idx in non_analyzed_ids:
                     sub.Popen("./voxelyze  -f " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % idx,
                             shell=True)
 
             # check to see if all are finished
-            all_done = True
-            for pymoo_ind in pop:
-                ind = pymoo_ind[0].X
-                # if ind.phenotype.is_valid() and ind.fitness == self.objective_dict[0]["worst_value"]:
-                if ind.phenotype.is_valid():
-                    all_done = False
+            all_done = len(ids_softbot_map) == 0
+            # for pymoo_ind in pop:
+            #     ind = pymoo_ind[0].X
+            #     # if ind.phenotype.is_valid() and ind.fitness == self.objective_dict[0]["worst_value"]:
+            #     if ind.phenotype.is_valid():
+            #         all_done = False
 
             # check for any fitness files that are present
-            ls_check = sub.check_output(["ls", self.run_directory + "/fitnessFiles/"])
+            # ls_check = sub.check_output(["ls", self.run_directory + "/fitnessFiles/"])
+
+            f_files_path = self.run_directory + "/fitnessFiles/"
+            f_files = [f for f in os.listdir(f_files_path) if os.path.isfile(os.path.join(f_files_path, f))]
             # duplicated ids issue: may be due to entering here two times for the same fitness file found in the directory.
 
-            if ls_check:
-                # ls_check = random.choice(ls_check.split())  # doesn't accomplish anything and undermines reproducibility
-                ls_check = ls_check.split()[0].decode('ascii')
-                if "softbotsOutput--id_" in ls_check:
-                    this_id = int(ls_check.split("_")[1].split(".")[0])
-
-                    if this_id in already_analyzed_ids:
-                        # workaround to avoid any duplicated ids when restarting self.sims
-                        self.print_log.message("Duplicate voxelyze results found from THIS gen with id {}".format(this_id))
-                        sub.call("rm " + self.run_directory + "/fitnessFiles/" + ls_check, shell=True)
-
-                    elif this_id in self.all_evaluated_individuals_ids:
-                        self.print_log.message("Duplicate voxelyze results found from PREVIOUS gen with id {}".format(this_id))
-                        sub.call("rm " + self.run_directory + "/fitnessFiles/" + ls_check, shell=True)
-
-                    else:
-                        num_evals_finished += 1
-                        already_analyzed_ids.append(this_id)
-
-                        ind_filename = self.run_directory + "/fitnessFiles/" + ls_check
-                        objective_values_dict = read_voxlyze_results(self.objective_dict, self.print_log, ind_filename)
-
-                        self.print_log.message("{0} fit = {1} ({2} / {3})".format(ls_check, objective_values_dict[0],
-                                                                            num_evals_finished,
-                                                                            num_evaluated_this_gen))
-
-                        # now that we've read the fitness file, we can remove it
-                        sub.call("rm " + self.run_directory + "/fitnessFiles/" + ls_check, shell=True)
-
-                        # assign the values to the corresponding individual
-                        for pymoo_ind in pop:
-                            ind = pymoo_ind[0].X
-                            if ind.id == this_id:
-                                for rank, details in self.objective_dict.items():
-                                    if objective_values_dict[rank] is not None:
-                                        setattr(ind, details["name"], objective_values_dict[rank])
-                                    else:
-                                        for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
-                                            if name == details["output_node_name"]:
-                                                state = details_phenotype["state"]
-                                                setattr(ind, details["name"], details["node_func"](state))
-
-                                self.already_evaluated[ind.md5] = [getattr(ind, details["name"])
-                                                                for rank, details in
-                                                                self.objective_dict.items()]
-                                self.all_evaluated_individuals_ids += [this_id]
-
-                                # update the run statistics and file management
-                                if ind.fitness > self.problem.best_fit_so_far:
-                                    self.problem.best_fit_so_far = ind.fitness
-                                    sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
-                                            ind.id + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
-                                            "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
-                                            (self.problem.n_gen, ind.fitness, ind.id), shell=True)
-
-                                # if save_lineages:
-                                #     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
-                                #              ind.id + " " + self.run_directory + "/ancestors/", shell=True)
-
-                                if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
-                                    file_source = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id
-                                    file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.problem.n_gen, ind.fitness, ind.id)
-                                    sub.call("mv " + file_source + " " + file_destination, shell=True)
-                                else:
-                                    sub.call("rm " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
-                                            ind.id, shell=True)
-
-                                break
-
-                # wait a second and try again
-                else:
-                    time.sleep(0.5)
-            else:
+            if not f_files:
                 time.sleep(0.5)
+                continue
+
+            evaluated_ids = {}
+            for f in f_files:
+                if "softbotsOutput--id_" in f:
+                    evaluated_ids.add((int(f.split("_")[1].split(".")[0]), f))
+
+            if not evaluated_ids:
+                time.sleep(0.5)
+                continue
+
+            for this_id, file in evaluated_ids:
+                ind_filename = os.path.join(f_files_path, file)
+                if this_id in already_analyzed_ids:
+                    # workaround to avoid any duplicated ids when restarting self.sims
+                    self.print_log.message("Duplicate voxelyze results found from THIS gen with id {}".format(this_id))
+                    sub.call("rm " + ind_filename, shell=True)
+
+                elif this_id in self.all_evaluated_individuals_ids:
+                    self.print_log.message("Duplicate voxelyze results found from PREVIOUS gen with id {}".format(this_id))
+                    sub.call("rm " + ind_filename, shell=True)
+
+                else:
+                    num_evals_finished += 1
+                    already_analyzed_ids.add(this_id)
+
+                    objective_values_dict = read_voxlyze_results(self.objective_dict, self.print_log, ind_filename)
+
+                    self.print_log.message("{0} fit = {1} ({2} / {3})".format(file, objective_values_dict[0],
+                                                                        num_evals_finished,
+                                                                        num_evaluated_this_gen))
+
+                    # now that we've read the fitness file, we can remove it
+                    sub.call("rm " + ind_filename, shell=True)
+
+                    # assign the values to the corresponding individual
+                    pymoo_ind = ids_softbot_map[this_id]
+                    ind = pymoo_ind[0].X
+                    for rank, details in self.objective_dict.items():
+                        if objective_values_dict[rank] is not None:
+                            setattr(ind, details["name"], objective_values_dict[rank])
+                        else:
+                            for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
+                                if name == details["output_node_name"]:
+                                    state = details_phenotype["state"]
+                                    setattr(ind, details["name"], details["node_func"](state))
+
+                    self.already_evaluated[ind.md5] = [getattr(ind, details["name"])
+                                                    for rank, details in
+                                                    self.objective_dict.items()]
+                    self.all_evaluated_individuals_ids += [this_id]
+
+                    # update the run statistics and file management
+                    if ind.fitness > self.problem.best_fit_so_far:
+                        self.problem.best_fit_so_far = ind.fitness
+                        sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
+                                ind.id + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
+                                "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
+                                (self.problem.n_gen, ind.fitness, ind.id), shell=True)
+
+                    # if save_lineages:
+                    #     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
+                    #              ind.id + " " + self.run_directory + "/ancestors/", shell=True)
+
+                    if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
+                        file_source = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id
+                        file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.problem.n_gen, ind.fitness, ind.id)
+                        sub.call("mv " + file_source + " " + file_destination, shell=True)
+                    else:
+                        sub.call("rm " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
+                                ind.id, shell=True)
+
+                    del ids_softbot_map[this_id]
+
+            # if ls_check:
+            #     ls_check = ls_check.split()[0].decode('ascii')
+            #     if "softbotsOutput--id_" in ls_check:
+            #         this_id = int(ls_check.split("_")[1].split(".")[0])
+
+            #         if this_id in already_analyzed_ids:
+            #             # workaround to avoid any duplicated ids when restarting self.sims
+            #             self.print_log.message("Duplicate voxelyze results found from THIS gen with id {}".format(this_id))
+            #             sub.call("rm " + self.run_directory + "/fitnessFiles/" + ls_check, shell=True)
+
+            #         elif this_id in self.all_evaluated_individuals_ids:
+            #             self.print_log.message("Duplicate voxelyze results found from PREVIOUS gen with id {}".format(this_id))
+            #             sub.call("rm " + self.run_directory + "/fitnessFiles/" + ls_check, shell=True)
+
+            #         else:
+            #             num_evals_finished += 1
+            #             already_analyzed_ids.append(this_id)
+
+            #             ind_filename = self.run_directory + "/fitnessFiles/" + ls_check
+            #             objective_values_dict = read_voxlyze_results(self.objective_dict, self.print_log, ind_filename)
+
+            #             self.print_log.message("{0} fit = {1} ({2} / {3})".format(ls_check, objective_values_dict[0],
+            #                                                                 num_evals_finished,
+            #                                                                 num_evaluated_this_gen))
+
+            #             # now that we've read the fitness file, we can remove it
+            #             sub.call("rm " + self.run_directory + "/fitnessFiles/" + ls_check, shell=True)
+
+            #             # assign the values to the corresponding individual
+            #             for pymoo_ind in pop:
+            #                 ind = pymoo_ind[0].X
+            #                 if ind.id == this_id:
+            #                     for rank, details in self.objective_dict.items():
+            #                         if objective_values_dict[rank] is not None:
+            #                             setattr(ind, details["name"], objective_values_dict[rank])
+            #                         else:
+            #                             for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
+            #                                 if name == details["output_node_name"]:
+            #                                     state = details_phenotype["state"]
+            #                                     setattr(ind, details["name"], details["node_func"](state))
+
+            #                     self.already_evaluated[ind.md5] = [getattr(ind, details["name"])
+            #                                                     for rank, details in
+            #                                                     self.objective_dict.items()]
+            #                     self.all_evaluated_individuals_ids += [this_id]
+
+            #                     # update the run statistics and file management
+            #                     if ind.fitness > self.problem.best_fit_so_far:
+            #                         self.problem.best_fit_so_far = ind.fitness
+            #                         sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
+            #                                 ind.id + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
+            #                                 "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
+            #                                 (self.problem.n_gen, ind.fitness, ind.id), shell=True)
+
+            #                     # if save_lineages:
+            #                     #     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
+            #                     #              ind.id + " " + self.run_directory + "/ancestors/", shell=True)
+
+            #                     if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
+            #                         file_source = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id
+            #                         file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.problem.n_gen, ind.fitness, ind.id)
+            #                         sub.call("mv " + file_source + " " + file_destination, shell=True)
+            #                     else:
+            #                         sub.call("rm " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
+            #                                 ind.id, shell=True)
+
+            #                     break
+
+            #     # wait a second and try again
+            #     else:
+            #         time.sleep(0.5)
+            # else:
+            #     time.sleep(0.5)
 
         if not all_done:
             self.print_log.message("WARNING: Couldn't get a fitness value in time for some individuals. "
