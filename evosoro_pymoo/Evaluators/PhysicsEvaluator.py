@@ -151,7 +151,8 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
             all_done = True
             for pymoo_ind in pop:
                 ind = pymoo_ind[0].X
-                if ind.phenotype.is_valid() and ind.fitness == self.objective_dict[0]["worst_value"]:
+                # if ind.phenotype.is_valid() and ind.fitness == self.objective_dict[0]["worst_value"]:
+                if ind.phenotype.is_valid():
                     all_done = False
 
             # check for any fitness files that are present
@@ -169,7 +170,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                         self.print_log.message("Duplicate voxelyze results found from THIS gen with id {}".format(this_id))
                         sub.call("rm " + self.run_directory + "/fitnessFiles/" + ls_check, shell=True)
 
-                    elif this_id in all_evaluated_individuals_ids:
+                    elif this_id in self.all_evaluated_individuals_ids:
                         self.print_log.message("Duplicate voxelyze results found from PREVIOUS gen with id {}".format(this_id))
                         sub.call("rm " + self.run_directory + "/fitnessFiles/" + ls_check, shell=True)
 
@@ -203,7 +204,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                                 self.already_evaluated[ind.md5] = [getattr(ind, details["name"])
                                                                 for rank, details in
                                                                 self.objective_dict.items()]
-                                all_evaluated_individuals_ids += [this_id]
+                                self.all_evaluated_individuals_ids += [this_id]
 
                                 # update the run statistics and file management
                                 if ind.fitness > self.problem.best_fit_so_far:

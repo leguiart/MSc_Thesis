@@ -17,7 +17,7 @@ from evosoro.tools.logging import PrintLog
 # Here we are going to evolve the stiffness distribution: need to define min and max elastic modulus
 MIN_ELASTIC_MOD = 0.01e6  # when, evolving stiffness, min elastic mod
 MAX_ELASTIC_MOD = 1e6  # when, evolving stiffness, max elastic mod
-MAX_FREQUENCY = 3.0  # We also evolve a global actuation frequency, max frequency
+MAX_FREQUENCY = 4.0  # We also evolve a global actuation frequency, max frequency
 
 def frequency_func(x):
     return MAX_FREQUENCY * 2.5 / (np.mean(1/x) + 1.5)  # SAM: inverse the additional inverse in read_write_voxelyze.py
@@ -55,7 +55,7 @@ class SimpleGenotypeIndirect(Genotype):
 
 # Define a custom phenotype, inheriting from the Phenotype class
 class SimplePhenotypeIndirect(Phenotype):
-    def is_valid(self, min_percent_full=0.3, min_percent_muscle=0.1):
+    def is_valid(self, min_percent_full=0.05, max_percent_full = 0.9, min_percent_muscle=0.1, max_percent_muscle = 0.8):
         # override super class function to redefine what constitutes a valid individuals
         for name, details in self.genotype.to_phenotype_mapping.items():
             if np.isnan(details["state"]).any():
@@ -63,10 +63,12 @@ class SimplePhenotypeIndirect(Phenotype):
             if name == "material":
                 state = details["state"]
                 # Discarding the robot if it doesn't have at least a given percentage of non-empty voxels
-                if np.sum(state>0) < np.product(self.genotype.orig_size_xyz) * min_percent_full:
+                voxels = np.sum(state>0)
+                if voxels < self.genotype.ds_size * min_percent_full or voxels > self.genotype.ds_size * max_percent_full:
                     return False
                 # Discarding the robot if it doesn't have at least a given percentage of muscles (materials 3 and 4)
-                if count_occurrences(state, [3, 4]) < np.product(self.genotype.orig_size_xyz) * min_percent_muscle:
+                muscles = count_occurrences(state, [3, 4]) 
+                if muscles < voxels * min_percent_muscle or muscles > voxels * max_percent_muscle:
                     return False
         return True
 

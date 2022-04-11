@@ -24,6 +24,7 @@ class Genotype(object):
         self.all_networks_outputs = []
         self.to_phenotype_mapping = GenotypeToPhenotypeMap()
         self.orig_size_xyz = orig_size_xyz
+        self.ds_size = np.prod(self.orig_size_xyz)
 
     def __iter__(self):
         """Iterate over the networks. Use the expression 'for n in network'."""

@@ -47,7 +47,7 @@ from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
 from evosoro.softbot import Population as SoftbotPopulation, Genotype, Phenotype
 from evosoro_pymoo.Problems.SoftbotProblem import QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem
-from Genotypes import BodyBrainGenotypeIndirect2, SimplePhenotypeIndirect
+from Genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
 from BodyBrainCommon import runBodyBrain
 
 sub.call("rm ./voxelyze", shell=True)
@@ -78,7 +78,7 @@ def main(argv):
         elif opt in ["-g", "--generations"]:
             max_gens = int(arg)
     
-    genotype_cls = BodyBrainGenotypeIndirect2
+    genotype_cls = BodyBrainGenotypeIndirect
     phenotype_cls = SimplePhenotypeIndirect
     softbot_problem_cls = None
     # Creating an objectives dictionary
@@ -94,17 +94,17 @@ def main(argv):
     # morphologies.
     # This information can be computed in Python (it's not returned by Voxelyze, thus tag=None),
     # which is done by counting the non empty voxels (material != 0) composing the robot.
-    objective_dict.add_objective(name="num_voxels", maximize=False, tag=None,
+    objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
                                     node_func=np.count_nonzero, output_node_name="material")
 
     # This information is not returned by Voxelyze (tag=None): it is instead computed in Python.
     # We also specify how energy should be computed, which is done by counting the occurrences of
     # active materials (materials number 3 and 4)
-    objective_dict.add_objective(name="active", maximize=False, tag=None,
+    objective_dict.add_objective(name="active", maximize=True, tag=None,
                                     node_func=partial(count_occurrences, keys=[3, 4]),
                                     output_node_name="material")
 
-    objective_dict.add_objective(name="passive", maximize=False, tag=None,
+    objective_dict.add_objective(name="passive", maximize=True, tag=None,
                             node_func=partial(count_occurrences, keys=[1, 2]),
                             output_node_name="material")
                             

@@ -13,7 +13,7 @@ from Evaluators.NoveltyEvaluator import NoveltyEvaluator, NSLCQuality
 from evosoro.softbot import SoftBot
 
 # Appending repo's root dir in the python path to enable subsequent imports
-from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator, evaluate_all_pymoo
+from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator
 # sys.path.append(os.getcwd() + "/../..")
 from evosoro.tools.logging import PrintLog
 
@@ -91,27 +91,33 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
 
     #def __init__(self, physics_evaluator : BasePhysicsEvaluator, sim, env, save_vxa_every, directory, name, max_eval_time, time_to_try_again, save_lineages, objective_dict):
     def __init__(self, physics_evaluator : BasePhysicsEvaluator):
-        super().__init__(physics_evaluator, n_var=1, n_obj=3, n_constr=0)
+        super().__init__(physics_evaluator, n_var=1, n_obj=1, n_constr=0)
         self.evaluators += [NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty")]
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:
-        return [-x.fitness, x.num_voxels, x.active]
+        return [-x.fitness]
+
+    def _extractConstraints(self, x: SoftBot) -> List[float]:
+        return [-x.num_voxels + 0.05*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
 
 
 class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BasePhysicsEvaluator):
-        super().__init__(physics_evaluator, n_var=1, n_obj=3, n_constr=0)
+        super().__init__(physics_evaluator, n_var=1, n_obj=2, n_constr=0)
         self.evaluators += [NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty")]
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:
-        return [-x.fitness, -x.unaligned_novelty, x.active]
+        return [-x.fitness, -x.unaligned_novelty]
+    
+    def _extractConstraints(self, x: SoftBot) -> List[float]:
+        return [-x.num_voxels + 0.05*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
 
 
 class MNSLCSoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BasePhysicsEvaluator):
-        super().__init__(physics_evaluator, n_var=1, n_obj=4, n_constr=0)
+        super().__init__(physics_evaluator, n_var=1, n_obj=3, n_constr=0)
         self.evaluators += [NoveltyEvaluator(aligned_distance_metric, "aligned_novelty"), 
                             NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", "unaligned_neighbors"),
                             NSLCQuality()]
@@ -119,7 +125,10 @@ class MNSLCSoftbotProblem(BaseSoftbotProblem):
         # self.unaligned_novelty_evaluator = NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", "unaligned_neighbors")
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:
-        return [-x.nslc_quality, -x.aligned_novelty, -x.unaligned_novelty, x.active]
+        return [-x.nslc_quality, -x.aligned_novelty, -x.unaligned_novelty]
+
+    def _extractConstraints(self, x: SoftBot) -> List[float]:
+        return [-x.num_voxels + 0.05*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
 
     # def _evaluate(self, x, out, *args, **kwargs):
     #     X = self.physics_evaluator.evaluate([x_i[0].X for x_i in x])
