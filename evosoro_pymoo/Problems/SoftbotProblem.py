@@ -9,14 +9,14 @@ import os
 import sys
 import math
 from pymoo.core.problem import Problem
-from Evaluators.NoveltyEvaluator import NoveltyEvaluator, NSLCQuality
-from evosoro.softbot import SoftBot
+
 
 # Appending repo's root dir in the python path to enable subsequent imports
-from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator
 # sys.path.append(os.getcwd() + "/../..")
+from evosoro_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluator, NSLCQuality
+from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator
+from evosoro.softbot import SoftBot
 from evosoro.tools.logging import PrintLog
-
 
 class BaseSoftbotProblem(Problem):
 

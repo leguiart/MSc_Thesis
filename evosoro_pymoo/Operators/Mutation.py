@@ -17,7 +17,7 @@ class SoftbotMutation(Mutation):
 
     def _do(self, problem, X, **kwargs):
         self.max_id = len(X) if self.max_id == 0 else self.max_id
-        return create_new_children_through_mutation(X, self, print_log = problem.print_log)
+        return create_new_children_through_mutation(X, self, print_log = problem.evaluators["physics"].print_log)
 
 
 def create_new_children_through_mutation(pop, mut, print_log, new_children=None, mutate_network_probs=None,

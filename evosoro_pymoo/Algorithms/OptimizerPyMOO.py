@@ -38,24 +38,24 @@ class PopulationBasedOptimizerPyMOO(Optimizer):
             save_nets=False, continued_from_checkpoint=False, new_run = True):
 
         if self.autosuspended:
-            sub.call("rm %s/AUTOSUSPENDED" % self.problem.directory, shell=True)
+            sub.call("rm %s/AUTOSUSPENDED" % self.problem.evaluators["physics"].run_directory, shell=True)
 
         self.autosuspended = False
         self.max_gens = max_gens  # can add additional gens through checkpointing
 
-        self.problem.print_log.add_timer("evaluation")
-        self.start_time = self.problem.print_log.timers["start"]  # sync start time with logging
+        self.problem.evaluators["physics"].print_log.add_timer("evaluation")
+        self.start_time = self.problem.evaluators["physics"].print_log.timers["start"]  # sync start time with logging
 
         # sub.call("clear", shell=True)
 
         #if not continued_from_checkpoint:  # generation zero
         if new_run:
-            self.directory = self.problem.directory
+            self.directory = self.problem.evaluators["physics"].run_directory
             self.name = self.problem.name
             self.num_random_inds = num_random_individuals
             self.num_env_cycles = num_env_cycles
-            initialize_folders(evosoro_pop, self.problem.directory, self.problem.name, save_nets, save_lineages=self.problem.save_lineages)
-            make_gen_directories(evosoro_pop, self.problem.directory, self.problem.save_vxa_every, save_nets)
+            initialize_folders(evosoro_pop, self.problem.evaluators["physics"].run_directory, self.problem.name, save_nets, save_lineages=self.problem.evaluators["physics"].save_lineages)
+            make_gen_directories(evosoro_pop, self.problem.evaluators["physics"].run_directory, self.problem.evaluators["physics"].save_vxa_every, save_nets)
             sub.call("touch {}/RUNNING".format(self.directory), shell=True)
         # self.evaluate(self.sim, self.env[self.curr_env_idx], self.pop, self.problem.print_log, save_vxa_every, self.directory,
         #               self.name, max_eval_time, time_to_try_again, save_lineages)
@@ -79,7 +79,8 @@ class PopulationBasedOptimizerPyMOO(Optimizer):
             #     break
            
             # ask the algorithm for the next solution to be evaluated
-            self.problem.evaluators["physics"].n_gen = self.algorithm.n_gen if self.algorithm.n_gen != None else 1
+            self.problem.evaluators["physics"].n_gen = self.algorithm.n_gen if self.algorithm.n_gen != None else 0
+            #self.problem.evaluators["physics"].n_gen = self.problem.n_gen
             self.problem.evaluators["physics"].print_log.message("Now creating new population")
             self.problem.evaluators["physics"].update_env()
             pop = self.algorithm.ask()
@@ -89,7 +90,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer):
             for i in range(len(evosoro_pop)):
                 evosoro_pop.individuals[i] = pop[i].X
             if new_run:
-                make_gen_directories(evosoro_pop, self.directory, self.problem.save_vxa_every, save_nets)
+                make_gen_directories(evosoro_pop, self.directory, self.problem.evaluators["physics"].save_vxa_every, save_nets)
 
             # evaluate fitness
             # evaluate the individuals using the algorithm's evaluator (necessary to count evaluations for termination)

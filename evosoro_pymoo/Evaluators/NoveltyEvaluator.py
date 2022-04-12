@@ -6,7 +6,7 @@ Based on the Novelty-Search algorithm found in here: https://github.com/PacktPub
 Author: Luis Andrés Eguiarte-Morett (Github: @leguiart)
 License: MIT.
 """
-from Evaluators.IEvaluator import IEvaluator
+from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 import numpy as np
 import copy
 
