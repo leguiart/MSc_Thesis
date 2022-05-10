@@ -1,7 +1,9 @@
+from asyncio import as_completed
 import operator
 import numpy as np
-from copy import deepcopy
 import math
+from copy import deepcopy
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 from evosoro.networks import Network
 from evosoro.tools.utils import sigmoid, xml_format, dominates
@@ -274,6 +276,7 @@ class Phenotype(object):
         """
         self.genotype = genotype
         self.genotype.express()
+        self.is_valid_cached = None
 
     def __deepcopy__(self, memo):
         """Override deepcopy to apply to class level attributes"""
@@ -291,13 +294,22 @@ class Phenotype(object):
         True if self is valid, False otherwise.
 
         """
+        if not self.is_valid_cached is None:
+            return self.is_valid_cached
+
         for network in self.genotype:
             for output_node_name in network.output_node_names:
                 if not network.direct_encoding and np.isnan(network.graph.nodes[output_node_name]["state"]).any():
+                    self.is_valid_cached = False
                     return False
                 elif network.direct_encoding and np.isnan(network.values).any():
+                    self.is_valid_cached = False
                     return False
+        self.is_valid_cached = True
         return True
+
+    def reset_is_valid(self):
+        self.is_valid_cached = None
 
 
 class SoftBot(object):
@@ -385,9 +397,11 @@ class Population(object):
         self.lineage_dict = {}
         self.max_id = 0
         self.non_dominated_size = 0
-
-        while len(self) < pop_size:
-            self.add_random_individual()
+        with ProcessPoolExecutor() as executor:
+            futures = {executor.submit(self._get_random_individual, i) for i in range(pop_size)}
+            for future in as_completed(futures):
+                self.append(future.result())
+        self.max_id = pop_size
 
     def __iter__(self):
         """Iterate over the individuals. Use the expression 'for n in population'."""
@@ -445,14 +459,17 @@ class Population(object):
         """
         return self.individuals.sort(reverse=reverse, key=operator.attrgetter(key))
 
+    def _get_random_individual(self, id) -> SoftBot:
+        ind = SoftBot(id, self.objective_dict, self.genotype, self.phenotype)
+        while not ind.phenotype.is_valid():
+            ind = SoftBot(id, self.objective_dict, self.genotype, self.phenotype)
+        return ind
+
+
     def add_random_individual(self):
-        valid = False
-        while not valid:
-            ind = SoftBot(self.max_id, self.objective_dict, self.genotype, self.phenotype)
-            if ind.phenotype.is_valid():
-                self.individuals.append(ind)
-                self.max_id += 1
-                valid = True
+        ind = self._get_random_individual(self.max_id)
+        self.individuals.append(ind)
+        self.max_id += 1
 
     def update_ages(self):
         """Increment the age of each individual."""

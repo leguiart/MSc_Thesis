@@ -36,7 +36,7 @@ class RankAndNoveltySurvival(Survival):
                 pop[i].set("rank", k)
                 pop[i].set("crowding", novelty_of_front[j])
 
-            # current front sorted by crowding distance if splitting
+            # current front sorted by novelty if splitting
             if len(survivors) + len(front) > n_survive:
                 I = randomized_argsort(novelty_of_front, order='descending', method='numpy')
                 I = I[:(n_survive - len(survivors))]
@@ -52,4 +52,4 @@ class RankAndNoveltySurvival(Survival):
 
 
 def get_unaligned_novelty(pop):
-    return np.array([x_i.X.unaligned_novelty_metric for x_i in pop])
+    return np.array([x_i.X.unaligned_novelty for x_i in pop])

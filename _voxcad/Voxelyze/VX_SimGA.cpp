@@ -32,6 +32,10 @@ void CVX_SimGA::SaveResultFile(std::string filename)
 
 void CVX_SimGA::WriteResultFile(CXML_Rip* pXML)
 {
+	Vec3D<> COMdisplacement = SS.CurCM-IniCM;
+	float COMtotalDisplacement2D = pow(pow(COMdisplacement.x,2)+pow(COMdisplacement.y,2),0.5);	
+	float COMdistX = COMdisplacement.x;
+	float COMdistY = COMdisplacement.y;
 
     double finalDist = pow(pow(SS.CurCM.x-IniCM.x,2)+pow(SS.CurCM.y-IniCM.y,2),0.5)/LocalVXC.GetLatticeDim();
 	double normFinalDist = finalDist; // includes frozen time
@@ -149,6 +153,10 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML)
 			pXML->Element("FinalDist", finalDist);
 			pXML->Element("finalDistX", finalDistX);
 			pXML->Element("finalDistY", finalDistY);
+
+			pXML->Element("absoluteDisplacement2D", COMtotalDisplacement2D);
+			pXML->Element("distX", COMdistX);
+			pXML->Element("distY", COMdistY);
 
 			pXML->Element("AnteriorDist", SS.CurAnteriorDist);
 			pXML->Element("PosteriorDist", SS.CurPosteriorDist);

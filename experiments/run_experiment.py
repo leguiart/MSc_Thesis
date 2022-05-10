@@ -33,12 +33,13 @@ import subprocess as sub
 import os
 import sys, getopt
 import uuid
+import random
 from functools import partial
-from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival
 from pymoo.core.population import Population
 
-from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
 from Constants import *
+from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import SoftbotMutation
@@ -46,13 +47,13 @@ from Analytics.Utils import readFromJson, save_json, writeToJson, countFileLines
 # sys.path.append(os.getcwd() + "/..")# Appending repo's root dir in the python path to enable subsequent imports
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
-from evosoro.softbot import Population as SoftbotPopulation, Genotype, Phenotype
-from evosoro_pymoo.Problems.SoftbotProblem import QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem
+from evosoro.softbot import Population as SoftbotPopulation
+from SoftbotProblemDefs import QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem
 from Genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
 from BodyBrainCommon import runBodyBrain
 
-sub.call("rm ./voxelyze", shell=True)
-sub.call("cp ../" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+#sub.call("rm voxelyze", shell=True)
+#sub.call("cp ../" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
 
 def main(argv):
@@ -121,6 +122,7 @@ def main(argv):
         run_dir = RUN_DIR_SO
         run_name = RUN_NAME_SO
         softbot_problem_cls = QualitySoftbotProblem
+        # survival_cls = RankAndCrowdingSurvival
     
     elif experiment == "QN-MOEA":
         seeds_json = SEEDS_JSON_QN
@@ -170,14 +172,13 @@ def main(argv):
         # Setting up the environment object
         env = Env(sticky_floor=0, time_between_traces=0)
 
+        #Setting up Softbot optimization problem
+        physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_dir, run_name + str(run + 1), objective_dict, MAX_EVAL_TIME, TIME_TO_TRY_AGAIN, SAVE_LINEAGES)
+        softbot_problem = softbot_problem_cls(physics_sim, pop_size)
 
         # Initializing a population of SoftBots
         my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
         Population.new("X", my_pop)
-
-        #Setting up Softbot optimization problem
-        physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_dir, run_name + str(run + 1), objective_dict, MAX_EVAL_TIME, TIME_TO_TRY_AGAIN, SAVE_LINEAGES)
-        softbot_problem = softbot_problem_cls(physics_sim)
 
         # Setting up optimization algorithm
         algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), mutation=SoftbotMutation(), crossover=DummySoftbotCrossover(), eliminate_duplicates=False)

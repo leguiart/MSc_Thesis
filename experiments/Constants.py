@@ -1,6 +1,3 @@
-import numpy as np
-import subprocess as sub
-import random
 
 VOXELYZE_VERSION = '_voxcad'
 
@@ -9,10 +6,10 @@ VOXELYZE_VERSION = '_voxcad'
 NUM_RANDOM_INDS = 1  # Number of random individuals to insert each generation
 MAX_GENS = 1000  # Number of generations
 POPSIZE = 15  # Population size (number of individuals in the population)
-IND_SIZE = (6, 6, 6)  # Bounding box dimensions (x,y,z). e.g. IND_SIZE = (6, 6, 6) -> workspace is a cube of 6x6x6 voxels
+IND_SIZE = (7, 7, 7)  # Bounding box dimensions (x,y,z). e.g. IND_SIZE = (6, 6, 6) -> workspace is a cube of 6x6x6 voxels
 SIM_TIME = 5  # (seconds), including INIT_TIME!
-INIT_TIME = 0.5
-DT_FRAC = 0.9  # Fraction of the optimal integration step. The lower, the more stable (and slower) the simulation.
+INIT_TIME = 1
+DT_FRAC = 1.  # Fraction of the optimal integration step. The lower, the more stable (and slower) the simulation.
 
 TIME_TO_TRY_AGAIN = 30  # (seconds) wait this long before assuming simulation crashed and resending
 MAX_EVAL_TIME = 60  # (seconds) wait this long before giving up on evaluating this individual

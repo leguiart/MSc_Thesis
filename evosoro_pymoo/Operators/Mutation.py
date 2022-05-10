@@ -17,10 +17,10 @@ class SoftbotMutation(Mutation):
 
     def _do(self, problem, X, **kwargs):
         self.max_id = len(X) if self.max_id == 0 else self.max_id
-        return create_new_children_through_mutation(X, self, print_log = problem.print_log)
+        return create_new_children_through_mutation(X, self)
 
 
-def create_new_children_through_mutation(pop, mut, print_log, new_children=None, mutate_network_probs=None,
+def create_new_children_through_mutation(pop, mut, print_log = None, new_children=None, mutate_network_probs=None,
                                          max_mutation_attempts=1500):
     """Create copies, with modification, of existing individuals in the population.
 
@@ -55,7 +55,7 @@ def create_new_children_through_mutation(pop, mut, print_log, new_children=None,
     while len(new_children) < len(pop):
         for ind in pop:
             clone = copy.deepcopy(ind)
-
+            
             if mutate_network_probs is None:
                 required = 0
             else:
@@ -91,10 +91,11 @@ def create_new_children_through_mutation(pop, mut, print_log, new_children=None,
             for selected_net_idx in selected_networks:
                 mutation_counter = 0
                 done = False
+                clone.phenotype.is_valid_cached = None
                 while not done:
                     mutation_counter += 1
                     candidate = copy.deepcopy(clone)
-
+                    candidate.phenotype.reset_is_valid()
                     # perform mutation(s)
                     for _ in range(candidate.genotype[selected_net_idx].num_consecutive_mutations):
                         if not clone.genotype[selected_net_idx].direct_encoding:
@@ -143,11 +144,13 @@ def create_new_children_through_mutation(pop, mut, print_log, new_children=None,
                         #         break
 
                     if mutation_counter > max_mutation_attempts:
-                        print_log.message("Couldn't find a successful mutation in {} attempts! "
-                                          "Skipping this network.".format(max_mutation_attempts))
+                        if print_log:
+                            print_log.message("Couldn't find a successful mutation in {} attempts! "
+                                            "Skipping this network.".format(max_mutation_attempts))
                         num_edges = len(clone.genotype[selected_net_idx].graph.edges())
                         num_nodes = len(clone.genotype[selected_net_idx].graph.nodes())
-                        print_log.message("num edges: {0}; num nodes {1}".format(num_edges, num_nodes))
+                        if print_log:
+                            print_log.message("num edges: {0}; num nodes {1}".format(num_edges, num_nodes))
                         break
 
                 # end while

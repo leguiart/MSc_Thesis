@@ -7,7 +7,7 @@ import subprocess as sub
 #sys.path.append(os.getcwd() + "/../..")
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file
 from evosoro.tools.logging import PrintLog
-from Evaluators.IEvaluator import IEvaluator
+from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 
 class BasePhysicsEvaluator(IEvaluator):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
@@ -80,16 +80,20 @@ class BasePhysicsEvaluator(IEvaluator):
 
 
 class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
+
+    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time=60, time_to_try_again=10, save_lineages=True, voxelyze_version = '_voxcad'):
+        super().__init__(sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time, time_to_try_again, save_lineages)
+        sub.call("cp " + voxelyze_version + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+
     def evaluate(self, pop):
         start_time = time.time()
         num_evaluated_this_gen = 0
         # ids_to_analyze = []
         ids_softbot_map = {}
 
-        for pymoo_ind in pop:
-            ind = pymoo_ind[0].X
+        for ind in pop:
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
-            ind.md5 = write_voxelyze_file(self.sim, self.env, ind, self.run_directory, self.run_name)
+            ind.md5 = write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
 
             # don't evaluate if invalid
             if not ind.phenotype.is_valid():
@@ -99,7 +103,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                 self.print_log.message("Skipping invalid individual")
 
             # don't evaluate if identical phenotype has already been evaluated
-            elif self.env.actuation_variance == 0 and ind.md5 in self.already_evaluated:
+            elif self.env[self.curr_env_idx].actuation_variance == 0 and ind.md5 in self.already_evaluated:
                 for rank, goal in self.objective_dict.items():
                     if goal["tag"] is not None:
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
@@ -108,7 +112,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                 if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id +
                             " " + self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name +
-                            "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.problem.n_gen, ind.fitness, ind.id), shell=True)
+                            "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_gen, ind.fitness, ind.id), shell=True)
 
             # otherwise evaluate with voxelyze
             else:
@@ -124,7 +128,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
 
         num_evals_finished = 0
         all_done = False
-        already_analyzed_ids = {}
+        already_analyzed_ids = set()
         redo_attempts = 1
 
         fitness_eval_start_time = time.time()
@@ -168,7 +172,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                 time.sleep(0.5)
                 continue
 
-            evaluated_ids = {}
+            evaluated_ids = set()
             for f in f_files:
                 if "softbotsOutput--id_" in f:
                     evaluated_ids.add((int(f.split("_")[1].split(".")[0]), f))
@@ -202,8 +206,8 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                     sub.call("rm " + ind_filename, shell=True)
 
                     # assign the values to the corresponding individual
-                    pymoo_ind = ids_softbot_map[this_id]
-                    ind = pymoo_ind[0].X
+                    ind = ids_softbot_map[this_id]
+                    #ind = pymoo_ind[0].X
                     for rank, details in self.objective_dict.items():
                         if objective_values_dict[rank] is not None:
                             setattr(ind, details["name"], objective_values_dict[rank])
@@ -219,12 +223,12 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                     self.all_evaluated_individuals_ids += [this_id]
 
                     # update the run statistics and file management
-                    if ind.fitness > self.problem.best_fit_so_far:
-                        self.problem.best_fit_so_far = ind.fitness
+                    if ind.fitness > self.best_fit_so_far:
+                        self.best_fit_so_far = ind.fitness
                         sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
                                 ind.id + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
                                 "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
-                                (self.problem.n_gen, ind.fitness, ind.id), shell=True)
+                                (self.n_gen, ind.fitness, ind.id), shell=True)
 
                     # if save_lineages:
                     #     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
@@ -232,7 +236,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
 
                     if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                         file_source = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id
-                        file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.problem.n_gen, ind.fitness, ind.id)
+                        file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_gen, ind.fitness, ind.id)
                         sub.call("mv " + file_source + " " + file_destination, shell=True)
                     else:
                         sub.call("rm " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %

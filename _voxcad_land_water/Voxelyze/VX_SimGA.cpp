@@ -42,10 +42,13 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML)
 // 		if (it->second < 0 ) {badSteps++;}
 // 	}
 // 	// std::cout << "totalPoints: " << totalPoints << std::endl;
-	//float dist = pow(pow(SS.CurCM.x-IniCM.x,2)+pow(SS.CurCM.y-IniCM.y,2),0.5);	
 
-	Vec3D<> normCOMdisplacement = (SS.CurCM-IniCM)/LocalVXC.GetLatticeDim();
+	Vec3D<> COMdisplacement = SS.CurCM-IniCM;
+	float COMtotalDisplacement2D = pow(pow(COMdisplacement.x,2)+pow(COMdisplacement.y,2),0.5);	
+	float COMdistX = COMdisplacement.x;
+	float COMdistY = COMdisplacement.y;
 
+	Vec3D<> normCOMdisplacement = COMdisplacement/LocalVXC.GetLatticeDim();
 	float normTotalDisplacement = normCOMdisplacement.Length();
 	float normDistX = normCOMdisplacement.x;
 	float normDistY = normCOMdisplacement.y;
@@ -60,6 +63,9 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML)
 	pXML->Element("normDistX", normDistX);
 	pXML->Element("normDistY", normDistY);
 	pXML->Element("normDistZ", normDistZ);
+	pXML->Element("absoluteDisplacement2D", COMtotalDisplacement2D);
+	pXML->Element("distX", COMdistX);
+	pXML->Element("distY", COMdistY);
 	pXML->Element("RobotVolumeStart", internalMesh->getRobotVolumeStart());
 	pXML->Element("ConvexHullVolumeStart", internalMesh->getRobotQhullVolumeStart());
 	pXML->Element("RobotVolumeEnd", internalMesh->getRobotVolumeEnd());
