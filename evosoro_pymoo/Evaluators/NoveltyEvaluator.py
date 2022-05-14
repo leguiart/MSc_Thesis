@@ -78,25 +78,51 @@ class NoveltyEvaluator(IEvaluator):
         X : list
             List of objects which contain a fitness metric definition
         """
+        preliminary_archive = []
         X_copy = X.copy()
         for i in range(len(X)):
             if self.is_valid_func(X[i]):
                 if not X[i].md5 in self.already_evaluated:
-                    novelty, kn_neighbors = self._average_knn_distance(X[i], X_copy)
+                    novelty, kn_neighborsf = self._average_knn_distance(X[i], X_copy)
+                    # Set novelty and in case it is needed (NSLC), the fitness of the kn neighbors
                     setattr(X[i], self.novelty_name, novelty)
                     if self.nslc_neighbors_name is not None:
-                        setattr(X[i], self.nslc_neighbors_name, kn_neighbors)
-                    if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
+                        setattr(X[i], self.nslc_neighbors_name, kn_neighborsf)
+                    if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(preliminary_archive) + len(self.novelty_archive) < self.min_novelty_archive_size):
                         self.items_added_in_generation+=1
+                        # Watch out! you shouldn't add individuals to the archive just yet, if you do so, you could end up counting twice the same individual
+                        # self.novelty_archive += [copy.deepcopy(X[i])]
+                        # Instead add to a preliminary archive for the current population
+                        preliminary_archive += [copy.deepcopy(X[i])]
                         self.already_evaluated.add(X[i].md5)
-                        self.novelty_archive += [copy.deepcopy(X[i])]
-                        if not self.max_novelty_archive_size is None and len(self.novelty_archive) > self.max_novelty_archive_size:
-                            self.novelty_archive.sort(key = lambda x : getattr(x, self.novelty_name))
-                            self.novelty_archive.pop(0)
+
+        # Now we can actually add the individuals to the archive
+        self.novelty_archive += preliminary_archive
+
+
         self._adjust_archive_settings()
         return X
     
     def _adjust_archive_settings(self):
+        # If we've exceeded the maximum size of the novelty archive
+        if not self.max_novelty_archive_size is None and len(self.novelty_archive) > self.max_novelty_archive_size:
+            # We have to recompute the novelty of all the individuals that were previously on the archive,
+            # otherwise we could end up evicting the wrong individuals
+            for i in range(len(self.novelty_archive)):
+                current_ind = self.novelty_archive[i]
+                novelty, kn_neighborsf = self._average_knn_distance(current_ind, self.novelty_archive)
+                # Set novelty, and in case it is needed (NSLC), the fitness of the kn neighbors
+                setattr(current_ind, self.novelty_name, novelty)
+                if self.nslc_neighbors_name is not None:
+                    setattr(current_ind, self.nslc_neighbors_name, kn_neighborsf)
+                self.novelty_archive[i] = current_ind
+                
+            self.novelty_archive.sort(key = lambda x : getattr(x, self.novelty_name))
+
+            for _ in range(len(self.novelty_archive) - self.max_novelty_archive_size):
+                self.novelty_archive.pop(0)
+
+
         if self.items_added_in_generation == 0:
             self.time_out+=1
         else:
@@ -117,20 +143,21 @@ class NoveltyEvaluator(IEvaluator):
             distances += [(novel.fitness, self.distance_metric(artifact,novel))]
         distances.sort(key = lambda x : x[1])
         if len(distances) < self.k_neighbors:
-            individuals = list(map(lambda x : x[0], distances))
+            kn_neighborsf = list(map(lambda x : x[0], distances))
             dists = list(map(lambda x : x[1], distances))
             average_knn_dist = np.average(dists)
         else:
-            individuals = list(map(lambda x : x[0], distances[0: self.k_neighbors]))
+            kn_neighborsf = list(map(lambda x : x[0], distances[0: self.k_neighbors]))
             dists = list(map(lambda x : x[1], distances[0: self.k_neighbors]))
             average_knn_dist = np.average(dists)
-        return average_knn_dist, individuals
+        return average_knn_dist, kn_neighborsf
 
 
 class NSLCQuality(IEvaluator):
     def evaluate(self, X: list, *args, **kwargs) -> list:
         for x in X:
             if x.phenotype.is_valid():
-                x.nslc_quality = sum([1 if x.fitness > n else 0 for n in x.unaligned_neighbors])/len(x.unaligned_neighbors)
+                k = len(x.unaligned_neighbors) 
+                x.nslc_quality = k - sum([1 if x.fitness < n else 0 for n in x.unaligned_neighbors])
             
         return X

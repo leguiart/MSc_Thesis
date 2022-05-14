@@ -51,6 +51,7 @@ class CPPN(Network):
         Network.__init__(self, output_node_names)
         self.set_minimal_graph()
         self.mutate()
+        self.euclidean_dist_cache = np.nan
 
     def set_minimal_graph(self):
         """Create a simple graph with each input attached to each output"""

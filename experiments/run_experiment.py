@@ -37,14 +37,18 @@ import random
 from functools import partial
 from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival
 from pymoo.core.population import Population
+from dotenv import load_dotenv
+load_dotenv()
+sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
 
 from Constants import *
 from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
+from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAndVectorFieldDiversitySurvival
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import SoftbotMutation
 from Analytics.Utils import readFromJson, save_json, writeToJson, countFileLines, readFirstJson, QD_Analytics
-# sys.path.append(os.getcwd() + "/..")# Appending repo's root dir in the python path to enable subsequent imports
+
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
 from evosoro.softbot import Population as SoftbotPopulation
@@ -82,6 +86,7 @@ def main(argv):
     
     genotype_cls = BodyBrainGenotypeIndirect
     phenotype_cls = SimplePhenotypeIndirect
+    nsga2_survival = RankAndCrowdingSurvival()
     softbot_problem_cls = None
     physics_sim_cls = None
     # Creating an objectives dictionary
@@ -122,7 +127,6 @@ def main(argv):
         run_dir = RUN_DIR_SO
         run_name = RUN_NAME_SO
         softbot_problem_cls = QualitySoftbotProblem
-        # survival_cls = RankAndCrowdingSurvival
     
     elif experiment == "QN-MOEA":
         seeds_json = SEEDS_JSON_QN
@@ -139,6 +143,7 @@ def main(argv):
         run_dir = RUN_DIR_MNSLC
         run_name = RUN_NAME_MNSLC
         softbot_problem_cls = MNSLCSoftbotProblem
+        nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
         objective_dict.add_objective(name="fitnessX", maximize=True, tag="<finalDistX>")
         objective_dict.add_objective(name="fitnessY", maximize=True, tag="<finalDistY>")
         objective_dict.add_objective(name="aligned_novelty", maximize=True, tag=None)
@@ -181,7 +186,7 @@ def main(argv):
         Population.new("X", my_pop)
 
         # Setting up optimization algorithm
-        algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), mutation=SoftbotMutation(), crossover=DummySoftbotCrossover(), eliminate_duplicates=False)
+        algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), mutation=SoftbotMutation(), crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
         algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
         analytics = QD_Analytics(run + 1, experiment)
         my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics)

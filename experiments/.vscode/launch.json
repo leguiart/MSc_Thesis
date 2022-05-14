@@ -13,7 +13,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["--experiment","QN-MOEA","--starting_run","1","--runs", "10", "--population_size", "15", "--generations", "5"]
+            "args": ["--experiment","QN-MOEA","--starting_run","1","--runs", "10", "--population_size", "15", "--generations", "5"],
+            "envFile": "../.env"
         }
     ]
 }
