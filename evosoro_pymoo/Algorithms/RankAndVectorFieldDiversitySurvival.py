@@ -1,10 +1,9 @@
 
-from socket import timeout
-from matplotlib.pyplot import axis
 import numpy as np
 import math
 import networkx as nx
 import itertools
+import concurrent.futures
 from pymoo.core.survival import Survival
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 from pymoo.util.randomized_argsort import randomized_argsort
@@ -45,9 +44,30 @@ class RankAndVectorFieldDiversitySurvival(Survival):
 
         # do the non-dominated sorting until splitting front
         fronts = self.nds.do(F, n_stop_if_ranked=n_survive)
-        fronts_idxs = list(range(len(fronts)))
-        len_fronts = sum([len(front) for front in fronts])
-        cached_distances = {}
+
+        # Calculate average vector field distance between each individual
+        fronts_indxs = []
+        max = -math.inf
+        for front in fronts:
+            for indx in front:
+                if indx > max:
+                    max = indx
+                fronts_indxs += [indx]
+
+        
+        dist_dict = {}
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            future_to_indexes = {}
+            for i in range(len(fronts_indxs)):              
+                for j in range(i + 1, len(fronts_indxs)):
+                    row_indx, col_indx = fronts_indxs[i], fronts_indxs[j]
+                    future_to_indexes[executor.submit(vector_field_distance, pop[row_indx].X, pop[col_indx].X, self.indexes, self.output_tags)] = (row_indx,col_indx)
+
+            for future in concurrent.futures.as_completed(future_to_indexes):
+                row_indx, col_indx = future_to_indexes[future]
+                dist_dict[(row_indx, col_indx)] = future.result()
+
+
 
         for k, front in enumerate(fronts):
             
@@ -57,7 +77,7 @@ class RankAndVectorFieldDiversitySurvival(Survival):
                     idxs += list(f)
             
             # calculate the divesity of the front
-            diversity_of_front = vector_field_diversity(pop, front, np.array(idxs), len_fronts, self.indexes, self.input_tags, self.output_tags, cached_distances)
+            diversity_of_front = vector_field_diversity(front, np.array(idxs), len(fronts_indxs), dist_dict)
             # save rank in the individual class
             for j, i in enumerate(front):
                 pop[i].set("rank", k)
@@ -65,7 +85,6 @@ class RankAndVectorFieldDiversitySurvival(Survival):
 
             # current front sorted by diversity if splitting
             if len(survivors) + len(front) > n_survive:
-
 
                 I = randomized_argsort(diversity_of_front, order='descending', method='numpy')
                 I = I[:(n_survive - len(survivors))]
@@ -80,88 +99,62 @@ class RankAndVectorFieldDiversitySurvival(Survival):
         return pop[survivors]
 
 
-def vector_field_diversity(pop, current_front, other_fronts, n, indexes, input_tags, output_tags, cached_distances):
+def vector_field_diversity(current_front, other_fronts, len_fronts, dist_dict):
 
-    genotype_len = len(pop[0].X.genotype)
     pop_diversity = []
 
     for i in current_front:
-        ind1 = pop[i].X
         distance_sum = 0
         
         for j in current_front:
-            ind2 = pop[j].X
-            d = 0
             if i != j:
-                if (i, j) not in cached_distances and (j, i) not in cached_distances:
-                    for graph_idx in range(genotype_len):
-                        d += vector_field_distance(ind1.genotype[graph_idx].graph, ind2.genotype[graph_idx].graph, indexes, input_tags[graph_idx], output_tags[graph_idx])
-                    d /= genotype_len
-                    cached_distances[(i, j)] = d
-                    distance_sum += d
-                    
-                elif (i, j) in cached_distances:
-                    distance_sum += cached_distances[(i, j)]
-                elif (j, i) in cached_distances:
-                    distance_sum += cached_distances[(j, i)]
+                distance_sum += dist_dict[(i,j)] if (i, j) in dist_dict else dist_dict[(j, i)] 
 
 
 
         for k in other_fronts:
-            ind2 = pop[k].X
-            d = 0
-            if (i, k) not in cached_distances and (k, i) not in cached_distances:
-                for graph_idx in range(genotype_len):
-                    d += vector_field_distance(ind1.genotype[graph_idx].graph, ind2.genotype[graph_idx].graph, indexes, input_tags[graph_idx], output_tags[graph_idx])
-                d /= genotype_len
-                cached_distances[(i, k)] = d
-                distance_sum += d
+            distance_sum += dist_dict[(i, k)] if (i, k) in dist_dict else dist_dict[(k, i)] 
                 
-            elif (i, k) in cached_distances:
-                distance_sum += cached_distances[(i, k)]
-            elif (k, i) in cached_distances:
-                distance_sum += cached_distances[(k, i)]
-        
-        distance_sum /= n
+        distance_sum /= len_fronts
         pop_diversity += [distance_sum]
     
     return np.array(pop_diversity)
 
 
-def vector_field_distance(g1, g2, indexes, input_tags, output_tags):
-    vector_distances = []
+def vector_field_distance(ind1, ind2, indexes, output_tags):
+    gene_length = len(ind1.genotype)
+    avg_dist = 0
     for i,j,k in indexes:
-        # for i2,j2,k2 in indexes:
-        #     if i1 != i2 or j1 != j2 or k1 != k2:
-        # Form input points
-        # p1 = []
-        # p2 = []
-        # for input_name in input_tags:
-        #     p1 += [g1.nodes[input_name]["state"][i1, j1, k1]]
-        #     p2 += [g2.nodes[input_name]["state"][i2, j2, k2]]
-        v1 = []
-        v2 = []
-        # Form output vectors
-        for output_name in output_tags:
-            v1 += [g1.nodes[output_name]["state"][i, j, k]]
-            v2 += [g2.nodes[output_name]["state"][i, j, k]]
-        # p1 = np.array(p1)
-        # p2 = np.array(p2)
-        v1 = np.array(v1)
-        v2 = np.array(v2)
+        dist = 0
+        for gene_index in range(gene_length):
+            g1 = ind1.genotype[gene_index].graph
+            g2 = ind2.genotype[gene_index].graph
+            v1 = []
+            v2 = []
+            # Form output vectors
+            for output_name in output_tags[gene_index]:
+                v1 += [g1.nodes[output_name]["state"][i, j, k]]
+                v2 += [g2.nodes[output_name]["state"][i, j, k]]
 
-        v1_norm = np.sqrt(np.sum(v1**2))
-        v2_norm = np.sqrt(np.sum(v2**2))
+            v1 = np.array(v1)
+            v2 = np.array(v2)
 
-        # euclidean_dist = np.exp(-np.sqrt(np.sum((p1 - p2)**2)))
-        angle_dist = np.exp(1.-max(-1.0, min(np.dot(v1, v2)/(v1_norm*v2_norm), 1.0)))
-        magn_diff = np.exp(-abs(v1_norm - v2_norm))
+            v1_norm = np.sqrt(np.sum(v1**2))
+            v2_norm = np.sqrt(np.sum(v2**2))
 
-        d = 1/3*(1 + angle_dist + magn_diff)
+            cos_sim = np.dot(v1, v2)/(v1_norm*v2_norm)
 
-        vector_distances += [1 - d]
+            # euclidean_dist = np.exp(-np.sqrt(np.sum((p1 - p2)**2)))
+            angle_sim = np.arccos(max(-1., min(1., cos_sim)))/np.pi
+            magn_sim = abs(v1_norm - v2_norm)
 
-    return abs(np.mean(vector_distances))
+            dist += 1/3*(angle_sim + magn_sim)
+
+        avg_dist += dist/gene_length
+
+    avg_dist /= len(indexes)
+
+    return avg_dist
 
 
                 
