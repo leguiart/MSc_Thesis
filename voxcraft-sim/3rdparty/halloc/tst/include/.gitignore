@@ -1,0 +1,6 @@
+*~
+\#*
+._*
+*.o
+libscatteralloc.a
+scatter-alloc.h
