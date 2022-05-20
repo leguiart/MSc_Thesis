@@ -2,6 +2,10 @@ import hashlib
 import os
 import time
 import random
+from lxml import etree
+
+from evosoro.base import Env, Sim
+
 
 
 def read_voxlyze_results(objective_dict, print_log, filename="softbotsOutput.xml"):
@@ -35,6 +39,107 @@ def read_voxlyze_results(objective_dict, print_log, filename="softbotsOutput.xml
         this_file.close()
 
     return results
+
+def get_vxd(sim : Sim, env : Env, individual):
+    # update any env variables based on outputs instead of writing outputs in
+    for name, details in individual.genotype.to_phenotype_mapping.items():
+        if details["env_kws"] is not None:
+            for env_key, env_func in details["env_kws"].items():
+                setattr(env, env_key, env_func(details["state"]))  # currently only used when evolving frequency 
+    
+    root = etree.Element("VXD")  # new vxd root
+
+    vxd_dt_frac = etree.SubElement(root, "DtFrac")
+    vxd_dt_frac.set('replace', "VXA.Simulator.Integration.DtFrac")
+    vxd_dt_frac.text = str(sim.dt_frac)
+
+    vxd_stop_condition = etree.SubElement(root, "StopCondition")
+    vxd_stop_condition.set('replace', "VXA.Simulator.StopCondition.mtSUB.mtCONST")
+    vxd_stop_condition.text = str(sim.stop_condition)
+
+    vxd_enable_collision = etree.SubElement(root, "EnableCollision")
+    vxd_enable_collision.set('replace', "VXA.Simulator.AttachDetach.EnableCollision")
+    vxd_enable_collision.text = str(int(sim.self_collisions_enabled))
+
+    vxd_grav_enabled = etree.SubElement(root, "GravEnabled")
+    vxd_grav_enabled.set('replace', "VXA.Environment.Gravity.GravEnabled")
+    vxd_grav_enabled.text = str(env.gravity_enabled)
+
+    vxd_floor_enabled = etree.SubElement(root, "FloorEnabled")
+    vxd_floor_enabled.set('replace', "VXA.Environment.Gravity.FloorEnabled")
+    vxd_floor_enabled.text = str(env.floor_enabled)
+
+    vxd_temp_amplitude = etree.SubElement(root, "TempAmplitude")
+    vxd_temp_amplitude.set('replace', "VXA.Environment.Thermal.TempAmplitude")
+    vxd_temp_amplitude.text = str(env.temp_amp)
+
+    vxd_temp_period = etree.SubElement(root, "TempPeriod")
+    vxd_temp_period.set('replace', "VXA.Environment.Thermal.TempPeriod")
+    vxd_temp_period.text = str(1./env.frequency)
+
+    vxd_lattice_dim = etree.SubElement(root, "Lattice_Dim")
+    vxd_lattice_dim.set('replace', "VXA.VXC.Lattice.Lattice_Dim")
+    vxd_lattice_dim.text = str(int(sim.self_collisions_enabled))
+
+    # vxd_fat_stiffness = etree.SubElement(root, "EnableCollision")
+    # vxd_fat_stiffness.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
+    # vxd_fat_stiffness.text = str(int(sim.self_collisions_enabled))
+
+    # vxd_bone_stiffness = etree.SubElement(root, "EnableCollision")
+    # vxd_bone_stiffness.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
+    # vxd_bone_stiffness.text = str(int(sim.self_collisions_enabled))
+
+    # vxd_muscle_stiffness = etree.SubElement(root, "EnableCollision")
+    # vxd_muscle_stiffness.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
+    # vxd_muscle_stiffness.text = str(int(sim.self_collisions_enabled))
+
+    # vxd_actuation_variance = etree.SubElement(root, "EnableCollision")
+    # vxd_actuation_variance.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
+    # vxd_actuation_variance.text = str(int(sim.self_collisions_enabled))
+
+    # vxd_fat_stiffness2 = etree.SubElement(root, "EnableCollision")
+    # vxd_fat_stiffness2.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
+    # vxd_fat_stiffness2.text = str(int(sim.self_collisions_enabled))
+
+    # vxd_actuation_variance2 = etree.SubElement(root, "EnableCollision")
+    # vxd_actuation_variance2.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
+    # vxd_actuation_variance2.text = str(int(sim.self_collisions_enabled))
+
+    # vxd_muscle_stiffness2 = etree.SubElement(root, "EnableCollision")
+    # vxd_muscle_stiffness2.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
+    # vxd_muscle_stiffness2.text = str(int(sim.self_collisions_enabled))
+
+
+    structure = etree.SubElement(root, "Structure")
+    structure.set('replace', 'VXA.VXC.Structure')
+    structure.set('Compression', 'ASCII_READABLE')
+    x = individual.genotype.orig_size_xyz[0]
+    y = individual.genotype.orig_size_xyz[1]
+    z = individual.genotype.orig_size_xyz[2]
+
+    etree.SubElement(structure, "X_Voxels").text = x
+    etree.SubElement(structure, "Y_Voxels").text = y
+    etree.SubElement(structure, "Z_Voxels").text = z
+
+    str_md5 = ""
+    if "Data" in individual.genotype.to_phenotype_mapping:
+        for name, details in individual.genotype.to_phenotype_mapping.items():
+            state = details["state"]
+            flattened_state = state.reshape(z, x*y)
+
+            data = etree.SubElement(structure, name)
+            for i in range(flattened_state.shape[0]):
+                if name == "Data":
+                    layer = etree.SubElement(data, "Layer")
+                    str_layer = "".join([str(c) for c in flattened_state[i]])
+                    str_md5 += str_layer
+                    layer.text = etree.CDATA(str_layer)
+
+    m = hashlib.md5()
+    m.update(str_md5.encode('utf-8'))
+
+    return m.hexdigest(), root
+
 
 
 def write_voxelyze_file(sim, env, individual, run_directory, run_name):
