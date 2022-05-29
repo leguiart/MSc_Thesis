@@ -1,25 +1,7 @@
-#!/usr/bin/python
+
 """
 
-In this example we evolve running soft robots in a terrestrial environment using a standard version of the physics
-engine (_voxcad). After running this program for some time, you can start having a look at some of the evolved
-morphologies and behaviors by opening up some of the generated .vxa (e.g. those in
-evosoro/evosoro/basic_data/bestSoFar/fitOnly) with ./evosoro/evosoro/_voxcad/release/VoxCad
-(then selecting the desired .vxa file from "File -> Import -> Simulation")
-
-The phenotype is here based on a discrete, predefined palette of materials, which are visualized with different colors
-when robots are simulated in the GUI.
-
-Materials are identified through a material ID:
-0: empty voxel, 1: passiveSoft (light blue), 2: passiveHard (blue), 3: active+ (red), 4:active- (green)
-
-Active+ and Active- voxels are in counter-phase.
-
-
-Additional References
----------------------
-
-This setup is similar to the one described in:
+    Based on the setup and code originally by:
 
     Cheney, N., MacCurdy, R., Clune, J., & Lipson, H. (2013).
     Unshackling evolution: evolving soft robots with multiple materials and a powerful generative encoding.
@@ -28,12 +10,14 @@ This setup is similar to the one described in:
     Related video: https://youtu.be/EXuR_soDnFo
 
 """
+from tracemalloc import start
 import numpy as np
 import subprocess as sub
 import os
 import sys, getopt
 import uuid
 import random
+import argparse
 from functools import partial
 from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival
 from pymoo.core.population import Population
@@ -60,54 +44,40 @@ from BodyBrainCommon import runBodyBrain
 #sub.call("cp ../" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
 
-def main(argv):
-    try:
-        opts, args = getopt.getopt(argv,"he:sr:r:p:g",["experiment=","starting_run=", "runs=","population_size=","generations="])
-    except getopt.GetoptError:
-        print("run_experiment.py --experiment=<experiment name>(one of: SO, QN-MOEA, MNSLC) --starting_run=<starting_run> --runs=<runs> --population_size=<population size> --generations=<generations>")
-        sys.exit()
-    for opt, arg in opts:
-        if opt == "-h":
-            print("run_experiment.py --experiment=<experiment name>(one of: SO, QN-MOEA, MNSLC) --starting_run=<starting_run> --runs=<runs> --population_size=<population size> --generations=<generations>")
-            sys.exit()
-        if opt in ["-e", "--experiment"]:
-            experiment = arg
-            if experiment not in ["SO", "QN-MOEA", "MNSLC"]:
-                print("run_experiment.py --experiment=<experiment name>(one of: SO, QN-MOEA, MNSLC) --starting_run=<starting_run> --runs=<runs> --population_size=<population size> --generations=<generations>")
-                sys.exit()
-        elif opt in ["-sr", "--starting_run"]:
-            starting_run = int(arg)
-        elif opt in ["-r", "--runs"]:
-            runs = int(arg)
-        elif opt in ["-p", "--population_size"]:
-            pop_size = int(arg)
-        elif opt in ["-g", "--generations"]:
-            max_gens = int(arg)
+def main(parser : argparse.ArgumentParser):
+    argv = parser.parse_args()
+    experiment = argv.experiment
+    starting_run = argv.starting_run
+    runs = argv.runs
+    pop_size = argv.population_size
+    max_gens = argv.generations
+
+
+    if experiment not in EXPERIMENT_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
+        parser.print_help()
+        sys.exit(2)
+    
     
     genotype_cls = BodyBrainGenotypeIndirect
     phenotype_cls = SimplePhenotypeIndirect
     nsga2_survival = RankAndCrowdingSurvival()
     softbot_problem_cls = None
     physics_sim_cls = None
+
     # Creating an objectives dictionary
     objective_dict = ObjectiveDict()
 
     # Now specifying the objectives for the optimization.
-    # Adding an objective named "fitness", which we want to maximize. This information is returned by Voxelyze
+    # Adding an objective named "fitness". This information is returned by Voxelyze
     # in a fitness .xml file, with a tag named "NormFinalDist"
     objective_dict.add_objective(name="fitness", maximize=True, tag="<FinalDist>")
 
-    # Adding another objective called "num_voxels", which we want to minimize in order to minimize
-    # the amount of material employed to build the robot, promoting at the same time non-trivial
-    # morphologies.
-    # This information can be computed in Python (it's not returned by Voxelyze, thus tag=None),
-    # which is done by counting the non empty voxels (material != 0) composing the robot.
+    # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
+    # Adding another objective called "num_voxels" for constraint reasons
     objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
                                     node_func=np.count_nonzero, output_node_name="material")
 
-    # This information is not returned by Voxelyze (tag=None): it is instead computed in Python.
-    # We also specify how energy should be computed, which is done by counting the occurrences of
-    # active materials (materials number 3 and 4)
+    
     objective_dict.add_objective(name="active", maximize=True, tag=None,
                                     node_func=partial(count_occurrences, keys=[3, 4]),
                                     output_node_name="material")
@@ -152,6 +122,7 @@ def main(argv):
     
     runToSeedMapping = readFromJson(seeds_json)
     runsSoFar = countFileLines(analytics_json)
+
     if runsSoFar > 0:
         runToAnalyticsMapping = readFirstJson(analytics_json)
         firstRun = list(runToAnalyticsMapping.keys())
@@ -168,7 +139,9 @@ def main(argv):
         if not str(run + 1) in runToSeedMapping.keys():
             runToSeedMapping[str(run + 1)] = uuid.uuid4().int & (1<<32)-1
             writeToJson(seeds_json, runToSeedMapping)
-        random.seed(runToSeedMapping[str(run + 1)])  # Initializing the random number generator for reproducibility
+        
+        # Initializing the random number generator for reproducibility
+        random.seed(runToSeedMapping[str(run + 1)])  
         np.random.seed(runToSeedMapping[str(run + 1)])
         
         # Setting up the simulation object
@@ -177,8 +150,10 @@ def main(argv):
         # Setting up the environment object
         env = Env(sticky_floor=0, time_between_traces=0)
 
-        #Setting up Softbot optimization problem
+        # Setting up physics simulation
         physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_dir, run_name + str(run + 1), objective_dict, MAX_EVAL_TIME, TIME_TO_TRY_AGAIN, SAVE_LINEAGES)
+        
+        # Setting up Softbot optimization problem
         softbot_problem = softbot_problem_cls(physics_sim, pop_size)
 
         # Initializing a population of SoftBots
@@ -191,7 +166,7 @@ def main(argv):
         analytics = QD_Analytics(run + 1, experiment)
         my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics)
 
-        # start optimization
+        # Start optimization
         my_optimization.run(my_pop, max_hours_runtime=MAX_TIME, max_gens=max_gens, num_random_individuals=NUM_RANDOM_INDS, checkpoint_every=CHECKPOINT_EVERY, new_run = new_experiment)
         save_json(analytics_json, analytics.qd_history)
         df = analytics.to_dataframe()
@@ -201,6 +176,20 @@ def main(argv):
        
 
 
-
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    class CustomParser(argparse.ArgumentParser):
+        def error(self, message):
+            sys.stderr.write('error: %s\n' % message)
+            self.print_help()
+            sys.exit(2)
+    parser = CustomParser()
+    parser.add_argument('-e', '--experiment', type=str, default='SO', help="Experiment to run: SO(default), QN-MOEA, MNSLC")
+    parser.add_argument('--starting_run', type=int, default=1, help="Run number to start from (use if existing data for experiment)")
+    parser.add_argument('-r', '--runs', type=int, default=1, help="Number of runs of the experiment")
+    parser.add_argument('-p', '--population_size', type=int, default=5, help="Size of the population")
+    parser.add_argument('-g','--generations', type=int, default=20, help="Number of iterations the optimization algorithm will execute")
+    parser.add_argument('--physics', type=str, default='CPU', help = "Type of physics engine to use: CPU (default), GPU")
+    # parser.add_argument('-o', '--outputDir', type=str, default=None, help = "Path of the output log files")
+    argv = parser.parse_args()
+
+    main(argv)

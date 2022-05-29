@@ -332,7 +332,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
 
 class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
 
-    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time=60, time_to_try_again=10, save_lineages=True, voxelyze_version = 'voxcraft-sim'):
+    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time=60, time_to_try_again=10, save_lineages=True, voxelyze_version = '_voxcraft-sim'):
         super().__init__(sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time, time_to_try_again, save_lineages)
         sub.call(f"cp {voxelyze_version}/build/voxcraft-sim .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
         sub.call(f"cp {voxelyze_version}/build/vx3_node_worker .", shell=True)
