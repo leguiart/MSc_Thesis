@@ -52,55 +52,11 @@ VX3_Voxel::~VX3_Voxel() {
     }
 }
 
-__device__ void VX3_Voxel::deviceInit(VX3_VoxelyzeKernel* k) {
-    d_kernel = k;
+__device__ void VX3_Voxel::syncVectors() {
     d_signal.value = 0;
     d_signal.activeTime = 0;
 
     d_signals.clear();
-
-    // orient = VX3_Quat3D<>(); // default orientation
-    targetPos = VX3_Vec3D<>();
-    settleForceZ = 0;
-    enableAttach = true;
-    nonStickTimer = 0.0;
-
-    // init randomState
-    int randIndex = ix + k->WorldSize*iy + k->WorldSize*k->WorldSize*iz;
-    // curand_init(k->RandomSeed + k->currentTime, randIndex, 0, &randomState);
-    curand_init(k->RandomSeed, randIndex, 0, &randomState);
-
-    WallRadius = (k->WorldSize - 1) * k->voxSize;
-    WallForce = k->WallForce;
-
-    // init linkdir
-    for (int i=0;i<6;i++) {
-        if (links[i]) {
-            
-            unbreakable = true; // sam: don't break voxels that are initialized with links
-
-            if (links[i]->pVNeg==this) {
-                links[i]->linkdirNeg = (linkDirection)i;
-            } else if (links[i]->pVPos==this) {
-                links[i]->linkdirPos = (linkDirection)i;
-            } else {
-                printf("linkdir initialization error.\n");
-            }
-        }
-    }
-    // d_group = new VX3_VoxelGroup(d_kernel); Sida: use halloc for now. note halloc and new need different de-allocation.
-    d_group = (VX3_VoxelGroup*) hamalloc(sizeof(VX3_VoxelGroup));
-    PRINT(d_kernel, "Create VoxelGroup (%p) in deviceInit.\n", d_group);
-    if (d_group==NULL) {
-        printf("halloc: Out of memory. Please increate the size of memory that halloc manages.\n");
-    }
-    d_group->deviceInit(d_kernel);
-    //
-    d_kernel->d_voxel_to_update_group.push_back(this);
-    d_group->d_voxels.push_back(this);
-    d_kernel->d_voxelgroups.push_back(d_group);
-
-    enableFloor(d_kernel->enableFloor);
 }
 __device__ VX3_Voxel *VX3_Voxel::adjacentVoxel(linkDirection direction) const {
     VX3_Link *pL = links[(int)direction];
@@ -204,12 +160,6 @@ __device__ VX3_Vec3D<float> VX3_Voxel::cornerOffset(voxelCorner corner) const {
 
 // http://klas-physics.googlecode.com/svn/trunk/src/general/Integrator.cpp (reference)
 __device__ void VX3_Voxel::timeStep(double dt, double currentTime, VX3_VoxelyzeKernel *k) {
-    if (freezeAllVoxelsAfterAttach) {
-        if (k->d_attach_manager->totalLinksFormed>=1) {
-            return;
-            //freeze all voxels when new link forms. just for a snapshot to analyze the position and angles.
-        }
-    }
     previousDt = dt;
     if (dt == 0.0f)
         return;
@@ -242,10 +192,6 @@ __device__ void VX3_Voxel::timeStep(double dt, double currentTime, VX3_VoxelyzeK
 
     assert(!(curForce.x != curForce.x) || !(curForce.y != curForce.y) || !(curForce.z != curForce.z)); // assert non QNAN
     linMom += curForce * dt;
-    //damp the giggling after new link formed.
-    if (d_group->hasNewLink) {
-        linMom = linMom * 0.99; // TODO: keep damping until damped???
-    }
 
     VX3_Vec3D<double> translate(linMom * (dt * mat->_massInverse)); // movement of the voxel this timestep
 
@@ -271,11 +217,6 @@ __device__ void VX3_Voxel::timeStep(double dt, double currentTime, VX3_VoxelyzeK
     // Rotation
     VX3_Vec3D<> curMoment = moment();
     angMom += curMoment * dt;
-
-    // // damp the giggling after new link formed.
-    if (d_group->hasNewLink) {
-        angMom = angMom * 0.99; // TODO: keep damping until damped???
-    }
 
     orient = VX3_Quat3D<>(angMom * (dt * mat->_momentInertiaInverse)) * orient; // update the orientation
     if (ext) {
@@ -331,20 +272,8 @@ __device__ void VX3_Voxel::timeStep(double dt, double currentTime, VX3_VoxelyzeK
         // printf("%f) before propagateSignal. this=%p.\n",currentTime, this);
         propagateSignal(currentTime);
         packMaker(currentTime);
-        if (mat->signalValueDecay <= 1.0) // sam: hack to keep material lit (set decay > 1)
-            localSignalDecay(currentTime);
+        localSignalDecay(currentTime);
     }
-
-
-    // // sam:
-    // if (teleportPos.Length2() > 0) {
-    //     pos = teleportPos;
-    //     // orient = teleportOrient;
-    //     // angMom = VX3_Vec3D<>(0, 0, 0);
-    //     // linMom = VX3_Vec3D<>(0, 0, 0);
-    // }
-
-
 }
 
 __device__ void VX3_Voxel::localSignalDecay(double currentTime) {
@@ -423,20 +352,17 @@ __device__ VX3_Vec3D<double> VX3_Voxel::force() {
     // forces from internal bonds
     VX3_Vec3D<double> totalForce(0, 0, 0);
     for (int i = 0; i < 6; i++) {
-        if (links[i]) {
-            totalForce += links[i]->force(this); // total force in LCS
-        }
+        if (links[i])
+            totalForce += links[i]->force(isNegative((linkDirection)i)); // total force in LCS
     }
+
     totalForce = orient.RotateVec3D(totalForce); // from local to global coordinates
     assert(!(totalForce.x != totalForce.x) || !(totalForce.y != totalForce.y) || !(totalForce.z != totalForce.z)); // assert non QNAN
 
     // other forces
     if (externalExists())
         totalForce += external()->force();                     // external forces
-        
-    // totalForce -= velocity() * mat->globalDampingTranslateC(); // global damping f-cv
-    totalForce -= velocity() * mat->globalDampingTranslateC() * mat->SlowDampingFrac; // sam
-
+    totalForce -= velocity() * mat->globalDampingTranslateC(); // global damping f-cv
     totalForce.z += mat->gravityForce();                       // gravity, according to f=mg
 
     // no collision yet
@@ -447,60 +373,8 @@ __device__ VX3_Vec3D<double> VX3_Voxel::force() {
     totalForce -= contactForce;
     contactForce.clear();
 
-    // sam:
-    if (mat->LockZ) {
-        CiliaForce.z = 0;
-        if ( (!d_kernel->firstRound)  && (!unbreakable))  // not removeMat
-            CiliaForce *= d_kernel->CiliaFracAfterFirstRound; 
-    }
-
-    CiliaForce *= d_group->d_voxels.size(); // sam
-
     totalForce += CiliaForce * mat->Cilia;
     CiliaForce.clear();
-
-    // sam:
-    if ( (targetPos.Length2() > 0) && (!weakLink) ) {  // was detached
-        totalForce += (targetPos - pos);
-    }
-
-    if (settleForceZ < 0)
-        totalForce.z += settleForceZ;
-
-    // sam
-    if ( (mat->WaterLevel > 0) and (pos.z >= mat->WaterLevel*d_kernel->voxSize) ) { 
-        double adjustment = pos.z / d_kernel->voxSize - mat->WaterLevel;
-        totalForce.z += adjustment*adjustment * mat->gravityForce(); 
-    }
-
-    // sam: let's test a square first
-    if (WallForce > 0 && WallRadius > 0) {
-        double adjustX = 0;
-        double adjustY = 0;
-        if (pos.x >= WallRadius) {
-            adjustX = -1 * (WallRadius - pos.x) * (WallRadius - pos.x);
-        } else if (pos.x <= 0) {
-            adjustX = pos.x*pos.x;
-        }
-        if (pos.y >= WallRadius) {
-            adjustY = -1 * (WallRadius - pos.y) * (WallRadius - pos.y);
-        } else if (pos.y <= 0) {
-            adjustY = pos.y*pos.y;
-        }
-        totalForce.x += adjustX * WallForce;
-        totalForce.y += adjustY * WallForce;
-    }
-
-    // sam
-    // totalForce.z += mat->Buoyancy * mat->mass();  // sam: lift bodies without simulating light stiff material
-    if (mat->Buoyancy > 0) {
-        totalForce.z += -1 * mat->gravityForce();  // just remove gravity
-    }
-
-    // sam
-    if (mat->LockZ) {
-        totalForce.z = 0;
-    }
 
     return totalForce;
 }
@@ -510,7 +384,7 @@ __device__ VX3_Vec3D<double> VX3_Voxel::moment() {
     VX3_Vec3D<double> totalMoment(0, 0, 0);
     for (int i = 0; i < 6; i++) {
         if (links[i]) {
-            totalMoment += links[i]->moment(this); // total force in LCS
+            totalMoment += links[i]->moment(isNegative((linkDirection)i)); // total force in LCS
         }
     }
     totalMoment = orient.RotateVec3D(totalMoment);
@@ -518,22 +392,7 @@ __device__ VX3_Vec3D<double> VX3_Voxel::moment() {
     // other moments
     if (externalExists())
         totalMoment += external()->moment();                        // external moments
-    // totalMoment -= angularVelocity() * mat->globalDampingRotateC(); // global damping
-    totalMoment -= angularVelocity() * mat->globalDampingRotateC() * mat->SlowDampingFrac; // sam
-
-    // sam
-    if (mat->LockZ) { 
-        totalMoment.x = 0;
-        totalMoment.y = 0;
-    }
-
-    // sam
-    if (mat->NoSpin) {
-        totalMoment.x = 0;
-        totalMoment.y = 0; 
-        totalMoment.z = 0;
-    }
-
+    totalMoment -= angularVelocity() * mat->globalDampingRotateC(); // global damping
     return totalMoment;
 }
 
@@ -670,104 +529,4 @@ __device__ void VX3_Voxel::enableCollisions(bool enabled, float watchRadius) {
 
 __device__ void VX3_Voxel::generateNearby(int linkDepth, int gindex, bool surfaceOnly) {
     assert(false); // not used. near by has logic flaws.
-}
-
-// __device__ void VX3_Voxel::updateGroup() {
-
-// }
-
-// __device__ void VX3_Voxel::switchGroupTo(VX3_VoxelGroup* group) {
-//     if (d_group==group)
-//         return;
-//     if (d_group) {
-//         // TODO: check all memory in that group is freed if necessary.
-//         // use delete because this is created by new. (new and delete, malloc and free)
-//         // VX3_VoxelGroup* to_delete = d_group; // because d_group->switchAllVoxelsTo() will change the pointer d_group, so save it here for deletion.
-//         d_group->switchAllVoxelsTo(group);
-//         // delete to_delete;
-//         // Free this memory seems will spend a lot of time checking conditions, just leave it there for now.
-//         // d_group = group;
-//     } else {
-//         d_group = group;
-//     }
-// }
-
-__device__ void VX3_Voxel::changeOrientationTo(VX3_Quat3D<> q) {
-    baseCiliaForce = q.RotateVec3DInv(orient.RotateVec3D(baseCiliaForce));
-    shiftCiliaForce = q.RotateVec3DInv(orient.RotateVec3D(shiftCiliaForce));
-    orient = q;
-}
-
-__device__ void VX3_Voxel::isSingletonOrSmallBar(bool *isSingleton, bool *isSmallBar, int *SmallBarDirection) {
-    int direction = -1;
-    for (int i=0;i<6;i++) {
-        if (links[i]) {
-            direction = i;
-            break;
-        }
-    }
-    if (direction==-1) {
-        *isSingleton = true;
-        *isSmallBar = false;
-    } else if (d_group->d_voxels.size() == 2) {
-        *isSingleton = false;
-        *isSmallBar = true;
-        *SmallBarDirection = direction;
-    } else {
-        *isSingleton = false;
-        *isSmallBar = false;
-    }
-}
-
-__device__ void VX3_Voxel::grow() {
-    double p = (double) d_kernel->randomGenerator->randint(1000) * 0.001; //TODO: Oh, this generate the same "random" number for all threads!!
-    // Solution: change randomGenerator to preallocate a bunch of random numbers, and get them by atomic operation.
-    printf("p %f. d_kernel->SurfaceGrowth_Rate %f. \n", p, d_kernel->SurfaceGrowth_Rate);
-    if (p > d_kernel->SurfaceGrowth_Rate)
-        return;
-    
-    int num_directions = 0;
-    int available_directions[6];
-    VX3_Vec3D<> available_position[6];
-
-    for (int i=0;i<6;i++) {
-        if (links[i]==NULL) { // available link slot
-            available_position[num_directions] = potentialNeighborPosition(i);
-            if (available_position[num_directions].z > d_kernel->voxSize / 2 && d_kernel->enableFloor) { // and above ground
-                available_directions[num_directions] = i;
-                num_directions ++;
-            }
-        }
-    }
-    if (num_directions==0)
-        return;
-    int choice = d_kernel->randomGenerator->randint(num_directions);
-    printf("grow()\n");
-    d_kernel->d_growth_manager->grow(this, available_directions[choice], available_position[choice]);
-}
-
-__device__ VX3_Vec3D<> VX3_Voxel::potentialNeighborPosition(int linkdir) {
-    VX3_Vec3D<> pnPos = VX3_Vec3D<>();
-    switch ((linkDirection)linkdir) {
-    case X_POS:
-        pnPos.x += d_kernel->voxSize;
-        break;
-    case X_NEG:
-        pnPos.x -= d_kernel->voxSize;
-        break;
-    case Y_POS:
-        pnPos.y += d_kernel->voxSize;
-        break;
-    case Y_NEG:
-        pnPos.y -= d_kernel->voxSize;
-        break;
-    case Z_POS:
-        pnPos.z += d_kernel->voxSize;
-        break;
-    case Z_NEG:
-        pnPos.z -= d_kernel->voxSize;
-    }
-    // real coordinate
-    pnPos = pos + orient.RotateVec3D(pnPos);
-    return pnPos;
 }

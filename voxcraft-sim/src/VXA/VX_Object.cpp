@@ -1191,14 +1191,6 @@ CVXC_Material& CVXC_Material::operator=(const CVXC_Material& RefMat)
 	sticky = RefMat.sticky;
 	Cilia = RefMat.Cilia;
 
-	LockZ = RefMat.LockZ;  // sam
-	NoSpin = RefMat.NoSpin;  // sam
-	SlowDampingFrac = RefMat.SlowDampingFrac; // sam
-	WaterLevel = RefMat.WaterLevel;  // sam
-	Buoyancy = RefMat.Buoyancy;  // sam
-	EndSimIfCompletelyRemoved = RefMat.EndSimIfCompletelyRemoved;  // sam
-	FailStressAddedStrengthPerNeighbor = RefMat.FailStressAddedStrengthPerNeighbor;  // sam
-
 	RemoveFromSimulationAfterThisManySeconds = RefMat.RemoveFromSimulationAfterThisManySeconds;
 	TurnOnThermalExpansionAfterThisManySeconds = RefMat.TurnOnThermalExpansionAfterThisManySeconds;
 	TurnOnCiliaAfterThisManySeconds = RefMat.TurnOnCiliaAfterThisManySeconds;
@@ -1443,15 +1435,6 @@ void CVXC_Material::ReadXML(CXML_Rip* pXML, std::string Version, std::string* Re
 				if (!pXML->FindLoadElement("Fixed", &Fixed)) Fixed = 0;
 				if (!pXML->FindLoadElement("Sticky", &sticky)) sticky = 0;
 				if (!pXML->FindLoadElement("Cilia", &Cilia)) Cilia = 0;
-
-				if (!pXML->FindLoadElement("LockZ", &LockZ)) LockZ = 0; // sam
-				if (!pXML->FindLoadElement("NoSpin", &NoSpin)) NoSpin = 0; // sam
-				if (!pXML->FindLoadElement("SlowDampingFrac", &SlowDampingFrac)) SlowDampingFrac = 1; // sam
-				if (!pXML->FindLoadElement("WaterLevel", &WaterLevel)) WaterLevel = 0; // sam
-				if (!pXML->FindLoadElement("Buoyancy", &Buoyancy)) Buoyancy = 0; // sam
-				if (!pXML->FindLoadElement("EndSimIfCompletelyRemoved", &EndSimIfCompletelyRemoved)) EndSimIfCompletelyRemoved = 0; // sam
-				if (!pXML->FindLoadElement("FailStressAddedStrengthPerNeighbor", &FailStressAddedStrengthPerNeighbor)) FailStressAddedStrengthPerNeighbor = 0; // sam
-
 				if (!pXML->FindLoadElement("Elastic_Mod", &Elastic_Mod)) Elastic_Mod = 0;
 				if (!pXML->FindLoadElement("Plastic_Mod", &Plastic_Mod)) Plastic_Mod = 0;
 				if (!pXML->FindLoadElement("Yield_Stress", &Yield_Stress)) Yield_Stress = 0;

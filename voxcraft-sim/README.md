@@ -1,27 +1,43 @@
-# Voxcraft
+# voxcraft-sim
 
-This repo is one of the three parts of voxcraft software.
+_A GPU accelerated voxel-based physics engine._
 
-1. [voxcraft-sim](https://github.com/voxcraft/voxcraft-sim): A highly parallelized physics engine that can simulate the voxel-based soft robots. This part utilizes CUDA and GPU.
+**Documentation:** https://voxcraft.readthedocs.io/en/latest/
 
-2. voxcraft-evo: The evolutionary algorithms that can automatically design voxel-based soft robots.
-
-3. [voxcraft-viz](https://github.com/voxcraft/voxcraft-viz): The visualization tool that can playback the history file produced by voxcraft-sim, and it can used for manually design bots and run it in a CPU-based physics engine.
-
-Learn more about the whole voxcraft project (not just software) to get a bigger picture, please refer to: https://voxcraft.github.io/
+**More information:** https://voxcraft.github.io/design
 
 
 # Installation
 
-* First of all, make sure you have an available Nvidia GPU.
+## Docker (recommended)
 
-## On DeepGreen
+#### Requirements
+When building voxcraft-sim the makefile checks if a GPU is available. Thus it is necessary for docker build to be able to see your GPU. To that end install and configure the [nvidia-container-runtime](https://stackoverflow.com/questions/59691207/docker-build-with-nvidia-runtime).
 
-DeepGreen is UVM’s GPU cluster. We have already compiled everything on DeepGreen, so it will be quite easy to use `voxcraft-sim` on DeepGreen.
+#### Installing nvidia runtime
 
-Follow a five-minute instruction here: https://github.com/liusida/gpuVoxels-dg-installation (Sorry about the old name there, since we recently renamed our project.)
+```
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+   && curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add - \
+   && curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+   
+sudo apt-get update && sudo apt-get install -y nvidia-docker2
+sudo systemctl restart docker
+```
 
-## On Google Colab
+#### Build
+```bash
+cd voxcraft-sim
+docker build -t voxcraft-sim .
+```
+
+#### Run
+```bash
+docker run -it --gpus all voxcraft-sim
+```
+
+
+## Google Colab
 
 [Google Colab](https://colab.research.google.com/) provides a free online GPU environment.
 
@@ -29,11 +45,11 @@ Create a new notebook and go to Menu->Runtime->Change runtime type, select GPU.
 
 Then, run the script:
 ```python
-!git clone https://github.com/voxcraft/voxcraft-sim.git; cd voxcraft-sim/; git submodule update --init --recursive;
+!git clone https://github.com/voxcraft/voxcraft-sim.git; cd voxcraft-sim/;
 
 print("Source code downloaded.")
 
-!cd voxcraft-sim; rm build -rf; mkdir build; cd build; cmake -DCMAKE_BUILD_TYPE=Release -DCUDA_DEBUG=OFF ..; make -j 10;
+!cd voxcraft-sim; rm build -rf; mkdir build; cd build; cmake ..; make -j 10;
 
 print("Executables built.")
 
@@ -49,7 +65,7 @@ files.download('a.history')
 
 Here is a [readonly example notebook](https://colab.research.google.com/drive/1yiqw7Uq3W3CgYCinXq4t808M2l7uuLv1?usp=sharing)
 
-## On Your Desktop/Laptop
+## Local install
 
 The most difficult part of compiling this project from scratch is installing the CUDA environment. First, make sure you have NVidia Graphic Cards, then [download CUDA 10.1](https://developer.nvidia.com/cuda-10.1-download-archive-base) and install it.
 
@@ -61,10 +77,9 @@ sudo apt-get install -y git cmake libboost-all-dev
 
 git clone https://github.com/voxcraft/voxcraft-sim.git
 cd voxcraft-sim
-git submodule update --init --recursive
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCUDA_DEBUG=OFF ..
+cmake ..
 make -j 10
 ```
 

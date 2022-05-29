@@ -5,11 +5,19 @@
     </GPU>
     <Simulator>
         <FitnessFunction>
-            <mtVAR>t</mtVAR>
-            <mtVAR>x</mtVAR>
-            <mtVAR>y</mtVAR>
-            <mtVAR>z</mtVAR>
-        </FitnessFunction>
+            <mtSQRT>
+                <mtADD>
+                    <mtMUL>
+                      <mtVAR>x</mtVAR>
+                      <mtVAR>x</mtVAR>
+                    </mtMUL>
+                    <mtMUL>
+                      <mtVAR>y</mtVAR>
+                      <mtVAR>y</mtVAR>
+                    </mtMUL>
+                  </mtADD>
+            </mtSQRT>
+          </FitnessFunction>
         <Integration>
             <DtFrac>1.0</DtFrac>
         </Integration>

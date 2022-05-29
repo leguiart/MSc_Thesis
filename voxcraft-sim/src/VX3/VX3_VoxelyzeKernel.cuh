@@ -1,7 +1,3 @@
-//
-// Created by Sida Liu
-//  This class is the backbone of one simulation. At each time step, it starts multiple threads to handle calculation of all aspects.
-//
 #if !defined(VX3_VOXELYZE_KERNEL_H)
 #define VX3_VOXELYZE_KERNEL_H
 #include "VX3.cuh"
@@ -17,11 +13,6 @@
 #include "VX3_MaterialLink.h"
 #include "VX3_Voxel.h"
 #include "VX_Enums.h"
-#include "VX3_AttachManager.h"
-#include "VX3_GrowthManager.h"
-#include "VX3_OnlineTest.h"
-
-#include "../Cu-Collision-Detection/include/CollisionSystem.cuh"
 
 /*
  * VX3_VoxelyzeKernel is a GPU mock class of CVoxelyze
@@ -35,15 +26,14 @@ class VX3_VoxelyzeKernel {
 
     void cleanup();
 
-    __device__ void deviceInit();
-
     /* Cuda methods */
     __device__ bool doTimeStep(float dt = -1.0f);
     __device__ double recommendedTimeStep();
     __device__ void updateCurrentCenterOfMass();
     __device__ bool StopConditionMet();
     __device__ void updateTemperature();
-    __device__ void updateAttach(int mode, bool needFullRebuild = false);  // sam
+    __device__ void syncVectors();
+    __device__ void updateAttach();
     __device__ void updateDetach();
     __device__ void regenerateSurfaceVoxels();
     __device__ VX3_MaterialLink *combinedMaterial(VX3_MaterialVoxel *mat1, VX3_MaterialVoxel *mat2);
@@ -52,38 +42,11 @@ class VX3_VoxelyzeKernel {
     __device__ void computeTargetCloseness();
     __device__ void saveInitialPosition();
 
+
     // for Secondary Experiment
     __device__ void removeVoxels();
     __device__ void InitializeCenterOfMass();
-    __device__ bool EarlyStopIfNoBotsRemain(); // sam
-    __device__ void replenishMaterial(int start, int end, int step, int mat, int height, int numLevels); // sam
-    __device__ void convertMatIfSmallBody(int mat1, int mat2, int minSizeToConvert); // sam
-    __device__ void convertMatIfLargeBody(int mat1, int mat2); // sam
 
-    __device__ void updateBrownianMotion(); // sam
-
-    __device__ void computeNumRealLinks(); // sam
-
-    __device__ void computeLargestStickyGroupSize(); // sam
-    __device__ void recordPileSizes(int mat1, int mat2);  // sam
-
-    __device__ void countLightsOn(); // sam
-    __device__ void clearGroupCheckMark(); // sam
-
-    __device__ void SandDownPiles(); // sam
-    __device__ void pushPilesToFloor(); // sam
-    __device__ void clearAllForces(); // sam
-    __device__ void FindWeakLinks(); // sam
-    __device__ void BreakWeakLinks(); // sam
-    
-    __device__ void reInitAllGroups(); // sam
-
-    __device__ bool addVoxel(int x, int y, int z, int mat); // sam
-
-    // for Testing
-    // check all the voxels, links and voxelgroups for validation.
-    __device__ bool ThoroughValidationCheck();
-    
     /* data */
     bool forceExit = false;
     char vxa_filename[256];
@@ -93,9 +56,7 @@ class VX3_VoxelyzeKernel {
     double DtFrac;
     StopCondition StopConditionType;
     double StopConditionValue;
-    unsigned long CurStepCount = 0;
-
-    bool enableFloor = true;
+    unsigned long CurStepCount = 0.0f;
 
     // Temperature:
     bool TempEnabled;                           // overall flag for temperature calculations
@@ -116,8 +77,6 @@ class VX3_VoxelyzeKernel {
     std::vector<CVX_Voxel *> h_voxels;
     VX3_Voxel *d_voxels;
     int num_d_voxels;
-    int num_d_init_voxels;
-    int MaxNewVoxelsAddedMidSim = 10000; // sam: pre-allocate memory for this many new voxels added mid sim
     VX3_Voxel **d_surface_voxels; // an array of pointer d_surface_voxels[i] -> d_voxels[j]
     int num_d_surface_voxels;
     std::map<CVX_Voxel *, VX3_Voxel *> h_lookup_voxels;
@@ -138,21 +97,14 @@ class VX3_VoxelyzeKernel {
     float watchDistance;  //(in voxel units) Distance between voxels (not including 2*boundingRadius for each voxel) to watch for collisions from.
 
     // bool* d_collisionsStale;
-    CollisionSystem *d_collision_system;
-    CollisionSystem *h_collision_system;
     VX3_dVector<VX3_Collision *> d_v_collisions;
 
     bool enableAttach;
     bool enableDetach;
-    bool ForceAttachment = false; // sam
     bool EnableCollision = true;
-    int CollisionMode = 1;
     int RecordStepSize = 0;
     int RecordLink = 0;
     int RecordVoxel = 0;
-    int RecordFixedVoxels = 1; // sam
-    int SurfaceVoxelsOnly = 1;
-    int RecordCoMTraceOfEachVoxelGroupfOfThisMaterial = 0;
 
     // Safety Guard during the creation of new link
     int SafetyGuard = 500;
@@ -167,7 +119,6 @@ class VX3_VoxelyzeKernel {
     VX3_MathTreeToken StopConditionFormula[1024];
 
     int collisionCount = 0;
-    int tmpCollisionCount = 0;
 
     //Calculate Angle
     //A---B----C
@@ -181,42 +132,12 @@ class VX3_VoxelyzeKernel {
     int EnableTargetCloseness = 0;
     int SavePositionOfAllVoxels = 0;
     int EnableCilia = 0;
-    double RandomizeCiliaEvery = 0;  // sam
-    double RandomSeed = 0; // sam
-    double ReplenishDebrisEvery = 0; // sam
     int EnableSignals = 0;
     double  targetCloseness = 0;
     VX3_dVector<VX3_Voxel*> d_targets;
     int numClosePairs = 0;
-    int largestStickyGroupSize = 0; // sam
-    int numRealLinks = 0; // sam
     bool isSurfaceChanged=false;
     double MaxDistInVoxelLengthsToCountAsPair=0.0;
-
-    bool ComputeLargestSitckyGroupForFirstRound = false; // sam
-    bool firstRound = true; // sam
-
-    int numLightsOn = 0; // sam
-
-    // sam: 
-    int pileSize01 = 0;
-    int pileSize02 = 0;
-    int pileSize03 = 0;
-    int pileSize04 = 0;
-    int pileSize05 = 0;
-    int pileSize06 = 0;
-    int pileSize07 = 0;
-    int pileSize08 = 0;
-    int pileSize09 = 0;
-    int pileSize10 = 0;
-    int pileSize11 = 0;
-    int pileSize12 = 0;
-    int pileSize13 = 0;
-    int pileSize14 = 0;
-    int pileSize15 = 0;
-    int pileSize16 = 0;
-    int pileSize17 = 0;
-    int pileSize18 = 0;
 
     //Spatial Hash
     //index all surface voxels into grid, so we only need to compare neighbor grids for detecting collision
@@ -234,68 +155,10 @@ class VX3_VoxelyzeKernel {
 
     //for Secondary Experiment
     int SecondaryExperiment = 0;
-    int SelfReplication = 0;
-    int WorldSize = 1;
-    double WallForce = 0;
-    int SpaceBetweenDebris = 2;
-    int BotMat = 1;
-    int RemoveMat = 1;
-    int DebrisMat = 2;
-    int DebrisHeight = 1;
-    int DebrisConcentration = 2;
     double ReinitializeInitialPositionAfterThisManySeconds = 0.0;
-    double SettleTimeBeforeNextRoundOfReplication = 0.0;  // sam
-    bool InitialPositionReinitialized = true;  // sam
-    int MinimumBotSize = 2; // sam
-    double CiliaFracAfterFirstRound = 1.0; // sam
-    double DetachStringyBodiesEvery = 0; // sam
-    double nonStickyTimeAfterStringyBodyDetach = 0; // sam
-    double lastDetachStringyBodiesTime = 0.0; // sam
-    double DetachProbability = 0.0; // sam
-    int detachmentMutex = 0; // push_back one voxel to detach at a time
-    bool readyToDetach = true; //sam
-    bool readyToReplenish = false; // sam
-
-    double lastReplicationTime = 0.0; // sam
-    double nextBrownianUpdateTime = 0.0; // sam
-    double lastReplenishDebrisTime = 0.0; // sam
+    bool InitialPositionReinitialized = false;
 
     int EnableExpansion=0;
-
-    VX3_AttachManager* d_attach_manager;
-
-    int mutexRotateSingleton=0;
-
-    double lastRegenerateSurfaceTime = 0;
-    
-    // Using static watch distance and caching it improves performance.
-    double staticWatchDistance = 0;
-    double staticWatchDistance_square = 0;
-
-    VX3_GrowthManager* d_growth_manager;
-
-    int EnableSurfaceGrowth = 0;
-    double SurfaceGrowth_Interval = 1;
-    double SurfaceGrowth_activeTime = 0;
-    double SurfaceGrowth_Rate = 1;
-    int SurfaceGrowth_Growed = 0;
-    RandomGenerator* randomGenerator;
-
-    VX3_dVector<VX3_VoxelGroup *> d_voxelgroups;
-    __device__ void updateGroups();
-
-    __device__ void surfaceGrow();
-
-    // To remember what voxels their groups should be update. and at the end of the timestep, update them one-by-one, sequentially, not in parallel.
-    VX3_dVector<VX3_Voxel *> d_voxel_to_update_group;
-    VX3_dVector<VX3_Voxel *> d_voxels_to_detach;
-
-    bool VerboseMode;
-    bool SkipThoroughTest;
-    unsigned int ThoroughTestStepSize;
-    unsigned int ThoroughTestStartAt;
-
-    int GPU_id;
 };
 
 #endif // VX3_VOXELYZE_KERNEL_H

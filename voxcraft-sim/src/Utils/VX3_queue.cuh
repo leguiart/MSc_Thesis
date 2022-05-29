@@ -1,7 +1,3 @@
-//
-// Created by Sida Liu
-//  This class implements a queue, with push_back() and pop_front().
-//
 #if !defined(VX3_QUEUE)
 #define VX3_QUEUE
 
@@ -27,10 +23,7 @@ template <typename T> class VX3_dQueue {
 
     __device__ void clear() {
         if (!mutex) {
-            mutex = (int *)hamalloc(sizeof(int));
-            if (mutex==NULL) {
-                printf("halloc: Out of memory. Please increate the size of memory that halloc manages.\n");
-            }
+            mutex = (int *)malloc(sizeof(int));
             *mutex = 0;
         }
         cursor_front = 0;
@@ -76,11 +69,11 @@ template <typename T> class VX3_dQueue {
                     }
                     if (main) {
                         memcpy(new_main, main, sizeof_chunk * sizeof(T));
-                        memcpy(new_main + sizeof_chunk, main, sizeof_chunk * sizeof(T));
+                        memcpy(new_main + sizeof_chunk * sizeof(T), main, sizeof_chunk * sizeof(T));
                         delete main;
                     } else {
                         memcpy(new_main, default_memory, sizeof_chunk * sizeof(T));
-                        memcpy(new_main + sizeof_chunk, default_memory, sizeof_chunk * sizeof(T));
+                        memcpy(new_main + sizeof_chunk * sizeof(T), default_memory, sizeof_chunk * sizeof(T));
                     }
                     main = new_main;
 

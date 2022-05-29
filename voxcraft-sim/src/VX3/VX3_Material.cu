@@ -7,17 +7,10 @@ VX3_Material::VX3_Material(CVX_Material *p, VX3_VoxelyzeKernel *k)
       TurnOnThermalExpansionAfterThisManySeconds(p->TurnOnThermalExpansionAfterThisManySeconds),
       TurnOnCiliaAfterThisManySeconds(p->TurnOnCiliaAfterThisManySeconds),
       signalValueDecay(p->signalValueDecay), signalTimeDelay(p->signalTimeDelay), inactivePeriod(p->inactivePeriod), isMeasured(p->isMeasured), isElectricalActive(p->isElectricalActive),
-      matid(p->matid), fixed(p->fixed), sticky(p->sticky), Cilia(p->Cilia), 
-      LockZ(p->LockZ), // sam
-      NoSpin(p->NoSpin), //sam
-      SlowDampingFrac(p->SlowDampingFrac), // sam
-      WaterLevel(p->WaterLevel), // sam
-      Buoyancy(p->Buoyancy), //sam
-      EndSimIfCompletelyRemoved(p->EndSimIfCompletelyRemoved), // sam
-      FailStressAddedStrengthPerNeighbor(p->FailStressAddedStrengthPerNeighbor), // sam
-      linear(p->linear), E(p->E), sigmaYield(p->sigmaYield),
+      matid(p->matid), fixed(p->fixed), sticky(p->sticky), Cilia(p->Cilia), linear(p->linear), E(p->E), sigmaYield(p->sigmaYield),
       sigmaFail(p->sigmaFail), epsilonYield(p->epsilonYield), epsilonFail(p->epsilonFail), hd_strainData(p->strainData),
-      hd_stressData(p->stressData), // hd_vector init in host, used for passing data to kernel. With syncVector() function, we use d_vector in kernel.
+      hd_stressData(
+          p->stressData), // hd_vector init in host, used for passing data to kernel. With syncVector() function, we use d_vector in kernel.
       nu(p->nu), rho(p->rho), alphaCTE(p->alphaCTE), muStatic(p->muStatic), muKinetic(p->muKinetic), zetaInternal(p->zetaInternal),
       zetaGlobal(p->zetaGlobal), zetaCollision(p->zetaCollision), extScale(p->extScale), _eHat(p->_eHat) {
     // Is the only dependency linkMats[j] depend on voxelMats[i]??
@@ -51,16 +44,6 @@ __device__ VX3_Material &VX3_Material::operator=(const VX3_Material &vIn) {
     fixed = vIn.fixed;
     sticky = vIn.sticky;
     Cilia = vIn.Cilia;
-
-    LockZ = vIn.LockZ;  // sam
-    NoSpin = vIn.NoSpin; // sam
-    SlowDampingFrac = vIn.SlowDampingFrac; // sam
-    WaterLevel = vIn.WaterLevel;  // sam
-    Buoyancy = vIn.Buoyancy; // sam
-    EndSimIfCompletelyRemoved = vIn.EndSimIfCompletelyRemoved; // sam
-
-    FailStressAddedStrengthPerNeighbor = vIn.FailStressAddedStrengthPerNeighbor; // sam
-
     linear = vIn.linear;
     E = vIn.E;
     sigmaYield = vIn.sigmaYield;
@@ -477,7 +460,7 @@ __device__ bool VX3_Material::updateDerived() {
     return true;
 }
 
-__device__ void VX3_Material::deviceInit() {
+__device__ void VX3_Material::syncVectors() {
     // hd_strainData -> d_strainData
     d_strainData.clear();
     d_strainData.push_back(0.0f);

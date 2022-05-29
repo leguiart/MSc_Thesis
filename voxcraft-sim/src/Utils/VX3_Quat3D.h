@@ -1,9 +1,23 @@
-//
-// Created by Sida Liu
-//  This is a device version of Quat3D class in VX2.
-//
 #if !defined(VX3_QUAT3D_H)
 #define VX3_QUAT3D_H
+
+/*******************************************************************************
+Copyright (c) 2015, Jonathan Hiller
+To cite academic use of Voxelyze: Jonathan Hiller and Hod Lipson "Dynamic
+Simulation of Soft Multimaterial 3D-Printed Objects" Soft Robotics. March 2014,
+1(1): 88-101. Available at
+http://online.liebertpub.com/doi/pdfplus/10.1089/soro.2013.0010
+
+This file is part of Voxelyze.
+Voxelyze is free software: you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. Voxelyze is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details. See <http://www.opensource.org/licenses/lgpl-3.0.html> for license
+details.
+*******************************************************************************/
 //
 // Learning resource: refer to https://eater.net/quaternions/video/intro , The
 // visualization and tutorial on Quanernions.
@@ -135,7 +149,7 @@ public:
       //!< post-rotation orientation.
 
     __device__ inline void debug() {
-        printf("(Quat3D) w:%e, x:%e, y:%e, z:%e\n", w, x, y, z);
+        printf("w:%f, x:%f, y:%f, z:%f\t", w, x, y, z);
     }
 
     // functions to make code with mixed template parameters work...

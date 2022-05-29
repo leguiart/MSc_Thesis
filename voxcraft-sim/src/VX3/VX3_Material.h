@@ -1,7 +1,3 @@
-//
-// Created by Sida Liu
-//  This is a device version of CVX_Material class in VX2.
-//
 #if !defined(VX3_MATERIAL_H)
 #define VX3_MATERIAL_H
 
@@ -19,8 +15,6 @@ public:
 
 	VX3_Material( CVX_Material* p, VX3_VoxelyzeKernel* k );
 
-	__device__ void deviceInit();
-
 	__device__ VX3_Material(float youngsModulus=1e6f, float density=1e3f); //!< Default Constructor. @param[in] youngsModulus The Young's Modulus (stiffness) of this material in Pascals. @param[in] density The density of this material in Kg/m^3
 	//__device__ virtual ~VX3_Material(void) {}; //!< Destructor. Specified as virtual so we can just keep track of generic material pointers for voxel and link materials.
 	__device__ VX3_Material(const VX3_Material& vIn) {*this = vIn;} //!< Copy constructor
@@ -35,9 +29,7 @@ public:
 	__device__ float stress(float strain, float transverseStrainSum=0.0f, bool forceLinear = false); //!<returns the stress of the material model accounting for volumetric strain effects. @param [in] strain The strain to query. The resulting stress in this direction will be returned. @param [in] transverseStrainSum The sum of the two principle normal strains in the plane perpendicular to strain. @param [in] forceLinear If true, the result will be calculated according to the elastic modulus of the material regardless of non-linearities in the model.
 	__device__ float modulus(float strain); //!<returns the modulus (slope of the stress/strain curve) of the material model at the specified strain. @param [in] strain The strain to query.
 	__device__ bool isYielded(float strain) {return epsilonYield != -1.0f && strain>epsilonYield;} //!< Returns true if the specified strain is past the yield point (if one is specified). @param [in] strain The strain to query.
-	__device__ bool isFailed(float strain, float additionalStrengthFactor=1.0f) {  // sam: additionalStrength
-			return epsilonFail != -1.0f && strain>epsilonFail*additionalStrengthFactor;
-		} //!< Returns true if the specified strain is past the failure point (if one is specified). @param [in] strain The strain to query.
+	__device__ bool isFailed(float strain) {return epsilonFail != -1.0f && strain>epsilonFail;} //!< Returns true if the specified strain is past the failure point (if one is specified). @param [in] strain The strain to query.
 
 	//color
 	__device__ void setColor(int red, int green, int blue, int alpha=255); //!< Sets the material color. Values from [0,255]. @param [in] red Red channel @param [in] green Green channel @param [in] blue Blue channel @param [in] alpha Alpha channel
@@ -104,6 +96,10 @@ public:
 	__device__ bool setYieldFromData(float percentStrainOffset=0.2); //!< Sets sigmaYield and epsilonYield assuming strainData, stressData, E, and failStrain are set correctly.
 	__device__ float strain(float stress); //!< Returns a simple reverse lookup of the first strain that yields this stress from data point lookup.
 
+	//VX3_vector
+	__device__ void syncVectors();
+
+
 
 /* data */
 	//std::string error; //!< The last error encountered
@@ -119,16 +115,6 @@ public:
 	bool fixed = false;
 	bool sticky = false;
 	double Cilia = 0;
-
-	bool LockZ = false;  // sam
-	bool NoSpin = false; // sam
-	double SlowDampingFrac = 1; // sam
-	double WaterLevel = 0;  // sam
-	double Buoyancy = 0; // sam
-	bool EndSimIfCompletelyRemoved = false; // sam
-
-	float FailStressAddedStrengthPerNeighbor = 0; //sam
-
 	bool linear; //!< Set to true if this material is specified as linear.
 	float E; //!< Young's modulus (stiffness) in Pa.
 	float sigmaYield; //!< Yield stress in Pa.

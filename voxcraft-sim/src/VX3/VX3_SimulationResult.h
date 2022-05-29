@@ -1,7 +1,3 @@
-//
-// Created by Sida Liu
-//  A structure for storing simulation results.
-//
 #include <iostream>
 #include "Vec3D.h"
 
@@ -26,28 +22,6 @@ struct VX3_SimulationResult {
     Vec3D<> initialCenterOfMass;
     Vec3D<> currentCenterOfMass;
     int numClosePairs = 0;
-    int numRealLinks = 0;
-    int largestStickyGroupSize = 0;
-
-    int numLightsOn = 0;
-    int pileSize01 = 0;
-    int pileSize02 = 0;
-    int pileSize03 = 0;
-    int pileSize04 = 0;
-    int pileSize05 = 0;
-    int pileSize06 = 0;
-    int pileSize07 = 0;
-    int pileSize08 = 0;
-    int pileSize09 = 0;
-    int pileSize10 = 0;
-    int pileSize11 = 0;
-    int pileSize12 = 0;
-    int pileSize13 = 0;
-    int pileSize14 = 0;
-    int pileSize15 = 0;
-    int pileSize16 = 0;
-    int pileSize17 = 0;
-    int pileSize18 = 0;
 
     static bool compareFitnessScore(VX3_SimulationResult i1, VX3_SimulationResult i2) // for sorting results
     {

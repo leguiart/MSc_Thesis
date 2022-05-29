@@ -122,16 +122,6 @@ class CVX_Material {
 	bool fixed = false;
 	bool sticky = false;
 	double Cilia = 0; //!< Scale factor of cilia force in VXD.
-
-	bool LockZ = false;  // sam
-	bool NoSpin = false;  // sam
-	double SlowDampingFrac = 1; // sam
-	double WaterLevel = 0;  // sam
-	double Buoyancy = 0; // sam
-	bool EndSimIfCompletelyRemoved = false; // sam
-
-	float FailStressAddedStrengthPerNeighbor = 0; // sam
-
 	bool linear; //!< Set to true if this material is specified as linear.
 	float E; //!< Young's modulus (stiffness) in Pa.
 	float sigmaYield; //!< Yield stress in Pa.

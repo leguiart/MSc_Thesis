@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include "halloc.h"
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 #include <boost/filesystem.hpp>
@@ -31,7 +30,7 @@ std::vector<std::string> split(const std::string& s, char delimiter)
 }
 
 int main(int argc, char** argv) {
-    DEBUG_PRINT("DEBUG mode. DEBUG_PRINT need at least two arguments, so to disable warning, here is %d. \n", 1);
+
     //setup tools for parsing arguments
     po::options_description desc(APP_DESCRIPTION);
     desc.add_options()
@@ -60,6 +59,7 @@ int main(int argc, char** argv) {
         std::cout << desc << "\n";
         return 1;
     }
+
 
     //Read vxt file
     pt::ptree tree;
@@ -107,38 +107,36 @@ int main(int argc, char** argv) {
         std::string simulation_name = split(res.vxa_filename, '.')[0];
         tr_result.put("report.detail."+simulation_name+".currentTime", res.currentTime);
         tr_result.put("report.detail."+simulation_name+".fitness_score", res.fitness_score);
-        // tr_result.put("report.detail."+simulation_name+".num_voxel", res.num_voxel);
-        // tr_result.put("report.detail."+simulation_name+".num_measured_voxel", res.num_measured_voxel);
-        // tr_result.put("report.detail."+simulation_name+".voxSize", res.voxSize);
-        // tr_result.put("report.detail."+simulation_name+".numClosePairs", res.numClosePairs);
-        // tr_result.put("report.detail."+simulation_name+".numRealLinks", res.numRealLinks);
-        tr_result.put("report.detail."+simulation_name+".largestStickyGroupSize", res.largestStickyGroupSize);
-        // tr_result.put("report.detail."+simulation_name+".initialCenterOfMass.x", res.initialCenterOfMass.x);
-        // tr_result.put("report.detail."+simulation_name+".initialCenterOfMass.y", res.initialCenterOfMass.y);
-        // tr_result.put("report.detail."+simulation_name+".initialCenterOfMass.z", res.initialCenterOfMass.z);
-        // tr_result.put("report.detail."+simulation_name+".currentCenterOfMass.x", res.currentCenterOfMass.x);
-        // tr_result.put("report.detail."+simulation_name+".currentCenterOfMass.y", res.currentCenterOfMass.y);
-        // tr_result.put("report.detail."+simulation_name+".currentCenterOfMass.z", res.currentCenterOfMass.z);
+        tr_result.put("report.detail."+simulation_name+".num_voxel", res.num_voxel);
+        tr_result.put("report.detail."+simulation_name+".num_measured_voxel", res.num_measured_voxel);
+        tr_result.put("report.detail."+simulation_name+".voxSize", res.voxSize);
+        tr_result.put("report.detail."+simulation_name+".numClosePairs", res.numClosePairs);
+        tr_result.put("report.detail."+simulation_name+".initialCenterOfMass.x", res.initialCenterOfMass.x);
+        tr_result.put("report.detail."+simulation_name+".initialCenterOfMass.y", res.initialCenterOfMass.y);
+        tr_result.put("report.detail."+simulation_name+".initialCenterOfMass.z", res.initialCenterOfMass.z);
+        tr_result.put("report.detail."+simulation_name+".currentCenterOfMass.x", res.currentCenterOfMass.x);
+        tr_result.put("report.detail."+simulation_name+".currentCenterOfMass.y", res.currentCenterOfMass.y);
+        tr_result.put("report.detail."+simulation_name+".currentCenterOfMass.z", res.currentCenterOfMass.z);
 
-        // tr_result.put("report.detail."+simulation_name+".total_distance_of_all_voxels", res.total_distance_of_all_voxels);
+        tr_result.put("report.detail."+simulation_name+".total_distance_of_all_voxels", res.total_distance_of_all_voxels);
 
-        // if (res.SavePositionOfAllVoxels) {
-        //     std::string str_tmp = "";
-        //     for (auto &pos: res.voxel_init_pos) {
-        //         str_tmp += std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ";";
-        //     }
-        //     tr_result.put("report.detail."+simulation_name+".init_pos", str_tmp);
-        //     str_tmp = "";
-        //     for (auto &pos: res.voxel_position) {
-        //         str_tmp += std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ";";
-        //     }
-        //     tr_result.put("report.detail."+simulation_name+".pos", str_tmp);
-        //     str_tmp = "";
-        //     for (auto matid: res.voxel_mats) {
-        //         str_tmp += std::to_string(matid) + ";";
-        //     }
-        //     tr_result.put("report.detail."+simulation_name+".mats", str_tmp);
-        // }
+        if (res.SavePositionOfAllVoxels) {
+            std::string str_tmp = "";
+            for (auto &pos: res.voxel_init_pos) {
+                str_tmp += std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ";";
+            }
+            tr_result.put("report.detail."+simulation_name+".init_pos", str_tmp);
+            str_tmp = "";
+            for (auto &pos: res.voxel_position) {
+                str_tmp += std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ";";
+            }
+            tr_result.put("report.detail."+simulation_name+".pos", str_tmp);
+            str_tmp = "";
+            for (auto matid: res.voxel_mats) {
+                str_tmp += std::to_string(matid) + ";";
+            }
+            tr_result.put("report.detail."+simulation_name+".mats", str_tmp);
+        }
     }
     pt::write_xml(output.string(), tr_result);
     return 0;

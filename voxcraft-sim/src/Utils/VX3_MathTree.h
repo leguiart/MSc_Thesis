@@ -1,7 +1,3 @@
-//
-// Created by Sida Liu
-//  MathTree provides a way to pass formulas from VXA/VXD files to the simulation.
-//
 #if !defined(VX3_MATHTREE_H)
 #define VX3_MATHTREE_H
 

@@ -1,11 +1,5 @@
-//
-// Created by Sida Liu
-//  This class provides handy tools for GPU(CUDA Kernel) code.
-//
 #if !defined(VX3_H)
 #define VX3_H
-
-#include "halloc.h"
 
 #include <string>
 #include <stdexcept>
@@ -38,36 +32,10 @@ inline bool u_with_ext(fs::path file, std::string ext) {
 
 #include <curand.h>
 #include <curand_kernel.h>
-class RandomGenerator {
-    public: 
-    curandState_t state;
-    __device__ RandomGenerator(int random_seed=0) {
-        curand_init(random_seed, 0, 0, &state);
-    }
-    __device__ __inline__ int randint(int max) {
-        return curand(&state) % max;
-    }
-};
 __device__ __inline__ int random(int max, int random_seed=0) {
     curandState_t state;
     curand_init(random_seed, 0, 0, &state);
     return curand(&state) % max;
-}
-#include "types.h"
-// Get Opposite linkDirection. X_NEG for X_POS, etc.
-__device__ __host__ static inline int oppositeDirection(int linkdir) {
-    return (linkdir%2==0)?linkdir+1:linkdir-1;
-}
-__device__ __host__ static inline linkAxis toAxis(linkDirection direction) {
-    return (linkAxis)((int)direction / 2);
-} 
-
-template <class T> __device__ static inline void debug_array(T* array, int size) {
-    T memory[1024];
-    for (int i=0;i<size&&i<1024;i++) {
-        memory[i] = array[i];
-        printf("memory %p\n", memory[i]);
-    }
 }
 
 #define COLORCODE_RED "\033[0;31m" 
@@ -79,14 +47,6 @@ template <class T> __device__ static inline void debug_array(T* array, int size)
 //#define DEBUG_LINE printf("%s(%d): %s\n", __FILE__, __LINE__, u_format_now("at %M:%S").c_str());
 #define CUDA_DEBUG_LINE(str) {printf("%s(%d): %s\n", __FILE__, __LINE__, str);}
 #define DEBUG_LINE_
-// #define DEBUG
-#ifndef NDEBUG
-#define DEBUG_PRINT(fmt, ...) { printf(fmt, __VA_ARGS__); }
-#else
-#define DEBUG_PRINT(fmt, ...) {}
-#endif
-
-#define PRINT(kernel, fmt, ...) { if (kernel->VerboseMode) { printf("GPU %d, Step %lu:\n", kernel->GPU_id, kernel->CurStepCount); printf(fmt, __VA_ARGS__);} }
 
 #ifndef CUDA_ERROR_CHECK
     __device__ __host__ inline void CUDA_ERROR_CHECK_OUTPUT(cudaError_t code, const char *file, int line, bool abort=false) {
@@ -98,6 +58,7 @@ template <class T> __device__ static inline void debug_array(T* array, int size)
     #define CUDA_ERROR_CHECK(ans) { CUDA_ERROR_CHECK_OUTPUT((ans), __FILE__, __LINE__); }
 #endif
 #define VcudaMemGetInfo(a,b) {CUDA_ERROR_CHECK(cudaMemGetInfo(a,b))}
+#define VcudaDeviceGetLimit(a,b) {CUDA_ERROR_CHECK(cudaDeviceGetLimit(a,b))}
 #define VcudaDeviceSetLimit(a,b) {CUDA_ERROR_CHECK(cudaDeviceSetLimit(a,b))}
 #define VcudaSetDevice(a) {CUDA_ERROR_CHECK(cudaSetDevice(a))}
 #define VcudaGetDeviceCount(a) {CUDA_ERROR_CHECK(cudaGetDeviceCount(a))}
@@ -117,9 +78,5 @@ template <class T> __device__ static inline void debug_array(T* array, int size)
 #include "Utils/VX3_vector.cuh"
 #include "Utils/VX3_dictionary.cuh"
 #include "VX3/VX3_SimulationResult.h"
-
-__device__ int to1D(VX3_Vec3D<int> pos, VX3_Vec3D<int>dim);
-__device__ VX3_Vec3D<int> to3D(int offset, VX3_Vec3D<int>dim);
-
 
 #endif // VX3_H

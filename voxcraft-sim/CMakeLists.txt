@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12.0)
+# if we need -fPIC globally
 # set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Set build type to Release by default
 if (NOT DEFINED CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RELEASE)
 endif()
@@ -20,27 +23,19 @@ file( GLOB VX3_SRC_cu src/VX3/*.cu )
 file( GLOB VX3_SRC_cpp src/VX3/*.cpp )
 file( GLOB VXA_SRC_cpp src/VXA/*.cpp )
 file( GLOB OLD_SRC src/old/*.c* )
-file(GLOB_RECURSE COLLISION_DETECT_SRC src/Cu-Collision-Detection/src/* src/Cu-Collision-Detection/include/*)
 
-add_subdirectory(3rdparty/halloc)
-include_directories(3rdparty/halloc/src/)
-
-set(Thrust_DIR 3rdparty/thrust/thrust/cmake)
-find_package(Thrust REQUIRED CONFIG)
-thrust_create_target(Thrust)
-
-add_library(voxelyze.3.0 ${UTILS_SRC_cu} ${VX3_SRC_cu} ${VX3_SRC_cpp} ${VXA_SRC_cpp} ${OLD_SRC} ${COLLISION_DETECT_SRC})
+add_library(voxelyze.3.0 ${UTILS_SRC_cu} ${VX3_SRC_cu} ${VX3_SRC_cpp} ${VXA_SRC_cpp} ${OLD_SRC})
 add_executable(voxcraft-sim src/Executables/voxcraft-sim.cpp)
 add_executable(vx3_node_worker src/Executables/vx3_node_worker.cu)
 add_executable(vx3_node_daemon src/Executables/vx3_node_daemon.cu)
 add_executable(vx3_test src/Executables/vx3_test.cu)
 
-target_link_libraries(vx3_node_worker PUBLIC voxelyze.3.0 halloc)
-target_link_libraries(vx3_test PUBLIC voxelyze.3.0 halloc)
+target_link_libraries(vx3_node_worker PUBLIC voxelyze.3.0)
+target_link_libraries(vx3_test PUBLIC voxelyze.3.0)
 # for Boost
 set(Boost_USE_STATIC_LIBS   ON)
 find_package(Boost REQUIRED COMPONENTS filesystem thread chrono program_options)
-target_link_libraries(voxelyze.3.0 PUBLIC ${Boost_LIBRARIES} Thrust)
+target_link_libraries(voxelyze.3.0 PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(voxcraft-sim PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(vx3_node_worker PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(vx3_node_daemon PUBLIC ${Boost_LIBRARIES})
@@ -116,8 +111,6 @@ if (test)
 
   # Standard linking to gtest stuff.
   target_link_libraries(runUnitTests gtest gtest_main)
-
-  target_link_libraries(runUnitTests halloc)
 
   # Extra linking for the project.
   target_link_libraries(runUnitTests voxelyze.3.0)
