@@ -380,7 +380,8 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
                     num_evaluated_this_gen += 1
                     ids_softbot_map[ind.id] = ind
                     with open(self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind.id, "w", encoding='utf-8') as vxd:
-                        vxd.write(etree.tostring(root))
+                        root_str = etree.tostring(root)
+                        vxd.write(root_str.decode('utf-8'))
 
         all_done = False
         fitness_eval_start_time = time.time()
@@ -390,7 +391,7 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
             if time_waiting_for_fitness > len(pop) * self.max_eval_time:
                 break
             try:
-                sub.call(f"./voxcraft-sim -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", shell=True)
+                sub.call(f"./voxcraft-sim -f -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", shell=True)
                 # sub.call waits for the process to return
                 # after it does, we collect the results output by the simulator
                 fitness_report = etree.parse(f"{self.run_directory}/output.xml").getroot()
@@ -402,24 +403,32 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
             except IndexError:
                 print("There was an IndexError. Re-simulating this batch again...")
 
-        for ind in pop:
+        for ind_id, ind in ids_softbot_map.items():
             
             results = {rank: None for rank in range(len(self.objective_dict))}
             for rank, details in self.objective_dict.items():
                 tag = details["tag"]
                 if tag is not None:
-                    results[rank] = float(fitness_report.findall(f"detail/bot{ind.id}/{tag}"))
+                    tag = tag.lstrip('<').rstrip('>')
+                    tag_ocurrences = fitness_report.findall("./detail/" + self.run_name + "--id_%05i" % ind_id + "/" + tag)
+                    results[rank] = float(tag_ocurrences[0].text)
 
             for rank, details in self.objective_dict.items():
                 if results[rank] is not None:
                     setattr(ind, details["name"], results[rank])
+                else:
+                    for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
+                        if name == details["output_node_name"]:
+                            state = details_phenotype["state"]
+                            setattr(ind, details["name"], details["node_func"](state))
+
 
             self.already_evaluated[ind.md5] = [getattr(ind, details["name"])
                                                 for rank, details in
                                                 self.objective_dict.items()]
 
-            ind_filename_vxd = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind.id
-            ind_filename_vxa = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id
+            ind_filename_vxd = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind_id
+            ind_filename_vxa = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind_id
             sub.call("rm " + ind_filename_vxd, shell=True)
 
             # update the run statistics and file management
@@ -427,12 +436,12 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
                 self.best_fit_so_far = ind.fitness
                 sub.call("cp " + ind_filename_vxa + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
                         "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
-                        (self.n_gen, ind.fitness, ind.id), shell=True)
+                        (self.n_gen, ind.fitness, ind_id), shell=True)
 
 
             if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                 file_source = ind_filename_vxa
-                file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_gen, ind.fitness, ind.id)
+                file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_gen, ind.fitness, ind_id)
                 sub.call("mv " + file_source + " " + file_destination, shell=True)
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)

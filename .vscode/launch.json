@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["--experiment", "MNSLC", "--starting_run", "1", "--runs", "10", "--population_size", "50", "--generations", "2000"]
+            "args": ["--physics", "GPU", "-e", "MNSLC"]
         }
     ]
 }

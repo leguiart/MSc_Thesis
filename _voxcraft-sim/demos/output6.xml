@@ -1,2 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<report><inputdir>compatibility_test</inputdir><bestfit><filename>robot.vxd</filename><fitness_score>-0.0095989607162342422</fitness_score></bestfit><detail><robot><currentTime>5.0001321185845882</currentTime><fitness_score>-0.0095989607162342422</fitness_score><largestStickyGroupSize>0</largestStickyGroupSize></robot><robot (copy)><currentTime>5.0001321185845882</currentTime><fitness_score>-0.0095989607174515566</fitness_score><largestStickyGroupSize>0</largestStickyGroupSize></robot (copy)></detail></report>

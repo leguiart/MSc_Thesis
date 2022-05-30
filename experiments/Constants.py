@@ -2,6 +2,8 @@
 VOXELYZE_VERSION = '_voxcad'
 
 EXPERIMENT_TYPES = ["SO", "QN-MOEA", "MNSLC"]
+PHYSICS_SIM_TYPES = ["CPU", "GPU"]
+
 
 NUM_RANDOM_INDS = 1  # Number of random individuals to insert each generation
 MAX_GENS = 1000  # Number of generations

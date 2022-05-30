@@ -10,11 +10,10 @@
     Related video: https://youtu.be/EXuR_soDnFo
 
 """
-from tracemalloc import start
+
 import numpy as np
-import subprocess as sub
 import os
-import sys, getopt
+import sys
 import uuid
 import random
 import argparse
@@ -28,7 +27,7 @@ sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the pytho
 from Constants import *
 from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
 from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAndVectorFieldDiversitySurvival
-from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxelyzePhysicsEvaluator
+from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import SoftbotMutation
 from Analytics.Utils import readFromJson, save_json, writeToJson, countFileLines, readFirstJson, QD_Analytics
@@ -51,9 +50,10 @@ def main(parser : argparse.ArgumentParser):
     runs = argv.runs
     pop_size = argv.population_size
     max_gens = argv.generations
+    physics_sim = argv.physics
 
 
-    if experiment not in EXPERIMENT_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
+    if experiment not in EXPERIMENT_TYPES or physics_sim not in PHYSICS_SIM_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
         parser.print_help()
         sys.exit(2)
     
@@ -67,58 +67,114 @@ def main(parser : argparse.ArgumentParser):
     # Creating an objectives dictionary
     objective_dict = ObjectiveDict()
 
-    # Now specifying the objectives for the optimization.
-    # Adding an objective named "fitness". This information is returned by Voxelyze
-    # in a fitness .xml file, with a tag named "NormFinalDist"
-    objective_dict.add_objective(name="fitness", maximize=True, tag="<FinalDist>")
+    if physics_sim == 'CPU':
 
-    # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
-    # Adding another objective called "num_voxels" for constraint reasons
-    objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
-                                    node_func=np.count_nonzero, output_node_name="material")
+        # Now specifying the objectives for the optimization.
+        # Adding an objective named "fitness". This information is returned by Voxelyze
+        # in a fitness .xml file, with a tag named "NormFinalDist"
+        objective_dict.add_objective(name="fitness", maximize=True, tag="<FinalDist>")
 
-    
-    objective_dict.add_objective(name="active", maximize=True, tag=None,
-                                    node_func=partial(count_occurrences, keys=[3, 4]),
-                                    output_node_name="material")
+        # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
+        # Adding another objective called "num_voxels" for constraint reasons
+        objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
+                                        node_func=np.count_nonzero, output_node_name="material")
 
-    objective_dict.add_objective(name="passive", maximize=True, tag=None,
-                            node_func=partial(count_occurrences, keys=[1, 2]),
-                            output_node_name="material")
-                            
-    objective_dict.add_objective(name="unaligned_novelty", maximize=True, tag=None)
+        
+        objective_dict.add_objective(name="active", maximize=True, tag=None,
+                                        node_func=partial(count_occurrences, keys=[3, 4]),
+                                        output_node_name="material")
 
-    physics_sim_cls = VoxelyzePhysicsEvaluator
+        objective_dict.add_objective(name="passive", maximize=True, tag=None,
+                                node_func=partial(count_occurrences, keys=[1, 2]),
+                                output_node_name="material")
+                                
+        objective_dict.add_objective(name="unaligned_novelty", maximize=True, tag=None)
 
-    if experiment == "SO":
-        seeds_json = SEEDS_JSON_SO
-        analytics_json = ANALYTICS_JSON_SO
-        analytics_csv = ANALYTICS_JSON_SO.replace(".json", ".csv")
-        run_dir = RUN_DIR_SO
-        run_name = RUN_NAME_SO
-        softbot_problem_cls = QualitySoftbotProblem
-    
-    elif experiment == "QN-MOEA":
-        seeds_json = SEEDS_JSON_QN
-        analytics_json = ANALYTICS_JSON_QN
-        analytics_csv = ANALYTICS_JSON_QN.replace(".json", ".csv")
-        run_dir = RUN_DIR_QN
-        run_name = RUN_NAME_QN
-        softbot_problem_cls = QualityNoveltySoftbotProblem
+        physics_sim_cls = VoxelyzePhysicsEvaluator
 
-    elif experiment == "MNSLC":
-        seeds_json = SEEDS_JSON_MNSLC
-        analytics_json = ANALYTICS_JSON_MNSLC
-        analytics_csv = ANALYTICS_JSON_MNSLC.replace(".json", ".csv")
-        run_dir = RUN_DIR_MNSLC
-        run_name = RUN_NAME_MNSLC
-        softbot_problem_cls = MNSLCSoftbotProblem
-        nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
-        objective_dict.add_objective(name="fitnessX", maximize=True, tag="<finalDistX>")
-        objective_dict.add_objective(name="fitnessY", maximize=True, tag="<finalDistY>")
-        objective_dict.add_objective(name="aligned_novelty", maximize=True, tag=None)
-        objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
-        objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
+        if experiment == "SO":
+            seeds_json = SEEDS_JSON_SO
+            analytics_json = ANALYTICS_JSON_SO
+            analytics_csv = ANALYTICS_JSON_SO.replace(".json", ".csv")
+            run_dir = RUN_DIR_SO
+            run_name = RUN_NAME_SO
+            softbot_problem_cls = QualitySoftbotProblem
+        
+        elif experiment == "QN-MOEA":
+            seeds_json = SEEDS_JSON_QN
+            analytics_json = ANALYTICS_JSON_QN
+            analytics_csv = ANALYTICS_JSON_QN.replace(".json", ".csv")
+            run_dir = RUN_DIR_QN
+            run_name = RUN_NAME_QN
+            softbot_problem_cls = QualityNoveltySoftbotProblem
+
+        elif experiment == "MNSLC":
+            seeds_json = SEEDS_JSON_MNSLC
+            analytics_json = ANALYTICS_JSON_MNSLC
+            analytics_csv = ANALYTICS_JSON_MNSLC.replace(".json", ".csv")
+            run_dir = RUN_DIR_MNSLC
+            run_name = RUN_NAME_MNSLC
+            softbot_problem_cls = MNSLCSoftbotProblem
+            nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
+            objective_dict.add_objective(name="fitnessX", maximize=True, tag="<finalDistX>")
+            objective_dict.add_objective(name="fitnessY", maximize=True, tag="<finalDistY>")
+            objective_dict.add_objective(name="aligned_novelty", maximize=True, tag=None)
+            objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
+            objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
+
+    elif physics_sim == 'GPU':
+        # Now specifying the objectives for the optimization.
+        # Adding an objective named "fitness". This information is returned by Voxelyze
+        # in a fitness .xml file, with a tag named "NormFinalDist"
+        objective_dict.add_objective(name="fitness", maximize=True, tag="fitness_score")
+
+        # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
+        # Adding another objective called "num_voxels" for constraint reasons
+        objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
+                                        node_func=np.count_nonzero, output_node_name="material")
+
+        
+        objective_dict.add_objective(name="active", maximize=True, tag=None,
+                                        node_func=partial(count_occurrences, keys=[3, 4]),
+                                        output_node_name="material")
+
+        objective_dict.add_objective(name="passive", maximize=True, tag=None,
+                                node_func=partial(count_occurrences, keys=[1, 2]),
+                                output_node_name="material")
+                                
+        objective_dict.add_objective(name="unaligned_novelty", maximize=True, tag=None)
+
+        physics_sim_cls = VoxcraftPhysicsEvaluator
+
+        if experiment == "SO":
+            seeds_json = SEEDS_JSON_SO
+            analytics_json = ANALYTICS_JSON_SO
+            analytics_csv = ANALYTICS_JSON_SO.replace(".json", ".csv")
+            run_dir = RUN_DIR_SO
+            run_name = RUN_NAME_SO
+            softbot_problem_cls = QualitySoftbotProblem
+        
+        elif experiment == "QN-MOEA":
+            seeds_json = SEEDS_JSON_QN
+            analytics_json = ANALYTICS_JSON_QN
+            analytics_csv = ANALYTICS_JSON_QN.replace(".json", ".csv")
+            run_dir = RUN_DIR_QN
+            run_name = RUN_NAME_QN
+            softbot_problem_cls = QualityNoveltySoftbotProblem
+
+        elif experiment == "MNSLC":
+            seeds_json = SEEDS_JSON_MNSLC
+            analytics_json = ANALYTICS_JSON_MNSLC
+            analytics_csv = ANALYTICS_JSON_MNSLC.replace(".json", ".csv")
+            run_dir = RUN_DIR_MNSLC
+            run_name = RUN_NAME_MNSLC
+            softbot_problem_cls = MNSLCSoftbotProblem
+            nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
+            objective_dict.add_objective(name="fitnessX", maximize=True, tag="currentCenterOfMass/x")
+            objective_dict.add_objective(name="fitnessY", maximize=True, tag="currentCenterOfMass/y")
+            objective_dict.add_objective(name="aligned_novelty", maximize=True, tag=None)
+            objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
+            objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
     
     runToSeedMapping = readFromJson(seeds_json)
     runsSoFar = countFileLines(analytics_json)
@@ -190,6 +246,5 @@ if __name__ == "__main__":
     parser.add_argument('-g','--generations', type=int, default=20, help="Number of iterations the optimization algorithm will execute")
     parser.add_argument('--physics', type=str, default='CPU', help = "Type of physics engine to use: CPU (default), GPU")
     # parser.add_argument('-o', '--outputDir', type=str, default=None, help = "Path of the output log files")
-    argv = parser.parse_args()
 
-    main(argv)
+    main(parser)

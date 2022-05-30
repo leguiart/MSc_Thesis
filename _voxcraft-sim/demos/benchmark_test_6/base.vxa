@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <VXA Version="1.1">
     <GPU>
-        <HeapSize>0.2</HeapSize>
+        <HeapSize>0.4</HeapSize>
     </GPU>
     <Simulator>
         <FitnessFunction>
@@ -15,11 +15,11 @@
                         <mtVAR>y</mtVAR>
                         <mtVAR>y</mtVAR>
                     </mtMUL>
-                    </mtADD>
+                </mtADD>
             </mtSQRT>
         </FitnessFunction>
         <Integration>
-            <DtFrac>1.0</DtFrac>
+            <DtFrac>0.9</DtFrac>
         </Integration>
         <Damping>
             <BondDampingZ>1</BondDampingZ>
