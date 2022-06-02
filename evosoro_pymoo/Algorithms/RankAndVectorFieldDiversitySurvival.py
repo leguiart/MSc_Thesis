@@ -4,14 +4,19 @@ import math
 import networkx as nx
 import itertools
 import concurrent.futures
+import logging
+
 from pymoo.core.survival import Survival
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 from pymoo.util.randomized_argsort import randomized_argsort
+from global_modules import timeit
+
+
+logger = logging.getLogger(f"__main__.{__name__}")
 
 # ---------------------------------------------------------------------------------------------------------
 # Survival Selection
 # ---------------------------------------------------------------------------------------------------------
-
 
 class RankAndVectorFieldDiversitySurvival(Survival):
 
@@ -22,11 +27,13 @@ class RankAndVectorFieldDiversitySurvival(Survival):
         self.indexes = [list(element) for element in itertools.product(*ranges)]
         self.input_tags = []
         self.output_tags = []
+        self.io_tags_cached = False
 
-
+    @timeit
     def _do(self, problem, pop, *args, n_survive=None, **kwargs):
 
-        if not (self.input_tags or self.output_tags):
+        #if not (self.input_tags or self.output_tags):
+        if not self.io_tags_cached:            
             for net in pop[0].X.genotype:
                 self.input_tags += [set()]
                 self.output_tags += [set()]
@@ -35,6 +42,7 @@ class RankAndVectorFieldDiversitySurvival(Survival):
                         self.input_tags[-1].add(name)
                     elif net.graph.nodes[name]['type'] == 'output':
                         self.output_tags[-1].add(name)
+            self.io_tags_cached = True
 
         # get the objective space values and objects
         F = pop.get("F").astype(float, copy=False)
@@ -54,7 +62,8 @@ class RankAndVectorFieldDiversitySurvival(Survival):
                     max = indx
                 fronts_indxs += [indx]
 
-        
+
+        logger.debug("Starting vector field distance calculation in parallel...")
         dist_dict = {}
         with concurrent.futures.ProcessPoolExecutor() as executor:
             future_to_indexes = {}
@@ -66,7 +75,7 @@ class RankAndVectorFieldDiversitySurvival(Survival):
             for future in concurrent.futures.as_completed(future_to_indexes):
                 row_indx, col_indx = future_to_indexes[future]
                 dist_dict[(row_indx, col_indx)] = future.result()
-
+        logger.debug("Finished vector field distance calculation...")
 
 
         for k, front in enumerate(fronts):

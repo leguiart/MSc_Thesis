@@ -5,6 +5,8 @@ import numpy as np
 import subprocess as sub
 from functools import partial
 
+from global_modules import timeit
+
 from .evaluation import evaluate_all
 from .selection import pareto_selection, pareto_tournament_selection
 from .mutation import create_new_children_through_mutation, genome_wide_mutation
@@ -39,6 +41,7 @@ class Optimizer(object):
         with open('{0}/pickledPops/Gen_{1}.pickle'.format(directory, gen), 'wb') as handle:
             pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    @timeit
     def run(self, *args, **kwargs):
         raise NotImplementedError
 

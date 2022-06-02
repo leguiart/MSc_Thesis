@@ -1,4 +1,5 @@
 import abc
+from global_modules import timeit
 
 class EvaluatorInterface(metaclass=abc.ABCMeta):
     @classmethod
@@ -10,6 +11,7 @@ class EvaluatorInterface(metaclass=abc.ABCMeta):
 @EvaluatorInterface.register
 class IEvaluator:
 
+    @timeit
     def evaluate(self, X : list, *args, **kwargs) -> list:
         """Evaluates phenotypes of the elements of a list of individuals with a certain fitness metric
         X : list

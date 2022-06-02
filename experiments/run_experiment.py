@@ -17,6 +17,7 @@ import sys
 import uuid
 import random
 import argparse
+import logging
 from functools import partial
 from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival
 from pymoo.core.population import Population
@@ -41,9 +42,27 @@ from BodyBrainCommon import runBodyBrain
 
 #sub.call("rm voxelyze", shell=True)
 #sub.call("cp ../" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+# create logger with __name__
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# create file handler which logs even debug messages
+fh = logging.FileHandler('experiments.log')
+fh.setLevel(logging.DEBUG)
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
 
 
 def main(parser : argparse.ArgumentParser):
+
+
     argv = parser.parse_args()
     experiment = argv.experiment
     starting_run = argv.starting_run
@@ -191,7 +210,7 @@ def main(parser : argparse.ArgumentParser):
         new_experiment = run + 1 == starting_run
 
         # Setting random seed
-        print(f"Starting run: {run + 1}")
+        logger.info(f"Starting run: {run + 1}")
         if not str(run + 1) in runToSeedMapping.keys():
             runToSeedMapping[str(run + 1)] = uuid.uuid4().int & (1<<32)-1
             writeToJson(seeds_json, runToSeedMapping)
