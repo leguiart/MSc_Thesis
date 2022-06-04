@@ -11,7 +11,7 @@ from lxml import etree
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro.tools.logging import PrintLog
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from global_modules import timeit
+from common.Utils import timeit
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
@@ -115,7 +115,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                 for rank, goal in self.objective_dict.items():
                     if goal["tag"] is not None:
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
-                logger.info("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
+                logger.debug("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
 
                 if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id +
@@ -375,7 +375,7 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
                 for rank, goal in self.objective_dict.items():
                     if goal["tag"] is not None:
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
-                logger.info("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
+                # logger.info("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
 
                 if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id +

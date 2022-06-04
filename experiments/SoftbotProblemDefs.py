@@ -3,7 +3,7 @@
 import numpy as np
 from typing import List
 
-from Constants import *
+from common.Constants import *
 from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator
 from evosoro_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluator, NSLCQuality
@@ -54,8 +54,8 @@ class MNSLCSoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BasePhysicsEvaluator, pop_size):
         super().__init__(physics_evaluator, n_var=1, n_obj=3, n_constr=4)
-        self.evaluators.update({"aligned_novelty" : NoveltyEvaluator(aligned_distance_metric, "aligned_novelty", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size//2, max_novelty_archive_size=MAX_NS_ARCHIVE_SIZE, k_neighbors=20), 
-                            "unaligned_novelty" : NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", nslc_neighbors_name="unaligned_neighbors", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size//2, max_novelty_archive_size=MAX_NS_ARCHIVE_SIZE, k_neighbors=20),
+        self.evaluators.update({"aligned_novelty" : NoveltyEvaluator(aligned_distance_metric, "aligned_novelty", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size//8, max_novelty_archive_size=MAX_NS_ARCHIVE_SIZE, k_neighbors=15), 
+                            "unaligned_novelty" : NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", nslc_neighbors_name="unaligned_neighbors", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size//8, max_novelty_archive_size=MAX_NS_ARCHIVE_SIZE, k_neighbors=15),
                             "nslc_quality" : NSLCQuality()})
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:

@@ -12,7 +12,7 @@ import copy
 import logging
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from global_modules import timeit
+from common.Utils import timeit
 
 logger = logging.getLogger(f"__main__.{__name__}")
 

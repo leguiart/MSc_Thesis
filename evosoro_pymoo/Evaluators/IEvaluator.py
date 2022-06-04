@@ -1,5 +1,5 @@
 import abc
-from global_modules import timeit
+from common.Utils import timeit
 
 class EvaluatorInterface(metaclass=abc.ABCMeta):
     @classmethod

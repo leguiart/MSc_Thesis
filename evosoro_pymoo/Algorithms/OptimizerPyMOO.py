@@ -14,7 +14,7 @@ from pymoo.core.algorithm import Algorithm
 from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
 from evosoro.tools.algorithms import Optimizer
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
-from global_modules import timeit
+from common.Utils import timeit
 
 logger = logging.getLogger(f"__main__.{__name__}")
 

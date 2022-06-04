@@ -6,12 +6,11 @@ import os
 import sys
 import math
 from pymoo.core.problem import Problem
-from Constants import *
+from common.Constants import *
 # sys.path.append(os.getcwd() + "/../..")
 from evosoro.networks import CPPN
 from evosoro.softbot import Genotype, Phenotype
 from evosoro.tools.utils import count_occurrences, make_material_tree, rescaled_positive_sigmoid
-from evosoro.tools.logging import PrintLog
 
 
 # Here we are going to evolve the stiffness distribution: need to define min and max elastic modulus
@@ -56,26 +55,26 @@ class SimpleGenotypeIndirect(Genotype):
 # Define a custom phenotype, inheriting from the Phenotype class
 class SimplePhenotypeIndirect(Phenotype):
     def is_valid(self, min_percent_full=0.1, max_percent_full = 0.9, min_percent_muscle=0.1, max_percent_muscle = 0.8):
-        if not self.is_valid_cached is None:
-            return self.is_valid_cached
+        # if not self.is_valid_cached is None:
+        #     return self.is_valid_cached
         # override super class function to redefine what constitutes a valid individuals
         for name, details in self.genotype.to_phenotype_mapping.items():
             if np.isnan(details["state"]).any():
-                self.is_valid_cached = False
+                # self.is_valid_cached = False
                 return False
             if name == "material":
                 state = details["state"]
                 # Discarding the robot if it doesn't have at least a given percentage of non-empty voxels
                 voxels = np.sum(state>0)
                 if voxels < self.genotype.ds_size * min_percent_full or voxels > self.genotype.ds_size * max_percent_full:
-                    self.is_valid_cached = False
+                    # self.is_valid_cached = False
                     return False
                 # Discarding the robot if it doesn't have at least a given percentage of muscles (materials 3 and 4)
                 muscles = count_occurrences(state, [3, 4]) 
                 if muscles < voxels * min_percent_muscle or muscles > voxels * max_percent_muscle:
-                    self.is_valid_cached = False
+                    # self.is_valid_cached = False
                     return False
-        self.is_valid_cached = True
+        # self.is_valid_cached = True
         return True
 
 

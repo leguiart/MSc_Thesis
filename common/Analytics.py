@@ -1,20 +1,14 @@
-import random
-import json
+
 import numpy as np
-import os
 import pandas as pd
-import sys
+import os
+import gc
 from pymoo.core.callback import Callback
 from pymoo.factory import get_performance_indicator
 
-from Constants import *
-# sys.path.append(os.getcwd() + "/..")
+from common.Constants import *
+from common.Utils import getsize, save_json
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
-
-
-def setRandomSeed(seed):
-    random.seed(seed)  # Initializing the random number generator for reproducibility
-    np.random.seed(seed)
 
 def get_extreme_points_c(F, ideal_point, extreme_points=None):
     # calculate the asf which is used for the extreme point decomposition
@@ -38,46 +32,6 @@ def get_extreme_points_c(F, ideal_point, extreme_points=None):
 
     return extreme_points
 
-def readFromJson(filename):
-    if os.path.exists(filename):            
-        with open(filename, 'r') as fp:           
-            return json.load(fp)
-    else:
-        return {}
-
-def writeToJson(filename, content):
-    with open(filename, 'w') as fp:           
-        json.dump(content, fp)
-
-def save_json(filename, content):
-    if os.path.exists(filename): 
-        with open(filename, 'a') as fp:           
-            fp.write('\n')
-            json.dump(content, fp)
-    else:
-        with open(filename, 'w') as fp:           
-            json.dump(content, fp)
-
-def countFileLines(filename):
-    if os.path.exists(filename): 
-        with open(filename, 'r') as fh:
-            count = 0
-            for _ in fh:
-                count += 1
-        return count
-    else:
-        return 0
-
-def readFirstJson(filename):
-    if os.path.exists(filename): 
-        with open(filename, 'r') as fh:
-            line = fh.readline()
-            j = json.loads(line)
-            return j
-    else:
-        return {}
-
-
 class MOEA_Analytics(Callback):
     def __init__(self, n_dim):
         super().__init__()
@@ -100,8 +54,24 @@ class MOEA_Analytics(Callback):
         self.front_history["hyper_volumes"].append(hypervolume)
 
 class QD_Analytics(Callback):
-    def __init__(self, run, method):
+    def __init__(self, run, method, json_path, csv_path):
         super().__init__()
+        self.run = run
+        self.method = method
+        self.json_path = json_path
+        self.csv_path = csv_path
+        self.total_voxels = IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2]
+        self.init_qd_history()
+        # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
+        min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
+        #1.- Elites in terms of fitness
+        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_descriptors)
+        #2.- Elites in terms of novelty
+        self.map_elites_archive_n = MAP_ElitesArchive(min_max_gr, self.extract_descriptors)
+        #3.- Elites in terms of both novelty and fitness (Pareto-dominance)
+        self.map_elites_archive_fn = MOMAP_ElitesArchive(min_max_gr, self.extract_descriptors)
+
+    def init_qd_history(self):
         self.qd_history = {
             "qd-score-f" : [],
             "nd-score-f" : [],
@@ -114,19 +84,9 @@ class QD_Analytics(Callback):
             "f_archive_progression" : [],
             "n_archive_progression" : [],
             "fn_archive_progression" : [],
-            "unaligned_novelty" : []
+            "unaligned_novelty" : [],
+            "run" : self.run
         }
-        self.run = run
-        self.method = method
-        self.total_voxels = IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2]
-        #We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
-        min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
-        #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_descriptors)
-        #2.- Elites in terms of novelty
-        self.map_elites_archive_n = MAP_ElitesArchive(min_max_gr, self.extract_descriptors)
-        #3.- Elites in terms of both novelty and fitness (Pareto-dominance)
-        self.map_elites_archive_fn = MOMAP_ElitesArchive(min_max_gr, self.extract_descriptors)
 
     def extract_descriptors(self, x):
         return [x.passive, x.active]
@@ -141,24 +101,24 @@ class QD_Analytics(Callback):
             self.map_elites_archive_n.try_add(ind.X, quality_metric="unaligned_novelty")
             self.map_elites_archive_fn.try_add(ind.X)
         
-        #We store the flattened versions of each archive to reconstruct them in a posterior data analysis step
+        # We store the flattened versions of each archive to reconstruct them in a posterior data analysis step
         vector_archive_f = []
         vector_archive_n = []
         vector_archive_fn = []
-        #We compute qd and nd scores for each archive
+        # We compute qd and nd scores for each archive
         qd_score_f = 0
         nd_score_f = 0
         qd_score_n = 0
         nd_score_n = 0
         qd_score_fn = 0
         nd_score_fn = 0
-        #Coverage is the same for all archives
+        # Coverage is the same for all archives
         coverage = 0
         for i in range(len(self.map_elites_archive_f.elites_archive)):
             xf = self.map_elites_archive_f.elites_archive[i]
             xn = self.map_elites_archive_n.elites_archive[i]
             xfn = self.map_elites_archive_fn.elites_archive[i]
-            #If one is None, all are None
+            # If one is None, all are None
             if xf is not None:
                 coverage += 1
                 qd_score_f += xf.fitness
@@ -187,6 +147,16 @@ class QD_Analytics(Callback):
         self.qd_history["fn_archive_progression"] += [vector_archive_n]
         self.qd_history["fitness"] += [fitness_li]
         self.qd_history["unaligned_novelty"] += [unaligned_novelty_li]
+
+        if getsize(self.qd_history) > 1000000000:
+            save_json(self.json_path, self.qd_history)
+            df = self.to_dataframe()
+            df.to_csv(self.csv_path, mode='a', header=not os.path.exists(self.csv_path), index = False)
+            del self.qd_history
+            gc.collect()
+            self.init_qd_history()
+            
+
 
     def to_dataframe(self):
         d = {"Indicator":[], "Best":[], "Average":[], "STD":[], "Generation":[], "Run":[], "Method":[]}
@@ -266,17 +236,3 @@ class QD_Analytics(Callback):
             d["Run"] += [self.run]
             d["Method"] += [self.method]
         return pd.DataFrame(d)
-
-
-
-
-
-def maxFromList(l):
-    max_elem = float('-inf')
-    for elem in l:
-        if elem > max_elem:
-            max_elem = elem
-    return max_elem
-
-
-

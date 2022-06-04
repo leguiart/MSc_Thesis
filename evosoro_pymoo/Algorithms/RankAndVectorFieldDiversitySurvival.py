@@ -9,7 +9,7 @@ import logging
 from pymoo.core.survival import Survival
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 from pymoo.util.randomized_argsort import randomized_argsort
-from global_modules import timeit
+from common.Utils import timeit
 
 
 logger = logging.getLogger(f"__main__.{__name__}")
@@ -28,6 +28,41 @@ class RankAndVectorFieldDiversitySurvival(Survival):
         self.input_tags = []
         self.output_tags = []
         self.io_tags_cached = False
+
+    def vector_field_distance(self, ind1, ind2, indexes, output_tags):
+        gene_length = len(ind1.genotype)
+        avg_dist = 0
+        for i,j,k in indexes:
+            dist = 0
+            for gene_index in range(gene_length):
+                g1 = ind1.genotype[gene_index].graph
+                g2 = ind2.genotype[gene_index].graph
+                v1 = []
+                v2 = []
+                # Form output vectors
+                for output_name in output_tags[gene_index]:
+                    v1 += [g1.nodes[output_name]["state"][i, j, k]]
+                    v2 += [g2.nodes[output_name]["state"][i, j, k]]
+
+                v1 = np.array(v1)
+                v2 = np.array(v2)
+
+                v1_norm = np.sqrt(np.sum(v1**2))
+                v2_norm = np.sqrt(np.sum(v2**2))
+
+                cos_sim = np.dot(v1, v2)/(v1_norm*v2_norm)
+
+                # euclidean_dist = np.exp(-np.sqrt(np.sum((p1 - p2)**2)))
+                angle_sim = np.arccos(max(-1., min(1., cos_sim)))/np.pi
+                magn_sim = abs(v1_norm - v2_norm)
+
+                dist += 1/3*(angle_sim + magn_sim)
+
+            avg_dist += dist/gene_length
+
+        avg_dist /= len(indexes)
+
+        return avg_dist
 
     @timeit
     def _do(self, problem, pop, *args, n_survive=None, **kwargs):
@@ -63,6 +98,7 @@ class RankAndVectorFieldDiversitySurvival(Survival):
                 fronts_indxs += [indx]
 
 
+
         logger.debug("Starting vector field distance calculation in parallel...")
         dist_dict = {}
         with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -70,7 +106,7 @@ class RankAndVectorFieldDiversitySurvival(Survival):
             for i in range(len(fronts_indxs)):              
                 for j in range(i + 1, len(fronts_indxs)):
                     row_indx, col_indx = fronts_indxs[i], fronts_indxs[j]
-                    future_to_indexes[executor.submit(vector_field_distance, pop[row_indx].X, pop[col_indx].X, self.indexes, self.output_tags)] = (row_indx,col_indx)
+                    future_to_indexes[executor.submit(self.vector_field_distance, pop[row_indx].X, pop[col_indx].X, self.indexes, self.output_tags)] = (row_indx,col_indx)
 
             for future in concurrent.futures.as_completed(future_to_indexes):
                 row_indx, col_indx = future_to_indexes[future]
@@ -130,40 +166,7 @@ def vector_field_diversity(current_front, other_fronts, len_fronts, dist_dict):
     return np.array(pop_diversity)
 
 
-def vector_field_distance(ind1, ind2, indexes, output_tags):
-    gene_length = len(ind1.genotype)
-    avg_dist = 0
-    for i,j,k in indexes:
-        dist = 0
-        for gene_index in range(gene_length):
-            g1 = ind1.genotype[gene_index].graph
-            g2 = ind2.genotype[gene_index].graph
-            v1 = []
-            v2 = []
-            # Form output vectors
-            for output_name in output_tags[gene_index]:
-                v1 += [g1.nodes[output_name]["state"][i, j, k]]
-                v2 += [g2.nodes[output_name]["state"][i, j, k]]
 
-            v1 = np.array(v1)
-            v2 = np.array(v2)
-
-            v1_norm = np.sqrt(np.sum(v1**2))
-            v2_norm = np.sqrt(np.sum(v2**2))
-
-            cos_sim = np.dot(v1, v2)/(v1_norm*v2_norm)
-
-            # euclidean_dist = np.exp(-np.sqrt(np.sum((p1 - p2)**2)))
-            angle_sim = np.arccos(max(-1., min(1., cos_sim)))/np.pi
-            magn_sim = abs(v1_norm - v2_norm)
-
-            dist += 1/3*(angle_sim + magn_sim)
-
-        avg_dist += dist/gene_length
-
-    avg_dist /= len(indexes)
-
-    return avg_dist
 
 
                 

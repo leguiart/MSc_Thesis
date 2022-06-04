@@ -22,16 +22,18 @@ from functools import partial
 from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival
 from pymoo.core.population import Population
 from dotenv import load_dotenv
+
 load_dotenv()
 sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
 
-from Constants import *
+from common.Constants import *
 from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
 from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAndVectorFieldDiversitySurvival
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import SoftbotMutation
-from Analytics.Utils import readFromJson, save_json, writeToJson, countFileLines, readFirstJson, QD_Analytics
+from common.Utils import readFromJson, save_json, writeToJson, countFileLines, readFirstJson
+from common.Analytics import QD_Analytics
 
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
@@ -40,17 +42,17 @@ from SoftbotProblemDefs import QualitySoftbotProblem, QualityNoveltySoftbotProbl
 from Genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
 from BodyBrainCommon import runBodyBrain
 
-#sub.call("rm voxelyze", shell=True)
-#sub.call("cp ../" + VOXELYZE_VERSION + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+
+
 # create logger with __name__
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-# create file handler which logs even debug messages
+# create file handler which logs only warning level messages
 fh = logging.FileHandler('experiments.log')
-fh.setLevel(logging.DEBUG)
+fh.setLevel(logging.WARNING)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+ch.setLevel(logging.DEBUG)
 # create formatter and add it to the handlers
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fh.setFormatter(formatter)
@@ -238,14 +240,15 @@ def main(parser : argparse.ArgumentParser):
         # Setting up optimization algorithm
         algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), mutation=SoftbotMutation(), crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
         algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
-        analytics = QD_Analytics(run + 1, experiment)
+        analytics = QD_Analytics(run + 1, experiment, analytics_json, analytics_csv)
         my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics)
 
         # Start optimization
         my_optimization.run(my_pop, max_hours_runtime=MAX_TIME, max_gens=max_gens, num_random_individuals=NUM_RANDOM_INDS, checkpoint_every=CHECKPOINT_EVERY, new_run = new_experiment)
-        save_json(analytics_json, analytics.qd_history)
-        df = analytics.to_dataframe()
-        df.to_csv(analytics_csv, mode='a', header=not os.path.exists(analytics_csv), index = False)
+        if analytics.qd_history:
+            save_json(analytics_json, analytics.qd_history)
+            df = analytics.to_dataframe()
+            df.to_csv(analytics_csv, mode='a', header=not os.path.exists(analytics_csv), index = False)
 
     # runBodyBrain(runs, pop_size, max_gens, seeds_json, analytics_json, objective_dict, softbot_problem_cls, genotype_cls, phenotype_cls)
        
