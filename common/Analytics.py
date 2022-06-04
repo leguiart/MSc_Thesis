@@ -1,4 +1,5 @@
 
+from typing import List
 import numpy as np
 import pandas as pd
 import os
@@ -65,11 +66,11 @@ class QD_Analytics(Callback):
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
         min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
         #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_descriptors)
+        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_descriptors, "fitness_elites")
         #2.- Elites in terms of novelty
-        self.map_elites_archive_n = MAP_ElitesArchive(min_max_gr, self.extract_descriptors)
+        self.map_elites_archive_n = MAP_ElitesArchive(min_max_gr, self.extract_descriptors, "novelty_elites")
         #3.- Elites in terms of both novelty and fitness (Pareto-dominance)
-        self.map_elites_archive_fn = MOMAP_ElitesArchive(min_max_gr, self.extract_descriptors)
+        self.map_elites_archive_fn = MOMAP_ElitesArchive(min_max_gr, self.extract_descriptors, "novelty-fitness_elites")
 
     def init_qd_history(self):
         self.qd_history = {
@@ -88,7 +89,7 @@ class QD_Analytics(Callback):
             "run" : self.run
         }
 
-    def extract_descriptors(self, x):
+    def extract_descriptors(self, x : object) -> List:
         return [x.passive, x.active]
     
     def notify(self, pop):
@@ -114,10 +115,10 @@ class QD_Analytics(Callback):
         nd_score_fn = 0
         # Coverage is the same for all archives
         coverage = 0
-        for i in range(len(self.map_elites_archive_f.elites_archive)):
-            xf = self.map_elites_archive_f.elites_archive[i]
-            xn = self.map_elites_archive_n.elites_archive[i]
-            xfn = self.map_elites_archive_fn.elites_archive[i]
+        for i in range(len(self.map_elites_archive_f)):
+            xf = self.map_elites_archive_f[i]
+            xn = self.map_elites_archive_n[i]
+            xfn = self.map_elites_archive_fn[i]
             # If one is None, all are None
             if xf is not None:
                 coverage += 1
@@ -148,7 +149,7 @@ class QD_Analytics(Callback):
         self.qd_history["fitness"] += [fitness_li]
         self.qd_history["unaligned_novelty"] += [unaligned_novelty_li]
 
-        if getsize(self.qd_history) > 1000000000:
+        if getsize(self.qd_history) > 100000000:
             save_json(self.json_path, self.qd_history)
             df = self.to_dataframe()
             df.to_csv(self.csv_path, mode='a', header=not os.path.exists(self.csv_path), index = False)

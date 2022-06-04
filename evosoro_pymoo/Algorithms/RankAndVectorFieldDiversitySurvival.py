@@ -13,7 +13,7 @@ from common.Utils import timeit
 
 
 logger = logging.getLogger(f"__main__.{__name__}")
-
+np.seterr(divide='ignore', invalid='ignore')
 # ---------------------------------------------------------------------------------------------------------
 # Survival Selection
 # ---------------------------------------------------------------------------------------------------------
@@ -32,9 +32,14 @@ class RankAndVectorFieldDiversitySurvival(Survival):
     def vector_field_distance(self, ind1, ind2, indexes, output_tags):
         gene_length = len(ind1.genotype)
         avg_dist = 0
-        for i,j,k in indexes:
-            dist = 0
-            for gene_index in range(gene_length):
+        
+        for gene_index in range(gene_length):
+            vectors1 = np.zeros((len(indexes), len(output_tags[gene_index])))
+            vectors2 = np.zeros((len(indexes), len(output_tags[gene_index])))
+            for indx, triplet in enumerate(indexes):
+                i,j,k  = triplet
+                dist = 0
+            
                 g1 = ind1.genotype[gene_index].graph
                 g2 = ind2.genotype[gene_index].graph
                 v1 = []
@@ -43,24 +48,38 @@ class RankAndVectorFieldDiversitySurvival(Survival):
                 for output_name in output_tags[gene_index]:
                     v1 += [g1.nodes[output_name]["state"][i, j, k]]
                     v2 += [g2.nodes[output_name]["state"][i, j, k]]
-
+                
                 v1 = np.array(v1)
                 v2 = np.array(v2)
+                vectors1[indx] = v1
+                vectors2[indx] = v2
 
-                v1_norm = np.sqrt(np.sum(v1**2))
-                v2_norm = np.sqrt(np.sum(v2**2))
+                # v1_norm = np.sqrt(np.sum(v1**2))
+                # v2_norm = np.sqrt(np.sum(v2**2))
 
-                cos_sim = np.dot(v1, v2)/(v1_norm*v2_norm)
+                # cos_sim = np.dot(v1, v2)/(v1_norm*v2_norm)
+                # cos_sim_normalized = (cos_sim + 1)/2
+                # cos_dist = 1 - cos_sim_normalized
 
-                # euclidean_dist = np.exp(-np.sqrt(np.sum((p1 - p2)**2)))
-                angle_sim = np.arccos(max(-1., min(1., cos_sim)))/np.pi
-                magn_sim = abs(v1_norm - v2_norm)
+                # # euclidean_dist = np.exp(-np.sqrt(np.sum((p1 - p2)**2)))
+                # # angle_sim = np.arccos(max(-1., min(1., cos_sim)))/np.pi
+                # magn_sim = abs(v1_norm - v2_norm)
 
-                dist += 1/3*(angle_sim + magn_sim)
+                # dist += 1/2*(cos_dist + magn_sim)
+            v1_norm = np.sqrt(np.sum(vectors1**2, axis=1))
+            v2_norm = np.sqrt(np.sum(vectors2**2, axis=1))
+            cos_sim = (np.sum(vectors1 * vectors2, axis = 1))/(v1_norm*v2_norm)
+            cos_sim_normalized = (cos_sim + 1)/2
+            cos_dist = 1 - cos_sim_normalized
 
-            avg_dist += dist/gene_length
+            magn_sim = np.abs(v1_norm - v2_norm)
+            magn_sim_normalized = np.nan_to_num((magn_sim - np.min(magn_sim))/(np.max(magn_sim) - np.min(magn_sim)), nan=1.)
+            magn_dist = 1 - magn_sim_normalized
 
-        avg_dist /= len(indexes)
+            dist = 1/2*(cos_dist + magn_dist)
+            avg_dist += np.mean(dist)
+
+        avg_dist /= gene_length
 
         return avg_dist
 

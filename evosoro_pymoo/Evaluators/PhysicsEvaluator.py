@@ -362,7 +362,7 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
         for ind in pop:
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
             ind.md5, root = get_vxd(self.sim, self.env[self.curr_env_idx], ind)
-            write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
+            
             # don't evaluate if invalid
             if not ind.phenotype.is_valid():
                 for rank, goal in self.objective_dict.items():
@@ -384,6 +384,7 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
 
             # otherwise evaluate with voxcraft
             else:
+                write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
                 # pop.total_evaluations += 1
                 # ids_to_analyze += [ind.id]
                 if ind.id not in ids_softbot_map:
