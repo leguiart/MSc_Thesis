@@ -1,13 +1,16 @@
-from asyncio import as_completed
+
 import operator
-import numpy as np
+import logging
 import math
+import numpy as np
+from asyncio import as_completed
 from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 from evosoro.networks import Network
 from evosoro.tools.utils import sigmoid, xml_format, dominates
 
+logger = logging.getLogger(f"__main__.{__name__}")
 
 class Genotype(object):
     """A container for multiple networks, 'genetic code' copied with modification to produce offspring."""

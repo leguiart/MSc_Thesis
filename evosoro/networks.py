@@ -1,4 +1,5 @@
 import random
+import logging
 import numpy as np
 import networkx as nx
 from networkx import DiGraph
@@ -7,6 +8,7 @@ from collections import OrderedDict
 
 from evosoro.tools.utils import neg_abs, neg_square, sqrt_abs, neg_sqrt_abs, normalize, sigmoid
 
+logger = logging.getLogger(f"__main__.{__name__}")
 
 class OrderedGraph(DiGraph):
     """Create a graph object that tracks the order nodes and their neighbors are added."""

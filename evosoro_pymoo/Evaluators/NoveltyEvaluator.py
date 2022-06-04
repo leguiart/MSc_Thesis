@@ -6,9 +6,15 @@ Based on the Novelty-Search algorithm found in here: https://github.com/PacktPub
 Author: Luis Andrés Eguiarte-Morett (Github: @leguiart)
 License: MIT.
 """
-from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
+
 import numpy as np
 import copy
+import logging
+
+from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
+from common.Utils import timeit
+
+logger = logging.getLogger(f"__main__.{__name__}")
 
 def std_is_valid(x):
     return True
@@ -73,11 +79,14 @@ class NoveltyEvaluator(IEvaluator):
         self.is_valid_func = is_valid_func
         self.already_evaluated = set()
 
+    @timeit
     def evaluate(self, X):
         """Evaluates the novelty of each object in a list of objects according to the Novelty-Search algorithm
         X : list
             List of objects which contain a fitness metric definition
         """
+
+        logger.debug("Starting novelty evaluation")
         preliminary_archive = []
         X_copy = X.copy()
         for i in range(len(X)):
@@ -90,15 +99,15 @@ class NoveltyEvaluator(IEvaluator):
                         setattr(X[i], self.nslc_neighbors_name, kn_neighborsf)
                     if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(preliminary_archive) + len(self.novelty_archive) < self.min_novelty_archive_size):
                         self.items_added_in_generation+=1
-                        # Watch out! you shouldn't add individuals to the archive just yet, if you do so, you could end up counting twice the same individual
-                        # self.novelty_archive += [copy.deepcopy(X[i])]
+                        # Should add individuals to the archive just yet? if so, could end up counting twice the same individual
+                        self.novelty_archive += [copy.deepcopy(X[i])]
                         # Instead add to a preliminary archive for the current population
-                        preliminary_archive += [copy.deepcopy(X[i])]
-                        self.already_evaluated.add(X[i].md5)
+                        # preliminary_archive += [copy.deepcopy(X[i])]
+                        # self.already_evaluated.add(X[i].md5)
 
         # Now we can actually add the individuals to the archive
         self.novelty_archive += preliminary_archive
-
+        logger.debug("Finished novelty evaluation")
 
         self._adjust_archive_settings()
         return X

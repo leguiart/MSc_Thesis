@@ -1,6 +1,7 @@
 
 
 import numpy as np
+import logging
 from typing import List
 from abc import ABC, abstractmethod
 from pymoo.core.problem import Problem
@@ -8,6 +9,7 @@ from pymoo.core.problem import Problem
 from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator
 
+logger = logging.getLogger(f"__main__.{__name__}")
 
 class BaseSoftbotProblem(Problem, ABC):
 

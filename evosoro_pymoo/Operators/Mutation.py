@@ -1,4 +1,6 @@
+
 import copy
+import logging
 import random
 import os
 import sys
@@ -7,8 +9,9 @@ import numpy as np
 
 from pymoo.core.mutation import Mutation
 
-# sys.path.append(os.getcwd() + "/..")
-#from evosoro.tools.mutation import create_new_children_through_mutation
+
+logger = logging.getLogger(f"__main__.{__name__}")
+
 
 class SoftbotMutation(Mutation):
     def __init__(self):
@@ -20,7 +23,7 @@ class SoftbotMutation(Mutation):
         return create_new_children_through_mutation(X, self)
 
 
-def create_new_children_through_mutation(pop, mut, print_log = None, new_children=None, mutate_network_probs=None,
+def create_new_children_through_mutation(pop, mut, new_children=None, mutate_network_probs=None,
                                          max_mutation_attempts=1500):
     """Create copies, with modification, of existing individuals in the population.
 
@@ -91,7 +94,7 @@ def create_new_children_through_mutation(pop, mut, print_log = None, new_childre
             for selected_net_idx in selected_networks:
                 mutation_counter = 0
                 done = False
-                clone.phenotype.is_valid_cached = None
+                # clone.phenotype.is_valid_cached = None
                 while not done:
                     mutation_counter += 1
                     candidate = copy.deepcopy(clone)
@@ -144,13 +147,11 @@ def create_new_children_through_mutation(pop, mut, print_log = None, new_childre
                         #         break
 
                     if mutation_counter > max_mutation_attempts:
-                        if print_log:
-                            print_log.message("Couldn't find a successful mutation in {} attempts! "
+                        logger.info("Couldn't find a successful mutation in {} attempts! "
                                             "Skipping this network.".format(max_mutation_attempts))
                         num_edges = len(clone.genotype[selected_net_idx].graph.edges())
                         num_nodes = len(clone.genotype[selected_net_idx].graph.nodes())
-                        if print_log:
-                            print_log.message("num edges: {0}; num nodes {1}".format(num_edges, num_nodes))
+                        logger.info("num edges: {0}; num nodes {1}".format(num_edges, num_nodes))
                         break
 
                 # end while

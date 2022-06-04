@@ -6,10 +6,14 @@ Author: Luis Andrés Eguiarte-Morett (Github: @leguiart)
 License: MIT.
 """
 
+
 import numpy as np
 import itertools
 import copy
-from typing import List
+import os
+import pickle
+import shutil
+from typing import List, Callable
 
 
 from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
@@ -22,7 +26,7 @@ class MAP_ElitesOptimizer(Optimizer):
         return super().run(*args, **kwargs)
 
 class MAP_ElitesArchive(object):
-    def __init__(self, min_max_gr_li : List[tuple], extract_descriptors_func) -> None:
+    def __init__(self, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], name : str) -> None:
         feats = []
         for min, max, granularity in min_max_gr_li:
             feats += [list(np.linspace(min, max, granularity))]
@@ -30,8 +34,12 @@ class MAP_ElitesArchive(object):
         for element in itertools.product(*feats):
             bc_space += [list(element)]
         self.bc_space = np.vstack(bc_space)
-        self.elites_archive = [None for _ in range(len(self.bc_space))]
+        self.filled_elites_archive = [0 for _ in range(len(self.bc_space))]
         self.extract_descriptors_func = extract_descriptors_func
+        self.name = name
+        if os.path.exists(self.name) and os.path.isdir(self.name):
+            shutil.rmtree(self.name)
+        os.mkdir(self.name)
 
     def feature_descriptor(self, x):
         return self.bc_space[self.feature_descriptor_idx(x)]
@@ -43,23 +51,36 @@ class MAP_ElitesArchive(object):
         return np.argmin(dist_vec)
 
     def __getitem__(self, i):
-        return self.elites_archive[i]
+        if self.filled_elites_archive[i] != 0:
+            with open(f"{self.name}/elite_{i}.pickle", 'rb') as handle:
+                x = pickle.load(handle)
+            return x
+        else:
+            return None
+
+    def __len__(self) -> int:
+        return len(self.filled_elites_archive)
 
     def try_add(self, x, quality_metric = "fitness"):
         i = self.feature_descriptor_idx(x)
-        x_e = self.elites_archive[i]
-        if x_e is None or getattr(x_e, quality_metric) < getattr(x, quality_metric):
-            self.elites_archive[i] = copy.deepcopy(x)
+        xe = self[i]
+        if xe is None or getattr(xe, quality_metric) < getattr(x, quality_metric):
+            self.filled_elites_archive[i] = 1
+            with open(f"{self.name}/elite_{i}.pickle", "wb") as fh:
+                pickle.dump(x, fh, protocol=pickle.HIGHEST_PROTOCOL)
+
     
 class MOMAP_ElitesArchive(MAP_ElitesArchive):
     def try_add(self, x, metrics = ["fitness", "unaligned_novelty"]):
         i = self.feature_descriptor_idx(x)
-        xe = self.elites_archive[i]
+        xe = self[i]
         xe_vec = extract_metrics(xe, metrics)
         x_vec = extract_metrics(x, metrics)
 
         if xe is None or (np.all(xe_vec <= x_vec) and np.any(xe_vec != x_vec)):
-            self.elites_archive[i] = copy.deepcopy(x)
+            self.filled_elites_archive[i] = 1
+            with open(f"{self.name}/elite_{i}.pickle", "wb") as fh:
+                pickle.dump(x, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def extract_metrics(x, metrics):

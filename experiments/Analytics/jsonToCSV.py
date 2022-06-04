@@ -1,10 +1,11 @@
+
 import sys
 import pandas as pd
 import json
 import os
 
-from Utils import QD_Analytics
-from Constants import *
+from common.Analytics import QD_Analytics
+from common.Constants import *
 # sys.path.append(os.getcwd() + "/..")
 
 def jsonToCSV(filename):

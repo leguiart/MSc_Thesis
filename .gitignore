@@ -131,3 +131,5 @@ dmypy.json
 
 *.o
 /_voxcad/GeneratedFiles
+/workspace
+/*_elites

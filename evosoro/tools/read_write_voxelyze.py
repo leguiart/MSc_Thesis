@@ -117,23 +117,28 @@ def get_vxd(sim : Sim, env : Env, individual):
     y = individual.genotype.orig_size_xyz[1]
     z = individual.genotype.orig_size_xyz[2]
 
-    etree.SubElement(structure, "X_Voxels").text = x
-    etree.SubElement(structure, "Y_Voxels").text = y
-    etree.SubElement(structure, "Z_Voxels").text = z
+    etree.SubElement(structure, "X_Voxels").text = str(x)
+    etree.SubElement(structure, "Y_Voxels").text = str(y)
+    etree.SubElement(structure, "Z_Voxels").text = str(z)
 
     str_md5 = ""
-    if "Data" in individual.genotype.to_phenotype_mapping:
-        for name, details in individual.genotype.to_phenotype_mapping.items():
+    # if "<Data>" in individual.genotype.to_phenotype_mapping:
+    for name, details in individual.genotype.to_phenotype_mapping.items():
+        if details['env_kws'] is None:
             state = details["state"]
             flattened_state = state.reshape(z, x*y)
-
-            data = etree.SubElement(structure, name)
+            
+            tag = details['tag'].lstrip('<').rstrip('>')
+            data = etree.SubElement(structure, tag)
             for i in range(flattened_state.shape[0]):
-                if name == "Data":
-                    layer = etree.SubElement(data, "Layer")
+                layer = etree.SubElement(data, "Layer")
+                if tag == "PhaseOffset":
+                    str_layer = "".join([str(c) + "," for c in flattened_state[i]])
+                else:
                     str_layer = "".join([str(c) for c in flattened_state[i]])
-                    str_md5 += str_layer
-                    layer.text = etree.CDATA(str_layer)
+                str_layer = str_layer.strip(',')
+                str_md5 += str_layer
+                layer.text = etree.CDATA(str_layer)
 
     m = hashlib.md5()
     m.update(str_md5.encode('utf-8'))
