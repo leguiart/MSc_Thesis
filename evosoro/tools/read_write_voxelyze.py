@@ -2,6 +2,7 @@ import hashlib
 import os
 import time
 import random
+import numpy as np
 from lxml import etree
 
 from evosoro.base import Env, Sim
@@ -79,7 +80,11 @@ def get_vxd(sim : Sim, env : Env, individual):
 
     vxd_lattice_dim = etree.SubElement(root, "Lattice_Dim")
     vxd_lattice_dim.set('replace', "VXA.VXC.Lattice.Lattice_Dim")
-    vxd_lattice_dim.text = str(int(sim.self_collisions_enabled))
+    vxd_lattice_dim.text = str(env.lattice_dimension)
+
+    # vxd_lattice_dim = etree.SubElement(root, "Lattice_Dim")
+    # vxd_lattice_dim.set('replace', "VXA.VXC.Lattice.Lattice_Dim")
+    # vxd_lattice_dim.text = str(int(sim.self_collisions_enabled))
 
     # vxd_fat_stiffness = etree.SubElement(root, "EnableCollision")
     # vxd_fat_stiffness.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
@@ -124,20 +129,23 @@ def get_vxd(sim : Sim, env : Env, individual):
     str_md5 = ""
     # if "<Data>" in individual.genotype.to_phenotype_mapping:
     for name, details in individual.genotype.to_phenotype_mapping.items():
+        state = details["state"]
         if details['env_kws'] is None:
-            state = details["state"]
-            flattened_state = state.reshape(z, x*y)
-            
+            flattened_state = state.T.reshape(z, x*y)
+
             tag = details['tag'].lstrip('<').rstrip('>')
             data = etree.SubElement(structure, tag)
             for i in range(flattened_state.shape[0]):
                 layer = etree.SubElement(data, "Layer")
                 if tag == "PhaseOffset":
                     str_layer = "".join([str(c) + "," for c in flattened_state[i]])
+                    str_md5 += "".join([str(c) for c in flattened_state[i]])
                 else:
                     str_layer = "".join([str(c) for c in flattened_state[i]])
+                    str_md5 += str_layer
+                
                 str_layer = str_layer.strip(',')
-                str_md5 += str_layer
+                
                 layer.text = etree.CDATA(str_layer)
 
     m = hashlib.md5()

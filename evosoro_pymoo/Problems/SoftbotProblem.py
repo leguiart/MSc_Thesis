@@ -30,7 +30,6 @@ class BaseSoftbotProblem(Problem, ABC):
         if constraints_mat:
             out["G"] = np.array(constraints_mat, dtype=float)
     
-    @abstractmethod
     def _extractConstraints(self, x : SoftBot) -> List[float]:
         pass
     
