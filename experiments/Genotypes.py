@@ -54,7 +54,7 @@ class SimpleGenotypeIndirect(Genotype):
 
 # Define a custom phenotype, inheriting from the Phenotype class
 class SimplePhenotypeIndirect(Phenotype):
-    def is_valid(self, min_percent_full=0.1, max_percent_full = 0.9, min_percent_muscle=0.1, max_percent_muscle = 0.8):
+    def is_valid(self, min_percent_full=0.05, max_percent_full = 0.9, min_percent_muscle=0.1, max_percent_muscle = 0.9):
         # if not self.is_valid_cached is None:
         #     return self.is_valid_cached
         # override super class function to redefine what constitutes a valid individuals

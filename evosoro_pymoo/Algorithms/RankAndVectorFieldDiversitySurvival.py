@@ -29,60 +29,6 @@ class RankAndVectorFieldDiversitySurvival(Survival):
         self.output_tags = []
         self.io_tags_cached = False
 
-    def vector_field_distance(self, ind1, ind2, indexes, output_tags):
-        gene_length = len(ind1.genotype)
-        avg_dist = 0
-        
-        for gene_index in range(gene_length):
-            vectors1 = np.zeros((len(indexes), len(output_tags[gene_index])))
-            vectors2 = np.zeros((len(indexes), len(output_tags[gene_index])))
-            for indx, triplet in enumerate(indexes):
-                i,j,k  = triplet
-                dist = 0
-            
-                g1 = ind1.genotype[gene_index].graph
-                g2 = ind2.genotype[gene_index].graph
-                v1 = []
-                v2 = []
-                # Form output vectors
-                for output_name in output_tags[gene_index]:
-                    v1 += [g1.nodes[output_name]["state"][i, j, k]]
-                    v2 += [g2.nodes[output_name]["state"][i, j, k]]
-                
-                v1 = np.array(v1)
-                v2 = np.array(v2)
-                vectors1[indx] = v1
-                vectors2[indx] = v2
-
-                # v1_norm = np.sqrt(np.sum(v1**2))
-                # v2_norm = np.sqrt(np.sum(v2**2))
-
-                # cos_sim = np.dot(v1, v2)/(v1_norm*v2_norm)
-                # cos_sim_normalized = (cos_sim + 1)/2
-                # cos_dist = 1 - cos_sim_normalized
-
-                # # euclidean_dist = np.exp(-np.sqrt(np.sum((p1 - p2)**2)))
-                # # angle_sim = np.arccos(max(-1., min(1., cos_sim)))/np.pi
-                # magn_sim = abs(v1_norm - v2_norm)
-
-                # dist += 1/2*(cos_dist + magn_sim)
-            v1_norm = np.sqrt(np.sum(vectors1**2, axis=1))
-            v2_norm = np.sqrt(np.sum(vectors2**2, axis=1))
-            cos_sim = (np.sum(vectors1 * vectors2, axis = 1))/(v1_norm*v2_norm)
-            cos_sim_normalized = (cos_sim + 1)/2
-            cos_dist = 1 - cos_sim_normalized
-
-            magn_sim = np.abs(v1_norm - v2_norm)
-            magn_sim_normalized = np.nan_to_num((magn_sim - np.min(magn_sim))/(np.max(magn_sim) - np.min(magn_sim)), nan=1.)
-            magn_dist = 1 - magn_sim_normalized
-
-            dist = 1/2*(cos_dist + magn_dist)
-            avg_dist += np.mean(dist)
-
-        avg_dist /= gene_length
-
-        return avg_dist
-
     @timeit
     def _do(self, problem, pop, *args, n_survive=None, **kwargs):
 
@@ -125,7 +71,7 @@ class RankAndVectorFieldDiversitySurvival(Survival):
             for i in range(len(fronts_indxs)):              
                 for j in range(i + 1, len(fronts_indxs)):
                     row_indx, col_indx = fronts_indxs[i], fronts_indxs[j]
-                    future_to_indexes[executor.submit(self.vector_field_distance, pop[row_indx].X, pop[col_indx].X, self.indexes, self.output_tags)] = (row_indx,col_indx)
+                    future_to_indexes[executor.submit(vector_field_distance, pop[row_indx].X, pop[col_indx].X, self.indexes, self.output_tags)] = (row_indx,col_indx)
 
             for future in concurrent.futures.as_completed(future_to_indexes):
                 row_indx, col_indx = future_to_indexes[future]
@@ -188,5 +134,91 @@ def vector_field_diversity(current_front, other_fronts, len_fronts, dist_dict):
 
 
 
-                
+def vector_field_distance(ind1, ind2, indexes, output_tags):
+    gene_length = len(ind1.genotype)
+    avg_dist = 0
+    
+    for gene_index in range(gene_length):
+        # vectors1 = np.zeros((len(indexes), len(output_tags[gene_index])))
+        # vectors2 = np.zeros((len(indexes), len(output_tags[gene_index])))
+
+        # Form output tensors
+        g1 = ind1.genotype[gene_index].graph
+        g2 = ind2.genotype[gene_index].graph
+
+        # Each graph can have multiple output nodes and each output node
+        # has an associated state which contains all outputs given the design space
+        # in the form of a 3D matrix.
+        # We need to concatenate the matrices, and form a 4D tensor
+        tensor1 = []
+        tensor2 = []
+
+        # Form output tensors
+        for output_name in output_tags[gene_index]:
+            tensor1 += [g1.nodes[output_name]["state"]]
+            tensor2 += [g2.nodes[output_name]["state"]]
+
+        tensor1 = np.array(tensor1).T
+        tensor2 = np.array(tensor2).T
+        
+        t1_norm = np.sqrt(np.sum(tensor1**2, axis = 3))
+        t2_norm = np.sqrt(np.sum(tensor2**2, axis = 3))
+        cos_sim = (np.sum(tensor1 * tensor2, axis = 3))/(t1_norm*t2_norm)
+
+        cos_sim_normalized = (cos_sim + 1)/2
+        cos_dist = 1 - cos_sim_normalized
+
+        magn_sim = np.abs(t1_norm - t2_norm)
+        magn_sim_normalized = np.nan_to_num((magn_sim - np.min(magn_sim))/(np.max(magn_sim) - np.min(magn_sim)), nan=1.)
+        magn_dist = 1 - magn_sim_normalized
+
+        dist = 1/2*(cos_dist + magn_dist)
+        avg_dist += np.mean(dist)
+
+        # for indx, triplet in enumerate(indexes):
+        #     i,j,k  = triplet
+        #     dist = 0
+        
+        #     g1 = ind1.genotype[gene_index].graph
+        #     g2 = ind2.genotype[gene_index].graph
+        #     v1 = []
+        #     v2 = []
+        #     # Form output vectors
+        #     for output_name in output_tags[gene_index]:
+        #         v1 += [g1.nodes[output_name]["state"][i, j, k]]
+        #         v2 += [g2.nodes[output_name]["state"][i, j, k]]
+            
+        #     v1 = np.array(v1)
+        #     v2 = np.array(v2)
+        #     vectors1[indx] = v1
+        #     vectors2[indx] = v2
+
+            # v1_norm = np.sqrt(np.sum(v1**2))
+            # v2_norm = np.sqrt(np.sum(v2**2))
+
+            # cos_sim = np.dot(v1, v2)/(v1_norm*v2_norm)
+            # cos_sim_normalized = (cos_sim + 1)/2
+            # cos_dist = 1 - cos_sim_normalized
+
+            # # euclidean_dist = np.exp(-np.sqrt(np.sum((p1 - p2)**2)))
+            # # angle_sim = np.arccos(max(-1., min(1., cos_sim)))/np.pi
+            # magn_sim = abs(v1_norm - v2_norm)
+
+            # dist += 1/2*(cos_dist + magn_sim)
+        # v1_norm = np.sqrt(np.sum(vectors1**2, axis=1))
+        # v2_norm = np.sqrt(np.sum(vectors2**2, axis=1))
+        # cos_sim = (np.sum(vectors1 * vectors2, axis = 1))/(v1_norm*v2_norm)
+        # cos_sim_normalized = (cos_sim + 1)/2
+        # cos_dist = 1 - cos_sim_normalized
+
+        # magn_sim = np.abs(v1_norm - v2_norm)
+        # magn_sim_normalized = np.nan_to_num((magn_sim - np.min(magn_sim))/(np.max(magn_sim) - np.min(magn_sim)), nan=1.)
+        # magn_dist = 1 - magn_sim_normalized
+
+        # dist = 1/2*(cos_dist + magn_dist)
+        # avg_dist += np.mean(dist)
+
+    avg_dist /= gene_length
+
+    return avg_dist            
 

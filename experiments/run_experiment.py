@@ -38,7 +38,7 @@ from common.Analytics import QD_Analytics
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
 from evosoro.softbot import Population as SoftbotPopulation
-from SoftbotProblemDefs import QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem
+from SoftbotProblemDefs import MNSLCSoftbotProblemGPU, QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem, NSLCSoftbotProblem
 from Genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
 from BodyBrainCommon import runBodyBrain
 
@@ -129,13 +129,24 @@ def main(parser : argparse.ArgumentParser):
             run_name = RUN_NAME_QN
             softbot_problem_cls = QualityNoveltySoftbotProblem
 
+        elif experiment == "NSLC":
+            seeds_json = SEEDS_JSON_NSLC
+            analytics_json = ANALYTICS_JSON_NSLC
+            analytics_csv = ANALYTICS_JSON_NSLC.replace(".json", ".csv")
+            run_dir = RUN_DIR_NSLC
+            run_name = RUN_NAME_NSLC
+            softbot_problem_cls = MNSLCSoftbotProblem
+            nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
+            objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
+            objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
+
         elif experiment == "MNSLC":
             seeds_json = SEEDS_JSON_MNSLC
             analytics_json = ANALYTICS_JSON_MNSLC
             analytics_csv = ANALYTICS_JSON_MNSLC.replace(".json", ".csv")
             run_dir = RUN_DIR_MNSLC
             run_name = RUN_NAME_MNSLC
-            softbot_problem_cls = MNSLCSoftbotProblem
+            softbot_problem_cls = NSLCSoftbotProblem
             nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
             objective_dict.add_objective(name="fitnessX", maximize=True, tag="<finalDistX>")
             objective_dict.add_objective(name="fitnessY", maximize=True, tag="<finalDistY>")
@@ -183,16 +194,31 @@ def main(parser : argparse.ArgumentParser):
             run_name = RUN_NAME_QN
             softbot_problem_cls = QualityNoveltySoftbotProblem
 
+        elif experiment == "NSLC":
+            seeds_json = SEEDS_JSON_NSLC
+            analytics_json = ANALYTICS_JSON_NSLC
+            analytics_csv = ANALYTICS_JSON_NSLC.replace(".json", ".csv")
+            run_dir = RUN_DIR_NSLC
+            run_name = RUN_NAME_NSLC
+            softbot_problem_cls = NSLCSoftbotProblem
+            nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
+            objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
+            objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
+
         elif experiment == "MNSLC":
             seeds_json = SEEDS_JSON_MNSLC
             analytics_json = ANALYTICS_JSON_MNSLC
             analytics_csv = ANALYTICS_JSON_MNSLC.replace(".json", ".csv")
             run_dir = RUN_DIR_MNSLC
             run_name = RUN_NAME_MNSLC
-            softbot_problem_cls = MNSLCSoftbotProblem
+            softbot_problem_cls = MNSLCSoftbotProblemGPU
             nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
-            objective_dict.add_objective(name="fitnessX", maximize=True, tag="currentCenterOfMass/x")
-            objective_dict.add_objective(name="fitnessY", maximize=True, tag="currentCenterOfMass/y")
+            objective_dict.add_objective(name="initialX", maximize=True, tag="initialCenterOfMass/x")
+            objective_dict.add_objective(name="initialY", maximize=True, tag="initialCenterOfMass/y")
+            objective_dict.add_objective(name="finalX", maximize=True, tag="currentCenterOfMass/x")
+            objective_dict.add_objective(name="finalY", maximize=True, tag="currentCenterOfMass/y")
+            objective_dict.add_objective(name="fitnessX", maximize=True, tag=None)
+            objective_dict.add_objective(name="fitnessY", maximize=True, tag=None)
             objective_dict.add_objective(name="aligned_novelty", maximize=True, tag=None)
             objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
             objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
@@ -225,7 +251,7 @@ def main(parser : argparse.ArgumentParser):
         sim = Sim(dt_frac=DT_FRAC, simulation_time=SIM_TIME, fitness_eval_init_time=INIT_TIME)
 
         # Setting up the environment object
-        env = Env(sticky_floor=0, time_between_traces=0)
+        env = Env(sticky_floor=0, time_between_traces=0, lattice_dimension=0.05)
 
         # Setting up physics simulation
         physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_dir, run_name + str(run + 1), objective_dict, MAX_EVAL_TIME, TIME_TO_TRY_AGAIN, SAVE_LINEAGES)

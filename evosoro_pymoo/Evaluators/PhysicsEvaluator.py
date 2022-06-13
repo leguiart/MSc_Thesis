@@ -105,9 +105,9 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
 
             # don't evaluate if invalid
             if not ind.phenotype.is_valid():
-                for rank, goal in self.objective_dict.items():
-                    if goal["name"] != "age":
-                        setattr(ind, goal["name"], goal["worst_value"])
+                # for rank, goal in self.objective_dict.items():
+                #     if goal["name"] != "age":
+                #         setattr(ind, goal["name"], goal["worst_value"])
                 logger.info("Skipping invalid individual")
 
             # don't evaluate if identical phenotype has already been evaluated
@@ -115,6 +115,7 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                 for rank, goal in self.objective_dict.items():
                     if goal["tag"] is not None:
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
+
                 logger.debug("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
 
                 if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
@@ -357,17 +358,17 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
 
         logger.info("Starting voxcraft physics evaluation")
         if self.n_gen == 1:
-            sub.call(f"cp {self.voxelyze_version}/demos/benchmark_test_6/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
-
+            #sub.call(f"cp {self.voxelyze_version}/demos/benchmark_test_6/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
+            sub.call(f"cp {self.voxelyze_version}/demos/voxelyze/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
         for ind in pop:
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
             ind.md5, root = get_vxd(self.sim, self.env[self.curr_env_idx], ind)
             
             # don't evaluate if invalid
             if not ind.phenotype.is_valid():
-                for rank, goal in self.objective_dict.items():
-                    if goal["name"] != "age":
-                        setattr(ind, goal["name"], goal["worst_value"])
+                # for rank, goal in self.objective_dict.items():
+                #     if goal["name"] != "age":
+                #         setattr(ind, goal["name"], goal["worst_value"])
                 logger.info("Skipping invalid individual")
 
             # don't evaluate if identical phenotype has already been evaluated
@@ -384,7 +385,7 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
 
             # otherwise evaluate with voxcraft
             else:
-                write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
+                md5 = write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
                 # pop.total_evaluations += 1
                 # ids_to_analyze += [ind.id]
                 if ind.id not in ids_softbot_map:
