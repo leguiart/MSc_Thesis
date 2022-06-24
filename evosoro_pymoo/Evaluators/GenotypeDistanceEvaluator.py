@@ -1,22 +1,43 @@
 
+from collections import _KT, _VT
 import concurrent.futures
 import logging
+from typing import Dict, List, Set, Tuple
 import numpy as np
+from evosoro.softbot import SoftBot
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 
 logger = logging.getLogger(f"__main__.{__name__}")
 np.seterr(divide='ignore', invalid='ignore')
 
-class GenotypeDistanceEvaluator(IEvaluator):
+class GenotypeDistanceEvaluator(IEvaluator, dict):
+
     def __init__(self) -> None:
         super().__init__()
-        self.distance_cache = {}
-        self.input_tags = []
-        self.output_tags = []
-        self.io_tags_cached = False
+        self.distance_cache : Dict[Tuple[str, str], List[float]] = {}
+        self.input_tags : List[Set[str]] = []
+        self.output_tags : List[Set[str]]= []
+        self.io_tags_cached : bool = False
 
-    def evaluate(self, X : list, *args, **kwargs) -> list:
+
+    def __getitem__(self, __k: Tuple[str, str]) -> List[float]:
+        if (__k[0],__k[1]) in self.distance_cache:
+            return self.distance_cache[(__k[0],__k[1]) ]
+        elif (__k[1],__k[0]) in self.distance_cache:
+            return self.distance_cache[(__k[1],__k[0])]
+        return [0. for _ in range(len(self.input_tags))]
+
+
+    def __setitem__(self, __k : Tuple[str, str], __v: List[float]) -> None:
+        self.distance_cache[__k] = __v
+
+
+    def __contains__(self, __o: Tuple[str, str]) -> bool:
+        return (__o[0], __o[1]) not in self.distance_cache and (__o[1], __o[0]) not in self.distance_cache
+
+
+    def evaluate(self, X : List[SoftBot], *args, **kwargs) -> List[SoftBot]:
         if not self.io_tags_cached:            
             for net in X[0].genotype:
                 self.input_tags += [set()]
@@ -35,21 +56,24 @@ class GenotypeDistanceEvaluator(IEvaluator):
             for i in range(len(X)):              
                 for j in range(i + 1, len(X)):
                     row_md5, col_md5 = X[i].md5, X[j].md5
-                    if row_md5 != col_md5 and (row_md5, col_md5) not in self.distance_cache and (col_md5, row_md5) not in self.distance_cache:
+                    if row_md5 != col_md5 and (row_md5, col_md5) not in self.distance_cache:
                         future_to_indexes[executor.submit(vector_field_distance, X[i], X[j], self.output_tags)] = (row_md5, col_md5)
 
             for future in concurrent.futures.as_completed(future_to_indexes):
                 row_md5, col_md5 = future_to_indexes[future]
-                self.distance_cache[(row_md5, col_md5)] = future.result()
+                self[(row_md5, col_md5)] = future.result()
 
         logger.debug("Finished vector field distance calculation...")
 
         return X
 
-def vector_field_distance(ind1, ind2, output_tags):
-    gene_length = len(ind1.genotype)
-    avg_dist = 0
+
+
+def vector_field_distance(ind1 : SoftBot, ind2 : SoftBot, output_tags : List[Set[str]]) -> List[float] :
     
+    gene_length = len(ind1.genotype)
+    gene_distances = []
+
     for gene_index in range(gene_length):
         # vectors1 = np.zeros((len(indexes), len(output_tags[gene_index])))
         # vectors2 = np.zeros((len(indexes), len(output_tags[gene_index])))
@@ -85,9 +109,9 @@ def vector_field_distance(ind1, ind2, output_tags):
         magn_dist = 1 - magn_sim_normalized
 
         dist = 1/2*(cos_dist + magn_dist)
-        avg_dist += np.mean(dist)
+        gene_distances += [np.mean(dist)]
 
 
-    avg_dist /= gene_length
+    return gene_distances     
 
-    return avg_dist            
+ 

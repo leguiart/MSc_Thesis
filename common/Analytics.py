@@ -63,14 +63,15 @@ class QD_Analytics(Callback):
         self.csv_path = csv_path
         self.total_voxels = IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2]
         self.init_qd_history()
+        self.gen_offset = 0
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
         min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
         #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_descriptors, "fitness_elites")
+        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "fitness_elites")
         #2.- Elites in terms of novelty
-        self.map_elites_archive_n = MAP_ElitesArchive(min_max_gr, self.extract_descriptors, "novelty_elites")
+        self.map_elites_archive_n = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "novelty_elites")
         #3.- Elites in terms of both novelty and fitness (Pareto-dominance)
-        self.map_elites_archive_fn = MOMAP_ElitesArchive(min_max_gr, self.extract_descriptors, "novelty-fitness_elites")
+        self.map_elites_archive_fn = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "novelty-fitness_elites")
 
     def init_qd_history(self):
         self.qd_history = {
@@ -86,11 +87,28 @@ class QD_Analytics(Callback):
             "n_archive_progression" : [],
             "fn_archive_progression" : [],
             "unaligned_novelty" : [],
+            "aligned_novelty" : [],
+            "end_points" : [],
+            "ini_points" : [],
+            "trayectories" : [],
+            "morpho_points" : [],
+            "gene_diversity" : [],
+            "control_gene_div" : [],
+            "morpho_gene_div" :[],
             "run" : self.run
         }
 
-    def extract_descriptors(self, x : object) -> List:
+    def extract_morpho(self, x : object) -> List:
         return [x.passive, x.active]
+
+    def extract_endpoint(self, x):
+        return [x.finalX, x.finalY]
+
+    def extract_initpoint(self, x):
+        return [x.initialX, x.initialY]
+
+    def extract_trayectory(self, x):
+        return [x.finalX - x.initialX, x.finalY -  x.initialY]
     
     def notify(self, pop):
         fitness_li = []
@@ -106,6 +124,7 @@ class QD_Analytics(Callback):
         vector_archive_f = []
         vector_archive_n = []
         vector_archive_fn = []
+
         # We compute qd and nd scores for each archive
         qd_score_f = 0
         nd_score_f = 0
@@ -113,6 +132,7 @@ class QD_Analytics(Callback):
         nd_score_n = 0
         qd_score_fn = 0
         nd_score_fn = 0
+        
         # Coverage is the same for all archives
         coverage = 0
         for i in range(len(self.map_elites_archive_f)):
@@ -135,6 +155,7 @@ class QD_Analytics(Callback):
                 vector_archive_f += [0]
                 vector_archive_n += [0]
                 vector_archive_fn += [0]
+
         coverage /= len(vector_archive_f)
         self.qd_history["qd-score-f"] += [qd_score_f]
         self.qd_history["nd-score-f"] += [nd_score_f]
@@ -149,7 +170,8 @@ class QD_Analytics(Callback):
         self.qd_history["fitness"] += [fitness_li]
         self.qd_history["unaligned_novelty"] += [unaligned_novelty_li]
 
-        if getsize(self.qd_history) > 100000000:
+
+        if getsize(self.qd_history) >= 100000000:
             save_json(self.json_path, self.qd_history)
             df = self.to_dataframe()
             df.to_csv(self.csv_path, mode='a', header=not os.path.exists(self.csv_path), index = False)
@@ -157,18 +179,20 @@ class QD_Analytics(Callback):
             gc.collect()
             self.init_qd_history()
             
+            
 
 
     def to_dataframe(self):
         d = {"Indicator":[], "Best":[], "Average":[], "STD":[], "Generation":[], "Run":[], "Method":[]}
         for gen in range(len(self.qd_history["fitness"])):
+            actual_generation = gen + self.gen_offset + 1
             #Computing fitness indicator
             d["Indicator"] += ["Fitness"]
             gen_fitness = np.array(self.qd_history["fitness"][gen])
             d["Best"] += [np.max(gen_fitness)]
             d["Average"] += [np.mean(gen_fitness)]
             d["STD"] += [np.std(gen_fitness)]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
             #Computing novelty indicator
@@ -177,7 +201,7 @@ class QD_Analytics(Callback):
             d["Best"] += [np.max(gen_novelty)]
             d["Average"] += [np.mean(gen_novelty)]
             d["STD"] += [np.std(gen_novelty)]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
             #Computing coverage
@@ -185,7 +209,7 @@ class QD_Analytics(Callback):
             d["Best"] += [self.qd_history["coverage"][gen]]
             d["Average"] += [self.qd_history["coverage"][gen]]
             d["STD"] += [0]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
             #Computing QD-F            
@@ -193,7 +217,7 @@ class QD_Analytics(Callback):
             d["Best"] += [self.qd_history["qd-score-f"][gen]]
             d["Average"] += [self.qd_history["qd-score-f"][gen]]
             d["STD"] += [0]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
             #Computing ND-F
@@ -201,7 +225,7 @@ class QD_Analytics(Callback):
             d["Best"] += [self.qd_history["nd-score-f"][gen]]
             d["Average"] += [self.qd_history["nd-score-f"][gen]]
             d["STD"] += [0]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
             #Computing QD-N
@@ -209,7 +233,7 @@ class QD_Analytics(Callback):
             d["Best"] += [self.qd_history["qd-score-n"][gen]]
             d["Average"] += [self.qd_history["qd-score-n"][gen]]
             d["STD"] += [0]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]            
             #Computing ND-N
@@ -217,7 +241,7 @@ class QD_Analytics(Callback):
             d["Best"] += [self.qd_history["nd-score-n"][gen]]
             d["Average"] += [self.qd_history["nd-score-n"][gen]]
             d["STD"] += [0]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
             #Computing QD-FN
@@ -225,7 +249,7 @@ class QD_Analytics(Callback):
             d["Best"] += [self.qd_history["qd-score-fn"][gen]]
             d["Average"] += [self.qd_history["qd-score-fn"][gen]]
             d["STD"] += [0]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
             #Computing ND-FN
@@ -233,7 +257,9 @@ class QD_Analytics(Callback):
             d["Best"] += [self.qd_history["nd-score-fn"][gen]]
             d["Average"] += [self.qd_history["nd-score-fn"][gen]]
             d["STD"] += [0]
-            d["Generation"] += [gen + 1]
+            d["Generation"] += [actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
+        self.gen_offset += len(self.qd_history["fitness"])
+        
         return pd.DataFrame(d)

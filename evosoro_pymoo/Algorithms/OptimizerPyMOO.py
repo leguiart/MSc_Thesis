@@ -125,7 +125,6 @@ class PopulationBasedOptimizerPyMOO(Optimizer):
         set_cv(pop)
 
         # Extract analytics
-        
         if self.analytics is not None:
             logger.debug("Collecting analytics data")
             self.analytics.notify(pop)

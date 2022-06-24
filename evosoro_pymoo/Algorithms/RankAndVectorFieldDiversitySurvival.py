@@ -54,8 +54,8 @@ class RankAndVectorFieldDiversitySurvival(Survival):
         population_of_fronts = [pop[indx].X for indx in fronts_indxs]
         population_parent_and_child = [individual.X for individual in pop]
 
-        problem.evaluators["genotype_distance_evaluator"].evaluate(population_of_fronts)
-        dist_dict = problem.evaluators["genotype_distance_evaluator"].distance_cache
+        problem.evaluators["genotype_diversity_evaluator"].genotypeDistanceEvaluator.evaluate(population_of_fronts)
+        dist_dict = problem.evaluators["genotype_distance_evaluator"].genotypeDistanceEvaluator
 
         for k, front in enumerate(fronts):
             
@@ -96,10 +96,11 @@ def vector_field_diversity(front_indxs, fronts_indxs, pop, dist_dict):
             if indx1 != indx2:
                 ind1_md5 = pop[indx1].md5
                 ind2_md5 = pop[indx2].md5
-                if (ind1_md5, ind2_md5) in dist_dict:
-                    distance_sum += dist_dict[(pop[indx1].md5, pop[indx2].md5)]
-                elif (ind2_md5, ind1_md5) in dist_dict:
-                    distance_sum += dist_dict[(pop[indx2].md5, pop[indx1].md5)] 
+                distance_sum += np.mean(dist_dict[(ind1_md5, ind2_md5)])
+                # if (ind1_md5, ind2_md5) in dist_dict:
+                #     distance_sum += 
+                # elif (ind2_md5, ind1_md5) in dist_dict:
+                #     distance_sum += np.mean(dist_dict[(pop[indx2].md5, pop[indx1].md5)])
 
         front_diversity += [distance_sum/len(fronts_indxs)]
     return np.array(front_diversity)

@@ -175,6 +175,21 @@ def main(parser : argparse.ArgumentParser):
                                 output_node_name="material")
                                 
         objective_dict.add_objective(name="unaligned_novelty", maximize=True, tag=None)
+        objective_dict.add_objective(name="aligned_novelty", maximize=True, tag=None)
+
+        objective_dict.add_objective(name="initialX", maximize=True, tag="initialCenterOfMass/x")
+        objective_dict.add_objective(name="initialY", maximize=True, tag="initialCenterOfMass/y")
+        objective_dict.add_objective(name="finalX", maximize=True, tag="currentCenterOfMass/x")
+        objective_dict.add_objective(name="finalY", maximize=True, tag="currentCenterOfMass/y")
+        objective_dict.add_objective(name="fitnessX", maximize=True, tag=None)
+        objective_dict.add_objective(name="fitnessY", maximize=True, tag=None)
+        
+        objective_dict.add_objective(name="gene_diversity", maximize=True, tag=None)
+        objective_dict.add_objective(name="control_gene_div", maximize=True, tag=None)
+        objective_dict.add_objective(name="morpho_gene_div", maximize=True, tag=None)
+
+
+        
 
         physics_sim_cls = VoxcraftPhysicsEvaluator
 
@@ -213,13 +228,6 @@ def main(parser : argparse.ArgumentParser):
             run_name = RUN_NAME_MNSLC
             softbot_problem_cls = MNSLCSoftbotProblemGPU
             nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
-            objective_dict.add_objective(name="initialX", maximize=True, tag="initialCenterOfMass/x")
-            objective_dict.add_objective(name="initialY", maximize=True, tag="initialCenterOfMass/y")
-            objective_dict.add_objective(name="finalX", maximize=True, tag="currentCenterOfMass/x")
-            objective_dict.add_objective(name="finalY", maximize=True, tag="currentCenterOfMass/y")
-            objective_dict.add_objective(name="fitnessX", maximize=True, tag=None)
-            objective_dict.add_objective(name="fitnessY", maximize=True, tag=None)
-            objective_dict.add_objective(name="aligned_novelty", maximize=True, tag=None)
             objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
             objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
     
