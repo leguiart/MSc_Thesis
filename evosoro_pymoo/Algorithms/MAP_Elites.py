@@ -14,6 +14,7 @@ import os
 import pickle
 import shutil
 from typing import List, Callable
+from sklearn.neighbors import KDTree
 
 
 from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
@@ -37,6 +38,8 @@ class MAP_ElitesArchive(object):
         self.filled_elites_archive = [0 for _ in range(len(self.bc_space))]
         self.extract_descriptors_func = extract_descriptors_func
         self.name = name
+        self.coverage = 0
+        self.qd_score = 0
         if os.path.exists(self.name) and os.path.isdir(self.name):
             shutil.rmtree(self.name)
         os.mkdir(self.name)
@@ -65,9 +68,53 @@ class MAP_ElitesArchive(object):
         i = self.feature_descriptor_idx(x)
         xe = self[i]
         if xe is None or getattr(xe, quality_metric) < getattr(x, quality_metric):
+            if xe is None:
+                self.coverage += 1/len(self)
+                self.qd_score += getattr(x, quality_metric)
+            else:
+                self.qd_score += getattr(x, quality_metric) - getattr(xe, quality_metric)
+
             self.filled_elites_archive[i] = 1
             with open(f"{self.name}/elite_{i}.pickle", "wb") as fh:
                 pickle.dump(x, fh, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def update_existing(self, individual_batch, novelty_evaluator):
+
+        union_hashtable = {}
+
+        # Compute the Union of Novelty archive and the population
+        for individual in individual_batch + novelty_evaluator.novelty_archive:
+            if individual.md5 not in union_hashtable:
+                union_hashtable[individual.md5] = individual
+        
+        union_matrix = np.array([[novelty_evaluator.vector_extractor(individual)] for individual in list(union_hashtable.values())])
+        kd_tree = KDTree(union_matrix)
+        novelty_metric = novelty_evaluator.novelty_name
+
+        for indx in range(len(self)):
+            current_elite = self[indx]
+            if not current_elite is None:
+                old_elite_novelty = getattr(current_elite, novelty_evaluator)
+                self.qd_score -= old_elite_novelty
+                if current_elite.md5 in union_hashtable:
+
+                    updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
+
+                else:
+                    
+                    distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
+                    updated_elite_novelty = np.mean(distances)
+
+                self.qd_score += updated_elite_novelty
+                setattr(current_elite, novelty_metric, updated_elite_novelty)
+                
+                with open(f"{self.name}/elite_{indx}.pickle", "wb") as fh:
+                    pickle.dump(current_elite, fh, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+
+
+
 
     
 class MOMAP_ElitesArchive(MAP_ElitesArchive):

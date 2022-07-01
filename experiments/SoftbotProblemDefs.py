@@ -9,7 +9,7 @@ from evosoro_pymoo.Evaluators.GenotypeDistanceEvaluator import GenotypeDistanceE
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
 from evosoro_pymoo.Evaluators.IEvaluator import EvaluatorInterface
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator
-from evosoro_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluator, NSLCEvaluator, NoveltyEvaluatorKD
+from evosoro_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator, NoveltyEvaluatorKD
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
 
 MAX_NS_ARCHIVE_SIZE = (IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2])**2//2
@@ -70,6 +70,7 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
             "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", unaligned_vector, "unaligned_novelty", min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
+
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:
         return [-x.fitness]

@@ -223,7 +223,7 @@ class NoveltyEvaluatorKD(IEvaluator):
         self.novelty_archive = []
         self.vector_extractor = vector_extractor
         self.novelty_name = novelty_name
-        self.already_evaluated = set()
+        self.archive_hashset = set()
 
     def _evaluate_novelty(self, individuals):
         # Prepare matrix for KD-Tree creation
@@ -252,13 +252,14 @@ class NoveltyEvaluatorKD(IEvaluator):
             novelty = novelty_scores[i]
             
             if i < len(X):
+                if X[i].md5 not in self.archive_hashset:
+                    # Set novelty
+                    setattr(X[i], self.novelty_name, novelty)
 
-                # Set novelty
-                setattr(X[i], self.novelty_name, novelty)
-
-                if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
-                    self.items_added_in_generation+=1
-                    self.novelty_archive += [copy.deepcopy(X[i])]
+                    if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
+                        self.items_added_in_generation+=1
+                        self.novelty_archive += [copy.deepcopy(X[i])]
+                        self.archive_hashset.add(X[i].md5)
 
             else:
                 setattr(self.novelty_archive[i%len(X)], self.novelty_name, novelty)
@@ -281,7 +282,8 @@ class NoveltyEvaluatorKD(IEvaluator):
             self.novelty_archive.sort(key = lambda x : getattr(x, self.novelty_name))
 
             for _ in range(len(self.novelty_archive) - self.max_novelty_archive_size):
-                self.novelty_archive.pop(0)
+                removed = self.novelty_archive.pop(0)
+                self.archive_hashset.remove(removed.md5)
 
 
         if self.items_added_in_generation == 0:
@@ -298,9 +300,10 @@ class NoveltyEvaluatorKD(IEvaluator):
         self.items_added_in_generation = 0
     
 
-    def _average_knn_distance(self, others, kd_tree : KDTree):
-        distances, ind = kd_tree.query(others, min(self.k_neighbors + 1, len(others)))
+    def _average_knn_distance(self, kd_matrix, kd_tree : KDTree):
+        distances, ind = kd_tree.query(kd_matrix, min(self.k_neighbors + 1, len(kd_matrix)))
         return np.mean(distances[:,1:], axis = 1), ind[:,1:]
+
 
 class NSLCEvaluator(NoveltyEvaluatorKD):
 
@@ -342,7 +345,7 @@ class NSLCEvaluator(NoveltyEvaluatorKD):
         logger.debug(f"{self.items_added_in_generation} were added to {self.evaluator_name} evaluator")
         logger.debug(f"{self.evaluator_name} evaluator has {self.novelty_threshold} novelty threshold")
         logger.debug(f"{self.evaluator_name} evaluator has currently has {len(self.novelty_archive)} elements")
-        logger.debug("Finished novelty evaluation")
+        logger.debug("Finished novelty search with local competition evaluation")
 
         self._adjust_archive_settings()
 
