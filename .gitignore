@@ -127,9 +127,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-/BodyBrain*
+
 
 *.o
+
+/BodyBrain*
+/experiments/BodyBrain*
 /_voxcad/GeneratedFiles
 /workspace
 /*_elites
+/experiments/*_elites

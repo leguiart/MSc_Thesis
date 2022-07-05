@@ -32,13 +32,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer):
         self.problem = problem
         self.analytics = analytics
         
-        
 
-    # def update_env(self):
-    #     if self.num_env_cycles > 0:
-    #         switch_every = self.max_gens / float(self.num_env_cycles)
-    #         self.curr_env_idx = int(self.algorithm.n_gen / switch_every % len(self.problem.env))
-    #         print (" Using environment {0} of {1}".format(self.curr_env_idx+1, len(self.problem.env)))
     @timeit
     def run(self, evosoro_pop, max_hours_runtime=29, max_gens=3000, num_random_individuals=1, num_env_cycles=0,
             checkpoint_every=100, save_pareto=False,
@@ -125,10 +119,9 @@ class PopulationBasedOptimizerPyMOO(Optimizer):
         set_cv(pop)
 
         # Extract analytics
-        
         if self.analytics is not None:
             logger.debug("Collecting analytics data")
-            self.analytics.notify(pop)
+            self.analytics.notify(pop, self.problem)
             logger.debug("Finishing collecting analytics data")
 
         logger.info("Fitness evaluation finished")  # record total eval time in log
