@@ -27,7 +27,7 @@ class MAP_ElitesOptimizer(Optimizer):
         return super().run(*args, **kwargs)
 
 class MAP_ElitesArchive(object):
-    def __init__(self, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], name : str) -> None:
+    def __init__(self, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], name : str, base_path : str) -> None:
         feats = []
         for min, max, granularity in min_max_gr_li:
             feats += [list(np.linspace(min, max, granularity))]
@@ -40,9 +40,11 @@ class MAP_ElitesArchive(object):
         self.name = name
         self.coverage = 0
         self.qd_score = 0
-        if os.path.exists(self.name) and os.path.isdir(self.name):
-            shutil.rmtree(self.name)
-        os.mkdir(self.name)
+        self.base_path = base_path
+        self.archive_path = os.path.join(self.base_path, self.name)
+        if os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
+            shutil.rmtree(self.archive_path)
+        os.mkdir(self.archive_path)
 
     def feature_descriptor(self, x):
         return self.bc_space[self.feature_descriptor_idx(x)]
@@ -55,7 +57,7 @@ class MAP_ElitesArchive(object):
 
     def __getitem__(self, i):
         if self.filled_elites_archive[i] != 0:
-            with open(f"{self.name}/elite_{i}.pickle", 'rb') as handle:
+            with open(f"{self.archive_path}/elite_{i}.pickle", 'rb') as handle:
                 x = pickle.load(handle)
             return x
         else:
@@ -75,7 +77,7 @@ class MAP_ElitesArchive(object):
                 self.qd_score += getattr(x, quality_metric) - getattr(xe, quality_metric)
 
             self.filled_elites_archive[i] = 1
-            with open(f"{self.name}/elite_{i}.pickle", "wb") as fh:
+            with open(f"{self.archive_path}/elite_{i}.pickle", "wb") as fh:
                 pickle.dump(x, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
     def update_existing(self, individual_batch, novelty_evaluator):
@@ -87,14 +89,14 @@ class MAP_ElitesArchive(object):
             if individual.md5 not in union_hashtable:
                 union_hashtable[individual.md5] = individual
         
-        union_matrix = np.array([[novelty_evaluator.vector_extractor(individual)] for individual in list(union_hashtable.values())])
+        union_matrix = np.array([novelty_evaluator.vector_extractor(individual) for individual in list(union_hashtable.values())])
         kd_tree = KDTree(union_matrix)
         novelty_metric = novelty_evaluator.novelty_name
 
         for indx in range(len(self)):
             current_elite = self[indx]
             if not current_elite is None:
-                old_elite_novelty = getattr(current_elite, novelty_evaluator)
+                old_elite_novelty = getattr(current_elite, novelty_metric)
                 self.qd_score -= old_elite_novelty
                 if current_elite.md5 in union_hashtable:
 
@@ -108,7 +110,7 @@ class MAP_ElitesArchive(object):
                 self.qd_score += updated_elite_novelty
                 setattr(current_elite, novelty_metric, updated_elite_novelty)
                 
-                with open(f"{self.name}/elite_{indx}.pickle", "wb") as fh:
+                with open(f"{self.archive_path}/elite_{indx}.pickle", "wb") as fh:
                     pickle.dump(current_elite, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
 
@@ -126,7 +128,7 @@ class MOMAP_ElitesArchive(MAP_ElitesArchive):
 
         if xe is None or (np.all(xe_vec <= x_vec) and np.any(xe_vec != x_vec)):
             self.filled_elites_archive[i] = 1
-            with open(f"{self.name}/elite_{i}.pickle", "wb") as fh:
+            with open(f"{self.archive_path}/elite_{i}.pickle", "wb") as fh:
                 pickle.dump(x, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
 

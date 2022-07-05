@@ -55,7 +55,7 @@ class RankAndVectorFieldDiversitySurvival(Survival):
         population_parent_and_child = [individual.X for individual in pop]
 
         problem.evaluators["genotype_diversity_evaluator"].genotypeDistanceEvaluator.evaluate(population_of_fronts)
-        dist_dict = problem.evaluators["genotype_distance_evaluator"].genotypeDistanceEvaluator
+        dist_dict = problem.evaluators["genotype_diversity_evaluator"].genotypeDistanceEvaluator
 
         for k, front in enumerate(fronts):
             

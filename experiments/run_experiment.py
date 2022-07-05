@@ -274,15 +274,17 @@ def main(parser : argparse.ArgumentParser):
         # Setting up optimization algorithm
         algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), mutation=SoftbotMutation(), crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
         algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
-        analytics = QD_Analytics(run + 1, experiment, analytics_json, analytics_csv)
+        analytics = QD_Analytics(run + 1, experiment, run_name, run_dir)
         my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics)
 
         # Start optimization
         my_optimization.run(my_pop, max_hours_runtime=MAX_TIME, max_gens=max_gens, num_random_individuals=NUM_RANDOM_INDS, checkpoint_every=CHECKPOINT_EVERY, new_run = new_experiment)
-        if analytics.qd_history:
-            save_json(analytics_json, analytics.qd_history)
-            df = analytics.to_dataframe()
-            df.to_csv(analytics_csv, mode='a', header=not os.path.exists(analytics_csv), index = False)
+        analytics.save_archives()
+        
+        #if analytics.qd_history:   
+            # save_json(analytics_json, analytics.qd_history)
+            # df = analytics.to_dataframe()
+            # df.to_csv(analytics_csv, mode='a', header=not os.path.exists(analytics_csv), index = False)
 
     # runBodyBrain(runs, pop_size, max_gens, seeds_json, analytics_json, objective_dict, softbot_problem_cls, genotype_cls, phenotype_cls)
        

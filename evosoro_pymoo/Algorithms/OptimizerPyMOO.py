@@ -121,7 +121,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer):
         # Extract analytics
         if self.analytics is not None:
             logger.debug("Collecting analytics data")
-            self.analytics.notify(pop)
+            self.analytics.notify(pop, self.problem)
             logger.debug("Finishing collecting analytics data")
 
         logger.info("Fitness evaluation finished")  # record total eval time in log
