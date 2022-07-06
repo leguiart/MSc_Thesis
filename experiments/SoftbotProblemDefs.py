@@ -8,7 +8,7 @@ from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.GenotypeDistanceEvaluator import GenotypeDistanceEvaluator
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
 from evosoro_pymoo.Evaluators.IEvaluator import EvaluatorInterface
-from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator
+from evosoro_pymoo.Evaluators.PhysicsEvaluator import BaseSoftBotPhysicsEvaluator
 from evosoro_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator, NoveltyEvaluatorKD
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
 
@@ -61,7 +61,7 @@ class GenotypeDiversityExtractor(EvaluatorInterface):
 
 class QualitySoftbotProblem(BaseSoftbotProblem):
 
-    def __init__(self, physics_evaluator : BasePhysicsEvaluator, pop_size):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size):
         super().__init__(physics_evaluator, n_var=1, n_obj=1)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator()
         # self.evaluators["unaligned_novelty"] = NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size//2, max_novelty_archive_size=int(MAX_NS_ARCHIVE_SIZE*0.68), k_neighbors=20)
@@ -81,7 +81,7 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
 
 class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 
-    def __init__(self, physics_evaluator : BasePhysicsEvaluator, pop_size):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size):
         super().__init__(physics_evaluator, n_var=1, n_obj=2)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator()
         # self.evaluators["unaligned_novelty"] = NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size, max_novelty_archive_size=int(MAX_NS_ARCHIVE_SIZE*0.68), k_neighbors=20)
@@ -100,7 +100,7 @@ class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 
 class NSLCSoftbotProblem(BaseSoftbotProblem):
 
-    def __init__(self, physics_evaluator : BasePhysicsEvaluator, pop_size):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size):
         super().__init__(physics_evaluator, n_var=1, n_obj=2)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator()
         # self.evaluators.update({"unaligned_novelty" : NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", nslc_neighbors_name="unaligned_neighbors", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size, max_novelty_archive_size=int(MAX_NS_ARCHIVE_SIZE*0.68), k_neighbors=20),
@@ -119,7 +119,7 @@ class NSLCSoftbotProblem(BaseSoftbotProblem):
 
 class MNSLCSoftbotProblem(BaseSoftbotProblem):
 
-    def __init__(self, physics_evaluator : BasePhysicsEvaluator, pop_size):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size):
         super().__init__(physics_evaluator, n_var=1, n_obj=3)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator()
         # self.evaluators.update({"aligned_novelty" : NoveltyEvaluator(aligned_distance_metric, "aligned_novelty", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size, max_novelty_archive_size=int(MAX_NS_ARCHIVE_SIZE*0.68), k_neighbors=20), 
@@ -140,7 +140,7 @@ class MNSLCSoftbotProblem(BaseSoftbotProblem):
 
 class MNSLCSoftbotProblemGPU(BaseSoftbotProblem):
 
-    def __init__(self, physics_evaluator : BasePhysicsEvaluator, pop_size):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size):
         super().__init__(physics_evaluator, n_var=1, n_obj=3)
         # self.evaluators.update({"aligned_novelty" : NoveltyEvaluator(aligned_distance_metric_gpu, "aligned_novelty", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size, max_novelty_archive_size=int(MAX_NS_ARCHIVE_SIZE*0.68), k_neighbors=20), 
         #                     "unaligned_novelty" : NoveltyEvaluator(unaligned_distance_metric, "unaligned_novelty", nslc_neighbors_name="unaligned_neighbors", is_valid_func=is_valid_func, min_novelty_archive_size=pop_size, max_novelty_archive_size=int(MAX_NS_ARCHIVE_SIZE*0.68), k_neighbors=20),

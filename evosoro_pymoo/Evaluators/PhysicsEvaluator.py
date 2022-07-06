@@ -7,17 +7,72 @@ import numpy as np
 import subprocess as sub
 from lxml import etree
 
+
+def initialize_folder_heirarchy(run_directory, run_name, save_networks, save_all_individual_data=True,
+                       save_lineages=True):
+
+    # sub.call("mkdir " + run_directory + "/" + run_name + "/" + " 2>/dev/null", shell=True)
+    ret = sub.call("mkdir " + run_directory + "/" + " 2>/dev/null", shell=True)
+    if ret != 0:
+        response = input("****************************************************\n"
+                             "** WARNING ** A directory named " + run_directory +
+                             " may exist already and would be erased.\n ARE YOU SURE YOU WANT TO CONTINUE? (y/n): ")
+        if not (("Y" in response) or ("y" in response)):
+            quit("Please change run name with -n DifferentName. Quitting.\n"
+                 "****************************************************\n\n")
+        else:
+            print ("****************************************************\n")
+
+    # clear directory
+    sub.call("rm -rf " + run_directory + "/* 2>/dev/null", shell=True)
+
+    sub.call("mkdir " + run_directory + "/voxelyzeFiles 2> /dev/null", shell=True)
+    sub.call("mkdir " + run_directory + "/tempFiles 2> /dev/null", shell=True)
+    sub.call("mkdir " + run_directory + "/fitnessFiles 2> /dev/null", shell=True)
+
+    sub.call("mkdir " + run_directory + "/bestSoFar 2> /dev/null", shell=True)
+    sub.call("mkdir " + run_directory + "/bestSoFar/paretoFronts 2> /dev/null", shell=True)
+    sub.call("mkdir " + run_directory + "/bestSoFar/fitOnly 2>/dev/null", shell=True)
+
+    sub.call("mkdir " + run_directory + "/pickledPops 2> /dev/null", shell=True)
+
+    if save_all_individual_data:
+        sub.call("mkdir " + run_directory + "/allIndividualsData", shell=True)
+        sub.call("rm -f " + run_directory + "/allIndividualsData/* 2>/dev/null", shell=True)  # TODO: why clear these
+
+    if save_networks:
+        sub.call("mkdir " + run_directory + "/network_gml", shell=True)
+        sub.call("rm -rf " + run_directory + "/network_gml/* 2>/dev/null", shell=True)
+
+    if save_lineages:
+        sub.call("mkdir " + run_directory + "/ancestors 2> /dev/null", shell=True)
+
+def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
+
+    print ("\n\n")
+    print ("----------------------------------")
+    print ("---------- GENERATION", gen, "----------")
+    print ("----------------------------------")
+    print ("\n")
+
+    if gen % save_vxa_every == 0 and save_vxa_every > 0:
+        sub.call("mkdir " + run_directory + "/Gen_%04i" % gen, shell=True)
+
+    if save_networks:
+        sub.call("mkdir " + run_directory + "/network_gml/Gen_%04i" % gen, shell=True)
+
+
 #sys.path.append(os.getcwd() + "/../..")
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
-from evosoro.tools.logging import PrintLog
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from common.Utils import timeit
+from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
-class BasePhysicsEvaluator(IEvaluator):
+class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
-                objective_dict, max_eval_time=60, time_to_try_again=10, save_lineages = True):
+                objective_dict, max_gens, num_env_cycles = 0, max_eval_time=60, time_to_try_again=10, save_lineages = True, save_nets = False):
         """Evaluate all individuals of the population in VoxCad.
 
         Parameters
@@ -64,6 +119,7 @@ class BasePhysicsEvaluator(IEvaluator):
         self.run_directory = run_directory
         self.run_name = run_name
         self.objective_dict = objective_dict
+        self.max_gens = max_gens
         self.max_eval_time = max_eval_time
         self.time_to_try_again = time_to_try_again
         self.save_lineages = save_lineages
@@ -72,24 +128,35 @@ class BasePhysicsEvaluator(IEvaluator):
         self.already_evaluated = {}
         self.all_evaluated_individuals_ids = []
  
-        self.num_env_cycles = 0
+        self.num_env_cycles = num_env_cycles
         self.curr_env_idx = 0
-        self.n_gen = 1
+        self.n_batch = 1
+        self.save_nets = save_nets
+
+    def start(self):
+        initialize_folder_heirarchy(self.run_directory, self.run_name, self.save_nets, save_lineages=self.save_lineages)
+        
 
     def update_env(self):
         if self.num_env_cycles > 0:
             switch_every = self.max_gens / float(self.num_env_cycles)
-            self.curr_env_idx = int(self.n_gen / switch_every % len(self.env))
+            self.curr_env_idx += 1 if self.n_batch % switch_every == 0 else 0
+            self.curr_env_idx %= len(self.env)
             logger.info(" Using environment {0} of {1}".format(self.curr_env_idx+1, len(self.env)))
 
 
 
 
-class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
+class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
-    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time=60, time_to_try_again=10, save_lineages=True, voxelyze_version = '_voxcad'):
-        super().__init__(sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time, time_to_try_again, save_lineages)
-        sub.call("cp " + voxelyze_version + "/voxelyzeMain/voxelyze .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_gens, num_env_cycles, max_eval_time=60, time_to_try_again=10, save_lineages=True, save_nets = False, sim_path = '_voxcad', experiments_path = '.'):
+        super().__init__(sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_gens, num_env_cycles, max_eval_time, time_to_try_again, save_lineages, save_nets)
+        self.sim_path = sim_path
+        self.experiments_path
+
+    def start(self):
+        super().start()
+        sub.call("cp " + self.sim_path + "/voxelyzeMain/voxelyze " + self.experiments_path, shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
     @timeit
     def evaluate(self, pop):
@@ -118,10 +185,10 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
 
                 logger.debug("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
 
-                if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
+                if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id +
-                            " " + self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name +
-                            "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_gen, ind.fitness, ind.id), shell=True)
+                            " " + self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name +
+                            "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind.id), shell=True)
 
             # otherwise evaluate with voxelyze
             else:
@@ -237,15 +304,15 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
                         sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
                                 ind.id + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
                                 "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
-                                (self.n_gen, ind.fitness, ind.id), shell=True)
+                                (self.n_batch, ind.fitness, ind.id), shell=True)
 
                     # if save_lineages:
                     #     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
                     #              ind.id + " " + self.run_directory + "/ancestors/", shell=True)
 
-                    if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
+                    if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                         file_source = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id
-                        file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_gen, ind.fitness, ind.id)
+                        file_destination = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind.id)
                         sub.call("mv " + file_source + " " + file_destination, shell=True)
                     else:
                         sub.call("rm " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
@@ -305,15 +372,15 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
             #                         sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
             #                                 ind.id + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
             #                                 "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
-            #                                 (self.problem.n_gen, ind.fitness, ind.id), shell=True)
+            #                                 (self.problem.n_batch, ind.fitness, ind.id), shell=True)
 
             #                     # if save_lineages:
             #                     #     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
             #                     #              ind.id + " " + self.run_directory + "/ancestors/", shell=True)
 
-            #                     if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
+            #                     if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
             #                         file_source = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id
-            #                         file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.problem.n_gen, ind.fitness, ind.id)
+            #                         file_destination = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.problem.n_batch, ind.fitness, ind.id)
             #                         sub.call("mv " + file_source + " " + file_destination, shell=True)
             #                     else:
             #                         sub.call("rm " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" %
@@ -335,31 +402,39 @@ class VoxelyzePhysicsEvaluator(BasePhysicsEvaluator):
         logger.info("num_evaluated_this_gen: {0}".format(num_evaluated_this_gen))
 
         logger.info("Finished voxelyze physics evaluation")
+        self.update_env()
+        self.n_batch += 1
         # print_log.message("total_evaluations: {}".format(pop.total_evaluations))
         return pop
 
 
 
-class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
+class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
-    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time=60, time_to_try_again=10, save_lineages=True, voxelyze_version = '_voxcraft-sim'):
-        super().__init__(sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_eval_time, time_to_try_again, save_lineages)
-        sub.call(f"cp {voxelyze_version}/build/voxcraft-sim .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
-        sub.call(f"cp {voxelyze_version}/build/vx3_node_worker .", shell=True)
-        self.voxelyze_version = voxelyze_version
-        self.run_directory = run_directory
-        
+    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_gens, num_env_cycles, max_eval_time=60, time_to_try_again=10, save_lineages=True, save_nets = False, sim_path = '_voxcraft-sim', experiments_path = 'experiments'):
+        super().__init__(sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_gens, num_env_cycles, max_eval_time, time_to_try_again, save_lineages, save_nets)
+        self.sim_path = sim_path
+        self.experiments_path = experiments_path
+
+    def start(self):
+        super().start()
+        sub.call(f"cp {self.sim_path}/build/voxcraft-sim {self.experiments_path}", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+        sub.call(f"cp {self.sim_path}/build/vx3_node_worker {self.experiments_path}", shell=True)
+        sub.call(f"cp {self.sim_path}/demos/voxelyze/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
+
     @timeit
     def evaluate(self, pop):
         start_time = time.time()
         num_evaluated_this_gen = 0
         # ids_to_analyze = []
         ids_softbot_map = {}
-
+        logger.info("Creating folders structure for this generation")
+        create_gen_directories(self.n_batch, self.run_directory, self.save_vxa_every, self.save_nets)
         logger.info("Starting voxcraft physics evaluation")
-        if self.n_gen == 1:
-            #sub.call(f"cp {self.voxelyze_version}/demos/benchmark_test_6/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
-            sub.call(f"cp {self.voxelyze_version}/demos/voxelyze/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
+
+        # if self.n_batch == 1:
+        #     #sub.call(f"cp {self.voxelyze_version}/demos/benchmark_test_6/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
+            
         for ind in pop:
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
             ind.md5, root = get_vxd(self.sim, self.env[self.curr_env_idx], ind)
@@ -378,10 +453,10 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
                 # logger.info("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
 
-                if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
+                if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id +
-                            " " + self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name +
-                            "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_gen, ind.fitness, ind.id), shell=True)
+                            " " + self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name +
+                            "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind.id), shell=True)
 
             # otherwise evaluate with voxcraft
             else:
@@ -403,7 +478,7 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
             if time_waiting_for_fitness > len(pop) * self.max_eval_time:
                 break
             try:
-                sub.call(f"./voxcraft-sim -f -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", shell=True)
+                sub.call(f"{self.experiments_path}/voxcraft-sim -f -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", shell=True)
                 # sub.call waits for the process to return
                 # after it does, we collect the results output by the simulator
                 fitness_report = etree.parse(f"{self.run_directory}/output.xml").getroot()
@@ -452,12 +527,12 @@ class VoxcraftPhysicsEvaluator(BasePhysicsEvaluator):
                 self.best_fit_so_far = ind.fitness
                 sub.call("cp " + ind_filename_vxa + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
                         "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
-                        (self.n_gen, ind.fitness, ind_id), shell=True)
+                        (self.n_batch, ind.fitness, ind_id), shell=True)
 
 
-            if self.n_gen% self.save_vxa_every == 0 and self.save_vxa_every > 0:
+            if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                 file_source = ind_filename_vxa
-                file_destination = self.run_directory + "/Gen_%04i/" % self.n_gen+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_gen, ind.fitness, ind_id)
+                file_destination = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind_id)
                 sub.call("mv " + file_source + " " + file_destination, shell=True)
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)

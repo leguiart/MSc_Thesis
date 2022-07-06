@@ -7,13 +7,14 @@ from abc import ABC, abstractmethod
 from pymoo.core.problem import Problem
 
 from evosoro.softbot import SoftBot
-from evosoro_pymoo.Evaluators.PhysicsEvaluator import BasePhysicsEvaluator
+from evosoro_pymoo.Evaluators.PhysicsEvaluator import BaseSoftBotPhysicsEvaluator
+from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
-class BaseSoftbotProblem(Problem, ABC):
+class BaseSoftbotProblem(Problem, ABC, IStarter):
 
-    def __init__(self, physics_evaluator : BasePhysicsEvaluator, n_var=-1, n_obj=1, n_constr=0):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, n_var=-1, n_obj=1, n_constr=0):
         super().__init__(n_var, n_obj, n_constr)
         self.evaluators = {"physics" : physics_evaluator}
 
@@ -30,6 +31,11 @@ class BaseSoftbotProblem(Problem, ABC):
         if constraints_mat:
             out["G"] = np.array(constraints_mat, dtype=float)
     
+    def _doEvaluations(self, X : List[SoftBot]):
+        for _, evaluator in self.evaluators.items():
+            X = evaluator.evaluate(X)
+        return X
+
     def _extractConstraints(self, x : SoftBot) -> List[float]:
         pass
     
@@ -37,7 +43,8 @@ class BaseSoftbotProblem(Problem, ABC):
     def _extractObjectives(self, x : SoftBot) -> List[float]:
         pass
 
-    def _doEvaluations(self, X : List[SoftBot]):
+    def start(self):
         for _, evaluator in self.evaluators.items():
-            X = evaluator.evaluate(X)
-        return X
+            if issubclass(type(evaluator), IStarter):
+                evaluator.start()
+
