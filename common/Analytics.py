@@ -7,33 +7,35 @@ from pymoo.core.callback import Callback
 from typing import List
 
 from common.Constants import *
+from common.IAnalytics import IAnalytics
 from common.Utils import getsize, save_json
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
 
 
 
-class QD_Analytics(Callback):
-    def __init__(self, run, method, experiment_name, base_path):
+class QD_Analytics(IAnalytics):
+    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path):
         super().__init__()
-        self.base_path = base_path
+        self.json_base_path = json_base_path
+        self.csv_base_path = csv_base_path
         self.run = run
         self.method = method
         self.experiment_name = experiment_name
         self.archives_json_name = self.experiment_name + "_archives.json"
-        self.archives_json_path = os.path.join(base_path, self.archives_json_name)
+        self.archives_json_path = os.path.join(self.json_base_path, self.archives_json_name)
         self.indicator_csv_name = self.experiment_name + ".csv"
-        self.indicators_csv_path = os.path.join(base_path, self.indicator_csv_name)
+        self.indicators_csv_path = os.path.join(self.csv_base_path, self.indicator_csv_name)
         self.stats_csv_name = self.experiment_name + "_stats.csv"
-        self.stats_csv_path = os.path.join(base_path, self.stats_csv_name)
+        self.stats_csv_path = os.path.join(self.csv_base_path, self.stats_csv_name)
         self.total_voxels = IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2]
         self.init_indicator_mapping()
         self.actual_generation = 1
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
         min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
         #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "f_elites", self.base_path)
+        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "f_elites", self.json_base_path)
         #2.- Elites in terms of aligned novelty
-        self.map_elites_archive_an = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "an_elites", self.base_path)
+        self.map_elites_archive_an = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "an_elites", self.json_base_path)
         #3.- Elites in terms of both aligned novelty and fitness (Pareto-dominance)
         # self.map_elites_archive_anf = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "anf_elites")
         self.indicator_stats_set = {
@@ -85,6 +87,10 @@ class QD_Analytics(Callback):
             "morphology_active",
             "morphology_passive"
         }
+
+    def start(self):
+        self.map_elites_archive_f.start()
+        self.map_elites_archive_an.start()
 
     def init_indicator_mapping(self):
         self.indicator_mapping = {

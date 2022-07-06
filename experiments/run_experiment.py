@@ -262,7 +262,7 @@ def main(parser : argparse.ArgumentParser):
         env = Env(sticky_floor=0, time_between_traces=0, lattice_dimension=0.05)
 
         # Setting up physics simulation
-        physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_dir, run_name + str(run + 1), objective_dict, MAX_EVAL_TIME, TIME_TO_TRY_AGAIN, SAVE_LINEAGES)
+        physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_dir + str(run + 1), run_name, objective_dict, max_gens, 0, max_eval_time= MAX_EVAL_TIME, time_to_try_again= TIME_TO_TRY_AGAIN, save_lineages = SAVE_LINEAGES)
         
         # Setting up Softbot optimization problem
         softbot_problem = softbot_problem_cls(physics_sim, pop_size)
@@ -274,9 +274,9 @@ def main(parser : argparse.ArgumentParser):
         # Setting up optimization algorithm
         algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), mutation=SoftbotMutation(), crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
         algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
-        analytics = QD_Analytics(run + 1, experiment, run_name, run_dir)
+        analytics = QD_Analytics(run + 1, experiment, run_name, run_dir + str(run+1), 'experiments')
         my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics)
-
+        my_optimization.start()
         # Start optimization
         my_optimization.run(my_pop, max_hours_runtime=MAX_TIME, max_gens=max_gens, num_random_individuals=NUM_RANDOM_INDS, checkpoint_every=CHECKPOINT_EVERY, new_run = new_experiment)
         analytics.save_archives()
@@ -287,7 +287,7 @@ def main(parser : argparse.ArgumentParser):
             # df.to_csv(analytics_csv, mode='a', header=not os.path.exists(analytics_csv), index = False)
 
     # runBodyBrain(runs, pop_size, max_gens, seeds_json, analytics_json, objective_dict, softbot_problem_cls, genotype_cls, phenotype_cls)
-       
+    sys.exit()
 
 
 if __name__ == "__main__":

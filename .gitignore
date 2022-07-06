@@ -130,7 +130,7 @@ dmypy.json
 
 
 *.o
-
+/experiments/*.o
 /BodyBrain*
 /experiments/BodyBrain*
 /_voxcad/GeneratedFiles

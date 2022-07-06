@@ -19,6 +19,7 @@ from sklearn.neighbors import KDTree
 
 from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
 from evosoro.tools.algorithms import Optimizer
+from evosoro_pymoo.common.IStart import IStarter
 
 class MAP_ElitesOptimizer(Optimizer):
     def __init__(self, sim, env, evaluation_func=...):
@@ -26,7 +27,7 @@ class MAP_ElitesOptimizer(Optimizer):
     def run(self, *args, **kwargs):
         return super().run(*args, **kwargs)
 
-class MAP_ElitesArchive(object):
+class MAP_ElitesArchive(IStarter, object):
     def __init__(self, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], name : str, base_path : str) -> None:
         feats = []
         for min, max, granularity in min_max_gr_li:
@@ -42,9 +43,12 @@ class MAP_ElitesArchive(object):
         self.qd_score = 0
         self.base_path = base_path
         self.archive_path = os.path.join(self.base_path, self.name)
+
+    def start(self):
         if os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
             shutil.rmtree(self.archive_path)
         os.mkdir(self.archive_path)
+
 
     def feature_descriptor(self, x):
         return self.bc_space[self.feature_descriptor_idx(x)]

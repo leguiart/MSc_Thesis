@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["--physics", "GPU", "-e", "MNSLC"]
+            "args": ["--physics", "GPU", "-e", "MNSLC", "-r", "2"]
         }
     ]
 }
