@@ -2,12 +2,19 @@
 import operator
 import logging
 import math
+import os
+import pickle
+import shutil
+import subprocess as sub
+from tracemalloc import start
 import numpy as np
 from asyncio import as_completed
 from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 from evosoro.networks import Network
+from evosoro.tools.logging import PrintLog
+from evosoro.tools.mutation import create_new_children_through_mutation
 from evosoro.tools.utils import sigmoid, xml_format, dominates
 
 logger = logging.getLogger(f"__main__.{__name__}")
@@ -363,6 +370,11 @@ class SoftBot(object):
         new = cls.__new__(cls)
         new.__dict__.update(deepcopy(self.__dict__, memo))
         return new
+    
+    def save_softbot_backup(self, backup_path):
+
+        with open(f"{backup_path}/individual_{self.id}.pickle", "wb") as fh:
+            pickle.dump(self, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 class Population(object):
@@ -400,11 +412,34 @@ class Population(object):
         self.lineage_dict = {}
         self.max_id = 0
         self.non_dominated_size = 0
-        with ProcessPoolExecutor() as executor:
-            futures = {executor.submit(self._get_random_individual, i) for i in range(pop_size)}
-            for future in as_completed(futures):
-                self.append(future.result())
-        self.max_id = pop_size
+
+
+    def start(self, backup_path : str = None):
+        if backup_path is None or not os.path.exists(backup_path):
+            with ProcessPoolExecutor() as executor:
+                futures = {executor.submit(self._get_random_individual, i) for i in range(self.pop_size)}
+                for future in as_completed(futures):
+                    self.append(future.result())
+            self.max_id = len(self)
+        else:
+            for entry in os.listdir(backup_path):
+                if os.path.isfile(os.path.join(backup_path, entry)) and entry.endswith(".pickle"):
+                    with open(os.path.join(backup_path, entry), 'rb') as handle:
+                        individual = pickle.load(handle)
+                    self.append(individual)
+                    if self.max_id < individual.id:
+                        self.max_id = individual.id
+            if len(self) < self.pop_size and len(self) > 0:
+                while len(self) < self.pop_size:
+                    self.add_random_individual()
+                
+            elif len(self) == 0:
+                return False
+        return True
+        
+        
+
+
 
     def __iter__(self):
         """Iterate over the individuals. Use the expression 'for n in population'."""

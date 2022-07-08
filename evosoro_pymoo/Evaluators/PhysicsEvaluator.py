@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import time
@@ -7,61 +8,6 @@ import numpy as np
 import subprocess as sub
 from lxml import etree
 
-
-def initialize_folder_heirarchy(run_directory, run_name, save_networks, save_all_individual_data=True,
-                       save_lineages=True):
-
-    # sub.call("mkdir " + run_directory + "/" + run_name + "/" + " 2>/dev/null", shell=True)
-    ret = sub.call("mkdir " + run_directory + "/" + " 2>/dev/null", shell=True)
-    if ret != 0:
-        response = input("****************************************************\n"
-                             "** WARNING ** A directory named " + run_directory +
-                             " may exist already and would be erased.\n ARE YOU SURE YOU WANT TO CONTINUE? (y/n): ")
-        if not (("Y" in response) or ("y" in response)):
-            quit("Please change run name with -n DifferentName. Quitting.\n"
-                 "****************************************************\n\n")
-        else:
-            print ("****************************************************\n")
-
-    # clear directory
-    sub.call("rm -rf " + run_directory + "/* 2>/dev/null", shell=True)
-
-    sub.call("mkdir " + run_directory + "/voxelyzeFiles 2> /dev/null", shell=True)
-    sub.call("mkdir " + run_directory + "/tempFiles 2> /dev/null", shell=True)
-    sub.call("mkdir " + run_directory + "/fitnessFiles 2> /dev/null", shell=True)
-
-    sub.call("mkdir " + run_directory + "/bestSoFar 2> /dev/null", shell=True)
-    sub.call("mkdir " + run_directory + "/bestSoFar/paretoFronts 2> /dev/null", shell=True)
-    sub.call("mkdir " + run_directory + "/bestSoFar/fitOnly 2>/dev/null", shell=True)
-
-    sub.call("mkdir " + run_directory + "/pickledPops 2> /dev/null", shell=True)
-
-    if save_all_individual_data:
-        sub.call("mkdir " + run_directory + "/allIndividualsData", shell=True)
-        sub.call("rm -f " + run_directory + "/allIndividualsData/* 2>/dev/null", shell=True)  # TODO: why clear these
-
-    if save_networks:
-        sub.call("mkdir " + run_directory + "/network_gml", shell=True)
-        sub.call("rm -rf " + run_directory + "/network_gml/* 2>/dev/null", shell=True)
-
-    if save_lineages:
-        sub.call("mkdir " + run_directory + "/ancestors 2> /dev/null", shell=True)
-
-def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
-
-    print ("\n\n")
-    print ("----------------------------------")
-    print ("---------- GENERATION", gen, "----------")
-    print ("----------------------------------")
-    print ("\n")
-
-    if gen % save_vxa_every == 0 and save_vxa_every > 0:
-        sub.call("mkdir " + run_directory + "/Gen_%04i" % gen, shell=True)
-
-    if save_networks:
-        sub.call("mkdir " + run_directory + "/network_gml/Gen_%04i" % gen, shell=True)
-
-
 #sys.path.append(os.getcwd() + "/../..")
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
@@ -70,9 +16,71 @@ from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
+
+def folder_heirarchy_creation_helper(run_directory, save_networks, save_all_individual_data, save_lineages, resuming_run = False):
+    # clear directory
+    if not resuming_run:
+        sub.call("rm -rf " + run_directory + "/* 2>/dev/null", shell=True)
+
+
+
+        sub.call("mkdir " + run_directory + "/voxelyzeFiles 2> /dev/null", shell=True)
+        sub.call("mkdir " + run_directory + "/tempFiles 2> /dev/null", shell=True)
+        sub.call("mkdir " + run_directory + "/fitnessFiles 2> /dev/null", shell=True)
+
+        sub.call("mkdir " + run_directory + "/bestSoFar 2> /dev/null", shell=True)
+        sub.call("mkdir " + run_directory + "/bestSoFar/paretoFronts 2> /dev/null", shell=True)
+        sub.call("mkdir " + run_directory + "/bestSoFar/fitOnly 2>/dev/null", shell=True)
+
+        sub.call("mkdir " + run_directory + "/pickledPops 2> /dev/null", shell=True)
+
+        if save_all_individual_data:
+            sub.call("mkdir " + run_directory + "/allIndividualsData", shell=True)
+            sub.call("rm -f " + run_directory + "/allIndividualsData/* 2>/dev/null", shell=True)  # TODO: why clear these
+
+        if save_networks:
+            sub.call("mkdir " + run_directory + "/network_gml", shell=True)
+            sub.call("rm -rf " + run_directory + "/network_gml/* 2>/dev/null", shell=True)
+
+        if save_lineages:
+            sub.call("mkdir " + run_directory + "/ancestors 2> /dev/null", shell=True)
+
+
+def initialize_folder_heirarchy(run_directory, save_networks, save_all_individual_data=True,
+                       save_lineages=True, resuming_run = False):
+
+    if os.path.exists(run_directory) and os.path.isdir(run_directory):
+
+        folder_heirarchy_creation_helper(run_directory, save_networks, 
+                                        save_all_individual_data, save_lineages, 
+                                        resuming_run)
+    else:
+        sub.call("mkdir " + run_directory + "/" + " 2>/dev/null", shell=True)
+        folder_heirarchy_creation_helper(run_directory, save_networks, 
+                                save_all_individual_data, save_lineages)
+
+
+
+def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
+
+    print ("\n\n")
+    print ("----------------------------------")
+    print ("---------- GENERATION", gen, "----------")
+    print ("----------------------------------")
+    print ("\n")
+    sub.call("rm -rf " + run_directory + "/Gen_%04i" % gen, shell=True)
+    if gen % save_vxa_every == 0 and save_vxa_every > 0:
+        sub.call("mkdir " + run_directory + "/Gen_%04i" % gen, shell=True)
+
+    if save_networks:
+        sub.call("mkdir " + run_directory + "/network_gml/Gen_%04i" % gen, shell=True)
+
+
 class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
-                objective_dict, max_gens, num_env_cycles = 0, max_eval_time=60, time_to_try_again=10, save_lineages = True, save_nets = False):
+                objective_dict, max_gens, num_env_cycles = 0, max_eval_time=60, 
+                time_to_try_again=10, save_lineages = True, save_nets = False, 
+                resuming_run = False):
         """Evaluate all individuals of the population in VoxCad.
 
         Parameters
@@ -123,8 +131,10 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
         self.max_eval_time = max_eval_time
         self.time_to_try_again = time_to_try_again
         self.save_lineages = save_lineages
+        self.resuming_run = resuming_run
         
         self.best_fit_so_far = objective_dict[0]["worst_value"]
+        self.already_evaluated_json_path = os.path.join(self.run_directory, "already_evaluated_json")
         self.already_evaluated = {}
         self.all_evaluated_individuals_ids = []
  
@@ -132,10 +142,23 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
         self.curr_env_idx = 0
         self.n_batch = 1
         self.save_nets = save_nets
+        
+    def _read_already_evaluated_from_json(self):
+        with open(self.already_evaluated_json_path, "r") as jsonFile:
+            self.already_evaluated = json.load(jsonFile)
+
+    def _write_already_evaluated_to_json(self):
+        with open(self.already_evaluated_json_path, "w") as jsonFile:
+            json.dump(self.already_evaluated, jsonFile)     
 
     def start(self):
-        initialize_folder_heirarchy(self.run_directory, self.run_name, self.save_nets, save_lineages=self.save_lineages)
-        
+        initialize_folder_heirarchy(self.run_directory, self.save_nets, save_lineages=self.save_lineages, resuming_run=self.resuming_run)
+
+        if self.resuming_run and os.path.exists(self.already_evaluated_json_path):
+            self._read_already_evaluated_from_json()
+
+    def set_generation(self, gen):
+        self.n_batch = gen
 
     def update_env(self):
         if self.num_env_cycles > 0:
@@ -149,10 +172,15 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
 
 class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
-    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_gens, num_env_cycles, max_eval_time=60, time_to_try_again=10, save_lineages=True, save_nets = False, sim_path = '_voxcad', experiments_path = '.'):
-        super().__init__(sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_gens, num_env_cycles, max_eval_time, time_to_try_again, save_lineages, save_nets)
+    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
+                objective_dict, max_gens, num_env_cycles, max_eval_time=60, 
+                time_to_try_again=10, save_lineages=True, save_nets = False, 
+                resuming_run = False, sim_path = '_voxcad', experiments_path = '.'):
+        super().__init__(sim, env, save_vxa_every, run_directory, run_name, 
+                        objective_dict, max_gens, num_env_cycles, max_eval_time, 
+                        time_to_try_again, save_lineages, save_nets, resuming_run)
         self.sim_path = sim_path
-        self.experiments_path
+        self.experiments_path = experiments_path
 
     def start(self):
         super().start()
@@ -411,8 +439,14 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
 class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
-    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_gens, num_env_cycles, max_eval_time=60, time_to_try_again=10, save_lineages=True, save_nets = False, sim_path = '_voxcraft-sim', experiments_path = 'experiments'):
-        super().__init__(sim, env, save_vxa_every, run_directory, run_name, objective_dict, max_gens, num_env_cycles, max_eval_time, time_to_try_again, save_lineages, save_nets)
+    def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
+                objective_dict, max_gens, num_env_cycles, max_eval_time=60, 
+                time_to_try_again=10, save_lineages=True, save_nets = False, 
+                resuming_run = False, sim_path = '_voxcraft-sim', 
+                experiments_path = 'experiments'):
+        super().__init__(sim, env, save_vxa_every, run_directory, run_name, 
+                        objective_dict, max_gens, num_env_cycles, max_eval_time, 
+                        time_to_try_again, save_lineages, save_nets, resuming_run)
         self.sim_path = sim_path
         self.experiments_path = experiments_path
 
@@ -478,7 +512,7 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             if time_waiting_for_fitness > len(pop) * self.max_eval_time:
                 break
             try:
-                sub.call(f"{self.experiments_path}/voxcraft-sim -f -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", shell=True)
+                sub.call(f"./voxcraft-sim -f -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", shell=True)
                 # sub.call waits for the process to return
                 # after it does, we collect the results output by the simulator
                 fitness_report = etree.parse(f"{self.run_directory}/output.xml").getroot()
@@ -493,6 +527,11 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                 logger.error(f"There was an IndexError:")
                 logger.exception(ie)
                 logger.error(f"Re-simulating this batch again...")
+
+        def int64Convertion(num):
+            if isinstance(num, np.integer):
+                return int(num)
+            return num
 
         for ind_id, ind in ids_softbot_map.items():
             
@@ -514,7 +553,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                             setattr(ind, details["name"], details["node_func"](state))
 
 
-            self.already_evaluated[ind.md5] = [getattr(ind, details["name"])
+
+            self.already_evaluated[ind.md5] = [int64Convertion(getattr(ind, details["name"]))
                                                 for rank, details in
                                                 self.objective_dict.items()]
 
@@ -537,7 +577,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)
 
-
+        self._write_already_evaluated_to_json()
+        self.n_batch += 1
 
         if not all_done:
             logger.warning("Couldn't get a fitness value in time for some individuals. "

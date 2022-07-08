@@ -39,9 +39,8 @@ class PopulationBasedOptimizerPyMOO(Optimizer, IStarter):
         self.analytics.start() 
 
     @timeit
-    def run(self, evosoro_pop, max_hours_runtime=29, max_gens=3000, num_random_individuals=1, num_env_cycles=0,
-            checkpoint_every=100, save_pareto=False,
-            save_nets=False, continued_from_checkpoint=False, new_run = True):
+    def run(self, evosoro_pop, save_pareto=False,
+            save_nets=False, continued_from_checkpoint=False):
 
         # if self.autosuspended:
         #     sub.call("rm %s/AUTOSUSPENDED" % self.problem.evaluators["physics"].run_directory, shell=True)

@@ -28,7 +28,7 @@ class MAP_ElitesOptimizer(Optimizer):
         return super().run(*args, **kwargs)
 
 class MAP_ElitesArchive(IStarter, object):
-    def __init__(self, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], name : str, base_path : str) -> None:
+    def __init__(self, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], name : str, base_path : str, resuming_run : bool = False) -> None:
         feats = []
         for min, max, granularity in min_max_gr_li:
             feats += [list(np.linspace(min, max, granularity))]
@@ -43,11 +43,15 @@ class MAP_ElitesArchive(IStarter, object):
         self.qd_score = 0
         self.base_path = base_path
         self.archive_path = os.path.join(self.base_path, self.name)
+        self.resuming_run = resuming_run
 
     def start(self):
         if os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
-            shutil.rmtree(self.archive_path)
-        os.mkdir(self.archive_path)
+            if not self.resuming_run:
+                shutil.rmtree(self.archive_path)
+                os.mkdir(self.archive_path)
+        else:
+            os.mkdir(self.archive_path)
 
 
     def feature_descriptor(self, x):

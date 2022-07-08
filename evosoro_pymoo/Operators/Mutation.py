@@ -14,8 +14,8 @@ logger = logging.getLogger(f"__main__.{__name__}")
 
 
 class SoftbotMutation(Mutation):
-    def __init__(self):
-        self.max_id = 0
+    def __init__(self, max_id):
+        self.max_id = max_id
         super().__init__()
 
     def _do(self, problem, X, **kwargs):

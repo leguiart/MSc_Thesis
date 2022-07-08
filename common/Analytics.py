@@ -14,7 +14,7 @@ from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesA
 
 
 class QD_Analytics(IAnalytics):
-    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path):
+    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path, resuming_run = False):
         super().__init__()
         self.json_base_path = json_base_path
         self.csv_base_path = csv_base_path
@@ -33,9 +33,9 @@ class QD_Analytics(IAnalytics):
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
         min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
         #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "f_elites", self.json_base_path)
+        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "f_elites", self.json_base_path, resuming_run)
         #2.- Elites in terms of aligned novelty
-        self.map_elites_archive_an = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "an_elites", self.json_base_path)
+        self.map_elites_archive_an = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "an_elites", self.json_base_path, resuming_run)
         #3.- Elites in terms of both aligned novelty and fitness (Pareto-dominance)
         # self.map_elites_archive_anf = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "anf_elites")
         self.indicator_stats_set = {
@@ -87,6 +87,9 @@ class QD_Analytics(IAnalytics):
             "morphology_active",
             "morphology_passive"
         }
+
+    def set_generation(self, gen):
+        self.actual_generation = gen
 
     def start(self):
         self.map_elites_archive_f.start()
