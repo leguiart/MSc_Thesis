@@ -7,23 +7,30 @@ Author: Luis Andrés Eguiarte-Morett (Github: @leguiart)
 License: MIT.
 """
 
+import os
+import pickle
+import shutil
+from typing import Callable, List
 import numpy as np
 import copy
 import logging
 import heapq as hq
 from requests import get
 from sklearn.neighbors import KDTree
+from evosoro.softbot import SoftBot
 
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import timeit
+from common.Utils import readFromJson, timeit, writeToJson
+from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
 def std_is_valid(x):
     return True
 
-class NoveltyEvaluator(IEvaluator):
+
+class NoveltyEvaluatorKD(IEvaluator[SoftBot], IStarter):
     """
     Novelty-search based phenotype evaluator.
     ...
@@ -48,152 +55,9 @@ class NoveltyEvaluator(IEvaluator):
     evaluate(artifacts)
         Evaluates the novelty of each artifact in a list of artifacts
     """
-    def __init__(self, distance_metric, novelty_name, novelty_threshold = 30., novelty_floor = .25, 
-                min_novelty_archive_size = 1, k_neighbors = 10, max_novelty_archive_size = None, 
-                max_iter = 100, nslc_neighbors_name = None, is_valid_func = std_is_valid):
-        """
-        Parameters
-        ----------
-        distance_metric : function
-            Function which defines a way to measure a distance
-        novelty_threshold : float, optional
-            Novelty score dynamic threshold for entrance to novelty archive (default is 30)
-        novelty_floor : float, optional
-            Lower bound of the novelty threshold (default is 0.25)
-        min_novelty_archive_size : int, optional (default is 1)
-            Novelty archive must have at least this number of individuals
-        k_neighbors : int, optional (default is 10)
-            K nearest neighbors to compute average distance to in order to get a novelty score
-        max_novelty_archive_size : int, optional (default is None)
-            Novelty archive can have at most this number of individuals
-        """        
-        self.novelty_threshold = novelty_threshold
-        self.novelty_floor = novelty_floor
-        self.min_novelty_archive_size = min_novelty_archive_size
-        self.k_neighbors = k_neighbors
-        self.max_novelty_archive_size = max_novelty_archive_size
-        self.max_iter = max_iter
-        self.items_added_in_generation = 0
-        self.time_out = 0
-        self.its = 0
-        self.novelty_archive = []
-        self.distance_metric = distance_metric
-        self.novelty_name = novelty_name
-        self.nslc_neighbors_name = nslc_neighbors_name
-        self.is_valid_func = is_valid_func
-        self.already_evaluated = set()
-
-    @timeit
-    def evaluate(self, X):
-        """Evaluates the novelty of each object in a list of objects according to the Novelty-Search algorithm
-        X : list
-            List of objects which contain a fitness metric definition
-        """
-
-        logger.debug("Starting novelty evaluation")
-        preliminary_archive = []
-        X_copy = X.copy()
-        for i in range(len(X)):
-            if self.is_valid_func(X[i]):
-                if not X[i].md5 in self.already_evaluated:
-                    novelty, kn_neighborsf = self._average_knn_distance(X[i], X_copy)
-                    # Set novelty and in case it is needed (NSLC), the fitness of the kn neighbors
-                    setattr(X[i], self.novelty_name, novelty)
-                    if self.nslc_neighbors_name is not None:
-                        setattr(X[i], self.nslc_neighbors_name, kn_neighborsf)
-                    if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(preliminary_archive) + len(self.novelty_archive) < self.min_novelty_archive_size):
-                        self.items_added_in_generation+=1
-                        # Should add individuals to the archive just yet? if so, could end up counting twice the same individual
-                        self.novelty_archive += [copy.deepcopy(X[i])]
-                        # Instead add to a preliminary archive for the current population
-                        # preliminary_archive += [copy.deepcopy(X[i])]
-                        # self.already_evaluated.add(X[i].md5)
-
-        # Now we can actually add the individuals to the archive
-        self.novelty_archive += preliminary_archive
-        logger.debug("Finished novelty evaluation")
-
-        self._adjust_archive_settings()
-        return X
-    
-    def _adjust_archive_settings(self):
-        # If we've exceeded the maximum size of the novelty archive
-        if not self.max_novelty_archive_size is None and len(self.novelty_archive) > self.max_novelty_archive_size:
-            # We have to recompute the novelty of all the individuals that were previously on the archive,
-            # otherwise we could end up evicting the wrong individuals
-            for i in range(len(self.novelty_archive)):
-                current_ind = self.novelty_archive[i]
-                novelty, kn_neighborsf = self._average_knn_distance(current_ind, self.novelty_archive)
-                # Set novelty, and in case it is needed (NSLC), the fitness of the kn neighbors
-                setattr(current_ind, self.novelty_name, novelty)
-                if self.nslc_neighbors_name is not None:
-                    setattr(current_ind, self.nslc_neighbors_name, kn_neighborsf)
-                self.novelty_archive[i] = current_ind
-                
-            self.novelty_archive.sort(key = lambda x : getattr(x, self.novelty_name))
-
-            for _ in range(len(self.novelty_archive) - self.max_novelty_archive_size):
-                self.novelty_archive.pop(0)
-
-
-        if self.items_added_in_generation == 0:
-            self.time_out+=1
-        else:
-            self.time_out = 0
-        if self.time_out >= 10:
-            self.novelty_threshold *= 0.95
-            self.novelty_threshold = max(self.novelty_threshold, self.novelty_floor)
-            self.time_out = 0
-        if self.items_added_in_generation >= 4:
-            self.novelty_threshold *= 1.2
-        self.items_added_in_generation = 0
-    
-    def _average_knn_distance(self, artifact, artifacts):
-        distances = []
-        for a in artifacts:
-            distances += [(a.fitness, self.distance_metric(artifact, a))]
-        for novel in self.novelty_archive:
-            distances += [(novel.fitness, self.distance_metric(artifact,novel))]
-        distances.sort(key = lambda x : x[1])
-        if len(distances) < self.k_neighbors:
-            kn_neighborsf = list(map(lambda x : x[0], distances))
-            dists = list(map(lambda x : x[1], distances))
-            average_knn_dist = np.average(dists)
-        else:
-            kn_neighborsf = list(map(lambda x : x[0], distances[0: self.k_neighbors]))
-            dists = list(map(lambda x : x[1], distances[0: self.k_neighbors]))
-            average_knn_dist = np.average(dists)
-        return average_knn_dist, kn_neighborsf
-
-
-class NoveltyEvaluatorKD(IEvaluator):
-    """
-    Novelty-search based phenotype evaluator.
-    ...
-
-    Attributes
-    ----------
-    distance_metric : function
-        Function which defines a way to measure a distance
-    novelty_threshold : float
-        Novelty score dynamic threshold for entrance to novelty archive
-    novelty_floor : float
-        Lower bound of the novelty threshold
-    min_novelty_archive_size : int
-        Novelty archive must have at least this number of individuals
-    k_neighbors : tuple (float, float)
-        K nearest neighbors to compute average distance to in order to get a novelty score
-    max_novelty_archive_size : int
-        Novelty archive can have at most this number of individuals
-
-    Methods
-    -------
-    evaluate(artifacts)
-        Evaluates the novelty of each artifact in a list of artifacts
-    """
-    def __init__(self, evaluator_name, vector_extractor, novelty_name, novelty_threshold = 30., novelty_floor = .25, 
-                min_novelty_archive_size = 1, k_neighbors = 10, max_novelty_archive_size = None, 
-                max_iter = 100):
+    def __init__(self, name : str, base_path : str, novelty_name : str, vector_extractor : Callable[[SoftBot], List], 
+                novelty_threshold = 30., novelty_floor = .25, min_novelty_archive_size = 1, k_neighbors = 10, 
+                max_novelty_archive_size = None, max_iter = 100):
         """
         Parameters
         ----------
@@ -210,20 +74,46 @@ class NoveltyEvaluatorKD(IEvaluator):
         max_novelty_archive_size : int, optional (default is None)
             Novelty archive can have at most this number of individuals
         """  
-        self.evaluator_name = evaluator_name      
-        self.novelty_threshold = novelty_threshold
+        self.name = name      
+        self.novelty_name = novelty_name
+        self.base_path = base_path
+        self.archive_path = os.path.join(self.base_path, self.name)
+        self.obj_properties_json_path = os.path.join(self.base_path, f"NS_{self.name}_properties_backup.json")
+        self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
+        self.novelty_threshold = novelty_threshold if "novelty_threshold" not in self.obj_properties_backup else self.obj_properties_backup["novelty_threshold"]
         self.novelty_floor = novelty_floor
         self.min_novelty_archive_size = min_novelty_archive_size
         self.k_neighbors = k_neighbors
         self.max_novelty_archive_size = max_novelty_archive_size
         self.max_iter = max_iter
         self.items_added_in_generation = 0
-        self.time_out = 0
-        self.its = 0
+        self.time_out = 0 if "time_out" not in self.obj_properties_backup else self.obj_properties_backup["time_out"]
+        self.its = 0 if "its" not in self.obj_properties_backup else self.obj_properties_backup["its"]
+
+        self.obj_properties_json_path = os.path.join(self.base_path, f"NS_{self.name}_properties_backup.json")
+        self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
+
         self.novelty_archive = []
         self.vector_extractor = vector_extractor
-        self.novelty_name = novelty_name
         self.archive_hashset = set()
+
+
+    def start(self):
+        if os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
+            dir_contents = [file for file in os.listdir(self.archive_path) if os.path.isfile(os.path.join(self.archive_path, file))]
+            if not dir_contents:
+                shutil.rmtree(self.archive_path)
+                os.mkdir(self.archive_path)
+            else:
+                for filename in dir_contents:
+                    if filename.endswith(".pickle"):
+                        with open(os.path.join(self.archive_path, filename), 'rb') as handle:
+                            individual = pickle.load(handle)
+                        self.novelty_archive += [individual]
+                        self.archive_hashset.add(individual.md5)
+        else:
+            os.mkdir(self.archive_path)
+
 
     def _evaluate_novelty(self, individuals):
         # Prepare matrix for KD-Tree creation
@@ -236,13 +126,22 @@ class NoveltyEvaluatorKD(IEvaluator):
 
         return self._average_knn_distance(kd_matrix, kd_tree)
 
+
+    def pickle_individual(self, individual):
+        with open(f"{self.archive_path}/individual_{individual.id}.pickle", "wb") as fh:
+            pickle.dump(individual, fh, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+    def remove_individual_from_backup(self, individual):
+        os.remove(f"{self.archive_path}/individual_{individual.id}.pickle")
+
+
     @timeit
     def evaluate(self, X):
         """Evaluates the novelty of each object in a list of objects according to the Novelty-Search algorithm
         X : list
             List of objects which contain a fitness metric definition
         """
-
 
         logger.debug("Starting novelty evaluation")
 
@@ -260,17 +159,24 @@ class NoveltyEvaluatorKD(IEvaluator):
                         self.items_added_in_generation+=1
                         self.novelty_archive += [copy.deepcopy(X[i])]
                         self.archive_hashset.add(X[i].md5)
+                        self.pickle_individual(X[i])
 
             else:
                 setattr(self.novelty_archive[i%len(X)], self.novelty_name, novelty)
 
         
-        logger.debug(f"{self.items_added_in_generation} were added to {self.evaluator_name} evaluator")
-        logger.debug(f"{self.evaluator_name} evaluator has {self.novelty_threshold} novelty threshold")
-        logger.debug(f"{self.evaluator_name} evaluator has currently has {len(self.novelty_archive)} elements")
+        logger.debug(f"{self.items_added_in_generation} were added to {self.name} evaluator")
+        logger.debug(f"{self.name} evaluator has {self.novelty_threshold} novelty threshold")
+        logger.debug(f"{self.name} evaluator has currently has {len(self.novelty_archive)} elements")
         logger.debug("Finished novelty evaluation")
 
         self._adjust_archive_settings()
+
+        self.obj_properties_backup["its"] = self.its
+        self.obj_properties_backup["time_out"] = self.time_out
+        self.obj_properties_backup["novelty_threshold"] = self.novelty_threshold
+
+        writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
         
         return X
     
@@ -284,6 +190,7 @@ class NoveltyEvaluatorKD(IEvaluator):
             for _ in range(len(self.novelty_archive) - self.max_novelty_archive_size):
                 removed = self.novelty_archive.pop(0)
                 self.archive_hashset.remove(removed.md5)
+                self.remove_individual_from_backup(removed)
 
 
         if self.items_added_in_generation == 0:
@@ -296,19 +203,26 @@ class NoveltyEvaluatorKD(IEvaluator):
             self.time_out = 0
         if self.items_added_in_generation >= 4 and self.its > 0:
             self.novelty_threshold *= 1.2
+
         self.its+=1
         self.items_added_in_generation = 0
-    
+
 
     def _average_knn_distance(self, kd_matrix, kd_tree : KDTree):
         distances, ind = kd_tree.query(kd_matrix, min(self.k_neighbors + 1, len(kd_matrix)))
         return np.mean(distances[:,1:], axis = 1), ind[:,1:]
 
 
+
 class NSLCEvaluator(NoveltyEvaluatorKD):
 
-    def __init__(self, evaluator_name, vector_extractor, novelty_name, nslc_quality_name, fitness_name, novelty_threshold=30, novelty_floor=0.25, min_novelty_archive_size=1, k_neighbors=10, max_novelty_archive_size=None, max_iter=100):
-        super().__init__(evaluator_name, vector_extractor, novelty_name, novelty_threshold, novelty_floor, min_novelty_archive_size, k_neighbors, max_novelty_archive_size, max_iter)
+    def __init__(self, name, base_path, novelty_name, vector_extractor, nslc_quality_name, 
+                fitness_name, novelty_threshold=30, novelty_floor=0.25, min_novelty_archive_size=1, 
+                k_neighbors=10, max_novelty_archive_size=None, max_iter=100):
+
+        super().__init__(name, base_path, novelty_name, vector_extractor,
+                        novelty_threshold, novelty_floor, min_novelty_archive_size, 
+                        k_neighbors, max_novelty_archive_size, max_iter)
         self.nslc_quality_name = nslc_quality_name
         self.fitness_name = fitness_name
 
@@ -336,17 +250,21 @@ class NSLCEvaluator(NoveltyEvaluatorKD):
                 if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
                     self.items_added_in_generation+=1
                     self.novelty_archive += [copy.deepcopy(X[i])]
-
+                    self.pickle_individual(X[i])
             else:
 
                 setattr(self.novelty_archive[i%len(X)], self.novelty_name, novelty)
 
         
-        logger.debug(f"{self.items_added_in_generation} were added to {self.evaluator_name} evaluator")
-        logger.debug(f"{self.evaluator_name} evaluator has {self.novelty_threshold} novelty threshold")
-        logger.debug(f"{self.evaluator_name} evaluator has currently has {len(self.novelty_archive)} elements")
+        logger.debug(f"{self.items_added_in_generation} were added to {self.name} evaluator")
+        logger.debug(f"{self.name} evaluator has {self.novelty_threshold} novelty threshold")
+        logger.debug(f"{self.name} evaluator has currently has {len(self.novelty_archive)} elements")
         logger.debug("Finished novelty search with local competition evaluation")
 
         self._adjust_archive_settings()
+        self.obj_properties_backup["its"] = self.its
+        self.obj_properties_backup["time_out"] = self.time_out
+        self.obj_properties_backup["novelty_threshold"] = self.novelty_threshold
 
+        writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
         return X

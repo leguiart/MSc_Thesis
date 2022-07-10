@@ -13,7 +13,6 @@ from gc import get_referents
 from common.Constants import *
 
 
-
 # create logger
 module_logger = logging.getLogger(f"__main__.timeit")
 
@@ -47,11 +46,9 @@ def timeit(method):
     return wrapper
 
 
-
 def setRandomSeed(seed):
     random.seed(seed)  # Initializing the random number generator for reproducibility
     np.random.seed(seed)
-
 
 
 def readFromJson(filename):
@@ -60,7 +57,6 @@ def readFromJson(filename):
             return json.load(fp)
     else:
         return {}
-
 
 
 def writeToJson(filename, content):

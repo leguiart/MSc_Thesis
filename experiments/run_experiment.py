@@ -11,7 +11,9 @@
 
 """
 
-import numpy as np
+import glob
+import re
+import numpy
 import os
 import sys
 import uuid
@@ -32,7 +34,7 @@ from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAnd
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import SoftbotMutation
-from common.Utils import readFromJson, save_json, writeToJson, countFileLines, readFirstJson
+from common.Utils import readFromJson, setRandomSeed, writeToJson, countFileLines, readFirstJson
 from common.Analytics import QD_Analytics
 
 from evosoro.base import Sim, Env, ObjectiveDict
@@ -98,7 +100,7 @@ def main(parser : argparse.ArgumentParser):
         # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
         # Adding another objective called "num_voxels" for constraint reasons
         objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
-                                        node_func=np.count_nonzero, output_node_name="material")
+                                        node_func=numpy.count_nonzero, output_node_name="material")
 
         
         objective_dict.add_objective(name="active", maximize=True, tag=None,
@@ -163,7 +165,7 @@ def main(parser : argparse.ArgumentParser):
         # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
         # Adding another objective called "num_voxels" for constraint reasons
         objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
-                                        node_func=np.count_nonzero, output_node_name="material")
+                                        node_func=numpy.count_nonzero, output_node_name="material")
 
         
         objective_dict.add_objective(name="active", maximize=True, tag=None,
@@ -252,8 +254,10 @@ def main(parser : argparse.ArgumentParser):
             writeToJson(seeds_json, runToSeedMapping)
         
         # Initializing the random number generator for reproducibility
+        # setRandomSeed(runToSeedMapping[str(run + 1)])
+        numpy.random.seed(runToSeedMapping[str(run + 1)])
         random.seed(runToSeedMapping[str(run + 1)])  
-        np.random.seed(runToSeedMapping[str(run + 1)])
+
         
         # Setting up the simulation object
         sim = Sim(dt_frac=DT_FRAC, simulation_time=SIM_TIME, fitness_eval_init_time=INIT_TIME)
@@ -261,30 +265,70 @@ def main(parser : argparse.ArgumentParser):
         # Setting up the environment object
         env = Env(sticky_floor=0, time_between_traces=0, lattice_dimension=0.05)
 
-        # Setting up physics simulation
-        physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_dir + str(run + 1), run_name, objective_dict, max_gens, 0, max_eval_time= MAX_EVAL_TIME, time_to_try_again= TIME_TO_TRY_AGAIN, save_lineages = SAVE_LINEAGES)
-        
-        # Setting up Softbot optimization problem
-        softbot_problem = softbot_problem_cls(physics_sim, pop_size)
+        run_path = run_dir + str(run + 1)
+        resume_run = False
+        starting_gen = 1
 
-        # Initializing a population of SoftBots
-        my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
-        Population.new("X", my_pop)
+        if os.path.exists(run_path) and os.path.isdir(run_path):
+            response = input("****************************************************\n"
+                            "** WARNING ** A directory named " + run_path + " may exist already.\n"
+                            "Would you like to resume possibly pending run? (y/n): ")
+            if not (("Y" in response) or ("y" in response)):
+                print(f"Restarting run {run + 1}.\n"
+                     "****************************************************\n\n")
+            else:
+                resume_run = True
+                stored_bots = glob.glob(run_path + "/Gen_*")
+                gen_lst = [int(str.lstrip(str(str.split(stored_bot, '_')[-1]), '0')) for stored_bot in stored_bots]
+                gen_lst.sort()
+                starting_gen = gen_lst[-1]
+                print (f"Resuming run {run + 1} at generation {starting_gen}.\n"
+                    "****************************************************\n")
+        if starting_gen <= max_gens:
+            start_success = False
+            start_attempts = 0
+            while not start_success and start_attempts < 5:
+                start_attempts += 1
+                # Setting up analytics
+                analytics = QD_Analytics(run + 1, experiment, run_name, run_path, 'experiments', resume_run)
+                analytics.set_generation(starting_gen)
 
-        # Setting up optimization algorithm
-        algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), mutation=SoftbotMutation(), crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
-        algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
-        analytics = QD_Analytics(run + 1, experiment, run_name, run_dir + str(run+1), 'experiments')
-        my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics)
-        my_optimization.start()
-        # Start optimization
-        my_optimization.run(my_pop, max_hours_runtime=MAX_TIME, max_gens=max_gens, num_random_individuals=NUM_RANDOM_INDS, checkpoint_every=CHECKPOINT_EVERY, new_run = new_experiment)
-        analytics.save_archives()
+                # Setting up physics simulation
+                physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_path, run_name, objective_dict, 
+                                                max_gens, 0, max_eval_time= MAX_EVAL_TIME, time_to_try_again= TIME_TO_TRY_AGAIN, 
+                                                save_lineages = SAVE_LINEAGES, resuming_run=resume_run)
+                physics_sim.set_generation(starting_gen)
+
+                # Setting up Softbot optimization problem
+                softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path)
+
+                # Initializing a population of SoftBots
+                my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
+                if resume_run:
+                    resume_success = my_pop.start(run_path + "/pickledPops")
+                    if not resume_success:
+                        print("Insufficient data to resume run execution.\nRestarting run...")
+                        resume_run = False
+                        starting_gen = 1
+                        continue
+                else:
+                    my_pop.start()
+                Population.new("X", my_pop)
+                start_success = True
+
+            # Setting up optimization algorithm
+            algorithm = NSGA2(pop_size=pop_size, sampling=numpy.array(my_pop.individuals), 
+                            mutation=SoftbotMutation(my_pop.max_id), crossover=DummySoftbotCrossover(), 
+                            survival=nsga2_survival, eliminate_duplicates=False)
+            algorithm.setup(softbot_problem, termination=('n_gen', max_gens - starting_gen + 1))
+            
+            my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics)
+            my_optimization.start()
+
+            # Start optimization
+            my_optimization.run(my_pop)
+            analytics.save_archives()
         
-        #if analytics.qd_history:   
-            # save_json(analytics_json, analytics.qd_history)
-            # df = analytics.to_dataframe()
-            # df.to_csv(analytics_csv, mode='a', header=not os.path.exists(analytics_csv), index = False)
 
     # runBodyBrain(runs, pop_size, max_gens, seeds_json, analytics_json, objective_dict, softbot_problem_cls, genotype_cls, phenotype_cls)
     sys.exit()

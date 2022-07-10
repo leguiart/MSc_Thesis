@@ -14,7 +14,7 @@ from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesA
 
 
 class QD_Analytics(IAnalytics):
-    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path):
+    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path, resuming_run = False):
         super().__init__()
         self.json_base_path = json_base_path
         self.csv_base_path = csv_base_path
@@ -33,9 +33,9 @@ class QD_Analytics(IAnalytics):
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
         min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
         #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "f_elites", self.json_base_path)
+        self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, min_max_gr, self.extract_morpho, resuming_run)
         #2.- Elites in terms of aligned novelty
-        self.map_elites_archive_an = MAP_ElitesArchive(min_max_gr, self.extract_morpho, "an_elites", self.json_base_path)
+        self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho, resuming_run)
         #3.- Elites in terms of both aligned novelty and fitness (Pareto-dominance)
         # self.map_elites_archive_anf = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "anf_elites")
         self.indicator_stats_set = {
@@ -87,6 +87,9 @@ class QD_Analytics(IAnalytics):
             "morphology_active",
             "morphology_passive"
         }
+
+    def set_generation(self, gen):
+        self.actual_generation = gen
 
     def start(self):
         self.map_elites_archive_f.start()
@@ -144,16 +147,6 @@ class QD_Analytics(IAnalytics):
     
     def notify(self, pop, problem):
 
-
-        # aligned_features = [[individual.fitness, individual.aligned_novelty] for individual in problem.evaluators["aligned_novelty"].novelty_archive]
-        
-        # if "unaligned_novelty" in problem.evaluators:
-        #     unaligned_features = [[individual.fitness, individual.unaligned_novelty] for individual in problem.evaluators["unaligned_novelty"].novelty_archive]
-        # elif "unaligned_nslc" in problem.evaluators:
-        #     unaligned_features = [[individual.fitness, individual.unaligned_novelty] for individual in problem.evaluators["unaligned_nslc"].novelty_archive]
-        
-        # aligned_features = np.array(aligned_features)
-        # unaligned_features = np.array(unaligned_features)
 
         for individual in problem.evaluators["aligned_novelty"].novelty_archive:
             self.indicator_mapping["aligned_novelty_archive_novelty"] += [individual.aligned_novelty]
@@ -218,7 +211,8 @@ class QD_Analytics(IAnalytics):
         self.init_indicator_mapping()
         self.actual_generation+=1
             
-            
+
+
     def save_archives(self):
 
         archives = {
@@ -238,6 +232,8 @@ class QD_Analytics(IAnalytics):
                 archives["map_elites_archive_f"] += [0]
                 archives["map_elites_archive_an"] += [0]
         save_json(self.archives_json_path, archives)
+
+
 
     def indicator_df(self):
         return pd.DataFrame({k : self.indicator_mapping[k] for k in self.indicator_set})
@@ -260,163 +256,4 @@ class QD_Analytics(IAnalytics):
 
         return pd.DataFrame(d)
         
-        # ##############################################
-        # ###-----------Population metrics-----------###
-        # ##############################################
-        
-        # # Population fitness
-        # d["Indicator"] += ["Population Fitness"]
-        # arr = np.array(self.indicator_mapping["fitness"])
-        # d["Best"] += [np.max(arr)]
-        # d["Average"] += [np.mean(arr)]
-        # d["STD"] += [np.std(arr)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
 
-        # # Population diversity
-        # # Computing morphological diversity indicator
-        # d["Indicator"] += ["Morphological diversity"]
-        # arr = np.array(self.indicator_mapping["morpho_div"])
-        # d["Best"] += [np.max(arr)]
-        # d["Average"] += [np.mean(arr)]
-        # d["STD"] += [np.std(arr)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing endpoint diversity indicator
-        # d["Indicator"] += ["Endpoint diversity"]
-        # arr = np.array(self.indicator_mapping["endpoint_div"])
-        # d["Best"] += [np.max(arr)]
-        # d["Average"] += [np.mean(arr)]
-        # d["STD"] += [np.std(arr)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing trayectory diversity indicator
-        # d["Indicator"] += ["Trayectory diversity"]
-        # arr = np.array(self.indicator_mapping["trayectory_div"])
-        # d["Best"] += [np.max(arr)]
-        # d["Average"] += [np.mean(arr)]
-        # d["STD"] += [np.std(arr)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing gene diversity indicator
-        # d["Indicator"] += ["Gene diversity"]
-        # arr = np.array(self.indicator_mapping["gene_diversity"])
-        # d["Best"] += [np.max(arr)]
-        # d["Average"] += [np.mean(arr)]
-        # d["STD"] += [np.std(arr)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing morphological gene diversity indicator
-        # d["Indicator"] += ["Morphology gene diversity"]
-        # arr = np.array(self.indicator_mapping["morpho_gene_div"])
-        # d["Best"] += [np.max(arr)]
-        # d["Average"] += [np.mean(arr)]
-        # d["STD"] += [np.std(arr)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing control gene diversity indicator
-        # d["Indicator"] += ["Control gene diversity"]
-        # arr = np.array(self.indicator_mapping["control_gene_div"])
-        # d["Best"] += [np.max(arr)]
-        # d["Average"] += [np.mean(arr)]
-        # d["STD"] += [np.std(arr)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-
-
-        # # Population novelty
-        # # Computing unaligned novelty indicator
-        # d["Indicator"] += ["Unaligned Novelty"]
-        # gen_novelty = np.array(self.indicator_mapping["unaligned_novelty"])
-        # d["Best"] += [np.max(gen_novelty)]
-        # d["Average"] += [np.mean(gen_novelty)]
-        # d["STD"] += [np.std(gen_novelty)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing aligned novelty indicator
-        # d["Indicator"] += ["Aligned Novelty"]
-        # gen_novelty = np.array(self.indicator_mapping["aligned_novelty"])
-        # d["Best"] += [np.max(gen_novelty)]
-        # d["Average"] += [np.mean(gen_novelty)]
-        # d["STD"] += [np.std(gen_novelty)]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-
-        
-        
-        # ##############################################
-        # ###------------Archives metrics------------###
-        # ##############################################
-
-        # aligned_features = np.array(self.indicator_mapping["aligned_features"])
-        # unaligned_features = np.array(self.indicator_mapping["unaligned_features"])
-        # # Computing aligned novelty archive novelty
-        # d["Indicator"] += ["Aligned Archive Novelty"]
-        # d["Best"] += [np.max(aligned_features[:,1])]
-        # d["Average"] += [np.mean(aligned_features[:,1])]
-        # d["STD"] += [np.std(aligned_features[:,1])]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing aligned novelty archive fitness
-        # d["Indicator"] += ["Aligned Archive Fitness"]
-        # d["Best"] += [np.max(aligned_features[:,0])]
-        # d["Average"] += [np.mean(aligned_features[:,0])]
-        # d["STD"] += [np.std(aligned_features[:,0])]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing unaligned novelty archive novelty
-        # d["Indicator"] += ["Unaligned Archive Novelty"]
-        # d["Best"] += [np.max(unaligned_features[:,1])]
-        # d["Average"] += [np.mean(unaligned_features[:,1])]
-        # d["STD"] += [np.std(unaligned_features[:,1])]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing unaligned novelty archive fitness
-        # d["Indicator"] += ["Unaligned Archive Fitness"]
-        # d["Best"] += [np.max(unaligned_features[:,0])]
-        # d["Average"] += [np.mean(unaligned_features[:,0])]
-        # d["STD"] += [np.std(unaligned_features[:,0])]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-
-        # # QD 
-        # # Computing coverage
-        # d["Indicator"] += ["Coverage"]
-        # d["Best"] += [self.indicator_mapping["coverage"]]
-        # d["Average"] += [self.indicator_mapping["coverage"]]
-        # d["STD"] += [0]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing QD-F            
-        # d["Indicator"] += ["QD-F"]
-        # d["Best"] += [self.indicator_mapping["qd-score_f"]]
-        # d["Average"] += [self.indicator_mapping["qd-score_f"]]
-        # d["STD"] += [0]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-        # # Computing QD-AN            
-        # d["Indicator"] += ["QD-AN"]
-        # d["Best"] += [self.indicator_mapping["qd-score_an"]]
-        # d["Average"] += [self.indicator_mapping["qd-score_an"]]
-        # d["STD"] += [0]
-        # d["Generation"] += [self.actual_generation]
-        # d["Run"] += [self.run]
-        # d["Method"] += [self.method]
-
-        
-        # return pd.DataFrame(d)
