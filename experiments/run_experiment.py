@@ -13,7 +13,7 @@
 
 import glob
 import re
-import numpy as np
+import numpy
 import os
 import sys
 import uuid
@@ -34,7 +34,7 @@ from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAnd
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import SoftbotMutation
-from common.Utils import readFromJson, save_json, writeToJson, countFileLines, readFirstJson
+from common.Utils import readFromJson, setRandomSeed, writeToJson, countFileLines, readFirstJson
 from common.Analytics import QD_Analytics
 
 from evosoro.base import Sim, Env, ObjectiveDict
@@ -100,7 +100,7 @@ def main(parser : argparse.ArgumentParser):
         # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
         # Adding another objective called "num_voxels" for constraint reasons
         objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
-                                        node_func=np.count_nonzero, output_node_name="material")
+                                        node_func=numpy.count_nonzero, output_node_name="material")
 
         
         objective_dict.add_objective(name="active", maximize=True, tag=None,
@@ -165,7 +165,7 @@ def main(parser : argparse.ArgumentParser):
         # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
         # Adding another objective called "num_voxels" for constraint reasons
         objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
-                                        node_func=np.count_nonzero, output_node_name="material")
+                                        node_func=numpy.count_nonzero, output_node_name="material")
 
         
         objective_dict.add_objective(name="active", maximize=True, tag=None,
@@ -254,8 +254,10 @@ def main(parser : argparse.ArgumentParser):
             writeToJson(seeds_json, runToSeedMapping)
         
         # Initializing the random number generator for reproducibility
+        # setRandomSeed(runToSeedMapping[str(run + 1)])
+        numpy.random.seed(runToSeedMapping[str(run + 1)])
         random.seed(runToSeedMapping[str(run + 1)])  
-        np.random.seed(runToSeedMapping[str(run + 1)])
+
         
         # Setting up the simulation object
         sim = Sim(dt_frac=DT_FRAC, simulation_time=SIM_TIME, fitness_eval_init_time=INIT_TIME)
@@ -298,7 +300,7 @@ def main(parser : argparse.ArgumentParser):
                 physics_sim.set_generation(starting_gen)
 
                 # Setting up Softbot optimization problem
-                softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path + "/pickledPops")
+                softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path)
 
                 # Initializing a population of SoftBots
                 my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
@@ -315,7 +317,7 @@ def main(parser : argparse.ArgumentParser):
                 start_success = True
 
             # Setting up optimization algorithm
-            algorithm = NSGA2(pop_size=pop_size, sampling=np.array(my_pop.individuals), 
+            algorithm = NSGA2(pop_size=pop_size, sampling=numpy.array(my_pop.individuals), 
                             mutation=SoftbotMutation(my_pop.max_id), crossover=DummySoftbotCrossover(), 
                             survival=nsga2_survival, eliminate_duplicates=False)
             algorithm.setup(softbot_problem, termination=('n_gen', max_gens - starting_gen + 1))

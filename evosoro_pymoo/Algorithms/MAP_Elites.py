@@ -15,6 +15,7 @@ import pickle
 import shutil
 from typing import List, Callable
 from sklearn.neighbors import KDTree
+from common.Utils import readFromJson, writeToJson
 
 
 from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
@@ -28,7 +29,7 @@ class MAP_ElitesOptimizer(Optimizer):
         return super().run(*args, **kwargs)
 
 class MAP_ElitesArchive(IStarter, object):
-    def __init__(self, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], name : str, base_path : str, resuming_run : bool = False) -> None:
+    def __init__(self, name : str, base_path : str, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], resuming_run : bool = False) -> None:
         feats = []
         for min, max, granularity in min_max_gr_li:
             feats += [list(np.linspace(min, max, granularity))]
@@ -39,10 +40,12 @@ class MAP_ElitesArchive(IStarter, object):
         self.filled_elites_archive = [0 for _ in range(len(self.bc_space))]
         self.extract_descriptors_func = extract_descriptors_func
         self.name = name
-        self.coverage = 0
-        self.qd_score = 0
         self.base_path = base_path
         self.archive_path = os.path.join(self.base_path, self.name)
+        self.obj_properties_json_path = os.path.join(self.base_path, f"ME_{self.name}_properties_backup.json")
+        self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
+        self.coverage = 0 if "coverage" not in self.obj_properties_backup else self.obj_properties_backup["coverage"]
+        self.qd_score = 0 if "qd_score" not in self.obj_properties_backup else self.obj_properties_backup["qd_score"]
         self.resuming_run = resuming_run
 
     def start(self):
@@ -84,6 +87,11 @@ class MAP_ElitesArchive(IStarter, object):
             else:
                 self.qd_score += getattr(x, quality_metric) - getattr(xe, quality_metric)
 
+            self.obj_properties_backup["coverage"] = self.coverage
+            self.obj_properties_backup["qd_score"] = self.qd_score
+
+            writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
+
             self.filled_elites_archive[i] = 1
             with open(f"{self.archive_path}/elite_{i}.pickle", "wb") as fh:
                 pickle.dump(x, fh, protocol=pickle.HIGHEST_PROTOCOL)
@@ -106,12 +114,10 @@ class MAP_ElitesArchive(IStarter, object):
             if not current_elite is None:
                 old_elite_novelty = getattr(current_elite, novelty_metric)
                 self.qd_score -= old_elite_novelty
+
                 if current_elite.md5 in union_hashtable:
-
                     updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
-
                 else:
-                    
                     distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
                     updated_elite_novelty = np.mean(distances)
 

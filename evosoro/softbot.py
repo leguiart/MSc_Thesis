@@ -4,13 +4,10 @@ import logging
 import math
 import os
 import pickle
-import shutil
-import subprocess as sub
-from tracemalloc import start
 import numpy as np
-from asyncio import as_completed
 from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
 
 from evosoro.networks import Network
 from evosoro.tools.logging import PrintLog
@@ -416,10 +413,12 @@ class Population(object):
 
     def start(self, backup_path : str = None):
         if backup_path is None or not os.path.exists(backup_path):
-            with ProcessPoolExecutor() as executor:
-                futures = {executor.submit(self._get_random_individual, i) for i in range(self.pop_size)}
-                for future in as_completed(futures):
-                    self.append(future.result())
+            # with ProcessPoolExecutor() as executor:
+            #     futures = {executor.submit(self._get_random_individual, i) for i in range(self.pop_size)}
+            #     for future in as_completed(futures):
+            #         self.append(future.result())
+            for i in range(self.pop_size):
+                self.append(self._get_random_individual(i))
             self.max_id = len(self)
         else:
             for entry in os.listdir(backup_path):
@@ -437,9 +436,6 @@ class Population(object):
                 return False
         return True
         
-        
-
-
 
     def __iter__(self):
         """Iterate over the individuals. Use the expression 'for n in population'."""
@@ -497,7 +493,8 @@ class Population(object):
         """
         return self.individuals.sort(reverse=reverse, key=operator.attrgetter(key))
 
-    def _get_random_individual(self, id) -> SoftBot:
+
+    def _get_random_individual(self, id : int) -> SoftBot:
         ind = SoftBot(id, self.objective_dict, self.genotype, self.phenotype)
         while not ind.phenotype.is_valid():
             ind = SoftBot(id, self.objective_dict, self.genotype, self.phenotype)

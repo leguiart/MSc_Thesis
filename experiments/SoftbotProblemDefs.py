@@ -67,10 +67,11 @@ class PopulationSaver(IEvaluator[SoftBot]):
 
 
     def evaluate(self, X : List[SoftBot], *args, **kwargs) -> List[SoftBot]:
-        subprocess.call("rm -rf " + self.backup_path+ "/* 2>/dev/null", shell=True)
+        subprocess.call("rm -rf " + self.backup_path + "/pickledPops" + "/* 2>/dev/null", shell=True)
         for individual in X:
-            individual.save_softbot_backup(self.backup_path)
+            individual.save_softbot_backup(self.backup_path + "/pickledPops")
         return X
+
 
 class QualitySoftbotProblem(BaseSoftbotProblem):
 
@@ -82,8 +83,12 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
         # self.evaluators["unaligned_novelty"] = NoveltyEvaluatorKD("Unaligned novelty", unaligned_vector, "unaligned_novelty", min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.)
         self.evaluators.update({"population_saver" : populationSaver,
             "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty",aligned_vector_gpu, "aligned_novelty", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, k_neighbors=20, novelty_threshold=.5), 
-            "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", unaligned_vector, "unaligned_novelty", min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, 
+                                                    min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
+                                                    k_neighbors=20, novelty_threshold=.5), 
+            "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", backup_path, "unaligned_novelty", unaligned_vector,
+                                                     min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, 
+                                                     k_neighbors=20, novelty_threshold=25.),
             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
 
@@ -105,8 +110,8 @@ class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
         # self.evaluators["unaligned_novelty"] = NoveltyEvaluatorKD("Unaligned novelty", unaligned_vector, "unaligned_novelty", min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.)
         self.evaluators.update({"population_saver" : populationSaver,
             "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty",aligned_vector_gpu, "aligned_novelty", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, k_neighbors=20, novelty_threshold=.5), 
-            "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", unaligned_vector, "unaligned_novelty", min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, k_neighbors=20, novelty_threshold=.5), 
+            "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", backup_path, "unaligned_novelty", unaligned_vector, min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
 
@@ -128,8 +133,12 @@ class NSLCSoftbotProblem(BaseSoftbotProblem):
         # self.evaluators.update({"unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", unaligned_vector, "unaligned_novelty", "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.)})
         self.evaluators.update({"population_saver" : populationSaver,
             "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty",aligned_vector_gpu, "aligned_novelty", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, k_neighbors=20, novelty_threshold=.5), 
-            "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", unaligned_vector, "unaligned_novelty", "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, 
+                                                    min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
+                                                    k_neighbors=20, novelty_threshold=.5), 
+            "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", backup_path, "unaligned_novelty", unaligned_vector, 
+                                            "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, 
+                                            k_neighbors=20, novelty_threshold=25.),
             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
 
@@ -152,8 +161,12 @@ class MNSLCSoftbotProblem(BaseSoftbotProblem):
         #             "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", unaligned_vector, "unaligned_novelty", "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.)})
         self.evaluators.update({"population_saver" : populationSaver,
             "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty",aligned_vector, "aligned_novelty", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, k_neighbors=20, novelty_threshold=.5), 
-            "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", unaligned_vector, "unaligned_novelty", "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector, 
+                                                    min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
+                                                    k_neighbors=20, novelty_threshold=.5), 
+            "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", backup_path, "unaligned_novelty", unaligned_vector, 
+                                            "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, 
+                                            max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
 
@@ -174,8 +187,10 @@ class MNSLCSoftbotProblemGPU(BaseSoftbotProblem):
         populationSaver = PopulationSaver(backup_path)
         self.evaluators.update({"population_saver" : populationSaver,
             "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty",aligned_vector_gpu, "aligned_novelty", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, k_neighbors=20, novelty_threshold=.5), 
-            "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", unaligned_vector, "unaligned_novelty", "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, 
+                                                    min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
+                                                    k_neighbors=20, novelty_threshold=.5), 
+            "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", backup_path, "unaligned_novelty", unaligned_vector, "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, k_neighbors=20, novelty_threshold=25.),
             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
         
