@@ -7,6 +7,7 @@ License: MIT.
 """
 
 
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import numpy as np
 import itertools
 import copy
@@ -96,24 +97,33 @@ class MAP_ElitesArchive(IStarter, object):
             with open(f"{self.archive_path}/elite_{i}.pickle", "wb") as fh:
                 pickle.dump(x, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
+
     def update_existing(self, individual_batch, novelty_evaluator):
 
         union_hashtable = {}
+        union_matrix = []
 
         # Compute the Union of Novelty archive and the population
         for individual in individual_batch + novelty_evaluator.novelty_archive:
             if individual.md5 not in union_hashtable:
                 union_hashtable[individual.md5] = individual
+                union_matrix += [novelty_evaluator.vector_extractor(individual)]
         
-        union_matrix = np.array([novelty_evaluator.vector_extractor(individual) for individual in list(union_hashtable.values())])
+        union_matrix = np.array(union_matrix)
         kd_tree = KDTree(union_matrix)
         novelty_metric = novelty_evaluator.novelty_name
 
-        for indx in range(len(self)):
+        individuals_to_update = {}
+        qds_to_remove = []
+        qds_to_add = []
+
+        def individualNoveltyUpdater(indx, qd_to_remove, qd_to_add):
             current_elite = self[indx]
             if not current_elite is None:
                 old_elite_novelty = getattr(current_elite, novelty_metric)
-                self.qd_score -= old_elite_novelty
+                # self.qd_score -= old_elite_novelty
+                qd_to_remove += [old_elite_novelty]
+
 
                 if current_elite.md5 in union_hashtable:
                     updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
@@ -121,11 +131,42 @@ class MAP_ElitesArchive(IStarter, object):
                     distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
                     updated_elite_novelty = np.mean(distances)
 
-                self.qd_score += updated_elite_novelty
+                # self.qd_score += updated_elite_novelty
+                qd_to_add += [updated_elite_novelty]
+
                 setattr(current_elite, novelty_metric, updated_elite_novelty)
+            
+            return current_elite
                 
-                with open(f"{self.archive_path}/elite_{indx}.pickle", "wb") as fh:
-                    pickle.dump(current_elite, fh, protocol=pickle.HIGHEST_PROTOCOL)
+
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(individualNoveltyUpdater, indx, qds_to_remove, qds_to_add) : indx for indx in range(len(self))}
+            for future in as_completed(futures):
+                indx = futures[future]
+                current_elite = future.result()
+                if not current_elite is None:
+                    individuals_to_update[indx] = current_elite
+
+        self.qd_score = sum(qds_to_add) - sum(qds_to_remove)
+
+        # for indx in range(len(self)):
+        #     current_elite = self[indx]
+        #     if not current_elite is None:
+        #         old_elite_novelty = getattr(current_elite, novelty_metric)
+        #         # self.qd_score -= old_elite_novelty
+
+        #         if current_elite.md5 in union_hashtable:
+        #             updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
+        #         else:
+        #             distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
+        #             updated_elite_novelty = np.mean(distances)
+
+        #         # self.qd_score += updated_elite_novelty
+        #         setattr(current_elite, novelty_metric, updated_elite_novelty)
+        
+        for indx, individual in individuals_to_update.items():
+            with open(f"{self.archive_path}/elite_{indx}.pickle", "wb") as fh:
+                pickle.dump(individual, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 
