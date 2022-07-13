@@ -300,7 +300,7 @@ def main(parser : argparse.ArgumentParser):
                 physics_sim.set_generation(starting_gen)
 
                 # Setting up Softbot optimization problem
-                softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path)
+                softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path, orig_size_xyz=IND_SIZE)
 
                 # Initializing a population of SoftBots
                 my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
