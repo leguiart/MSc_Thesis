@@ -399,9 +399,11 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
-                    sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id +
-                            " " + self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name +
-                            "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind.id), shell=True)
+                    source_file = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id 
+                    if os.path.exists(source_file):
+                        sub.call("cp " + source_file +
+                                " " + self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name +
+                                "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind.id), shell=True)
 
             # otherwise evaluate with voxcraft
             else:
@@ -422,8 +424,15 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             if time_waiting_for_fitness > len(pop) * self.max_eval_time:
                 break
             try:
-                sub.call(f"./voxcraft-sim -f -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", shell=True)
-                # sub.call waits for the process to return
+                process = sub.run(f"./voxcraft-sim -f -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", universal_newlines=True, stdout=sub.PIPE, stderr=sub.PIPE, shell=True)
+                
+                logger.info(process.stdout)
+                logger.info(process.stderr)
+                # logger.info(process.returncode)
+                
+                if "CUDA Function Error: out of memory" in process.stdout:
+                    raise MemoryError("/voxcraft-sim/src/VX3/VX3_SimulationManager.cu(425): CUDA Function Error: out of memory")
+                # sub.run waits for the process to return
                 # after it does, we collect the results output by the simulator
                 fitness_report = etree.parse(f"{self.run_directory}/output.xml").getroot()
                 all_done = True
@@ -436,6 +445,10 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             except IndexError as ie:
                 logger.error(f"There was an IndexError:")
                 logger.exception(ie)
+                logger.error(f"Re-simulating this batch again...")
+            except MemoryError as me:
+                logger.error(f"There was Memory error:")
+                logger.exception(me)
                 logger.error(f"Re-simulating this batch again...")
 
         def int64Convertion(num):
@@ -470,7 +483,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
             ind_filename_vxd = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind_id
             ind_filename_vxa = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind_id
-            sub.call("rm " + ind_filename_vxd, shell=True)
+            if os.path.exists(ind_filename_vxd):
+                sub.call("rm " + ind_filename_vxd, shell=True)
 
             # update the run statistics and file management
             if ind.fitness > self.best_fit_so_far:
@@ -483,8 +497,9 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
             if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                 file_source = ind_filename_vxa
-                file_destination = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind_id)
-                sub.call("mv " + file_source + " " + file_destination, shell=True)
+                if os.path.exists(file_source):
+                    file_destination = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind_id)
+                    sub.call("mv " + file_source + " " + file_destination, shell=True)
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)
 
