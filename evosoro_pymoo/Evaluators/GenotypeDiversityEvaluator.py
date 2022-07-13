@@ -11,9 +11,9 @@ logger = logging.getLogger(f"__main__.{__name__}")
 
 class GenotypeDiversityEvaluator(IEvaluator, object):
 
-    def __init__(self) -> None:
+    def __init__(self, orig_size_xyz = (6,6,6)) -> None:
         super().__init__()
-        self.genotypeDistanceEvaluator = GenotypeDistanceEvaluator()
+        self.genotypeDistanceEvaluator = GenotypeDistanceEvaluator(orig_size_xyz)
         self.gene_div_matrix = []
 
 

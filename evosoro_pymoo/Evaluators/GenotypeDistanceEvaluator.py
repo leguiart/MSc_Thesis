@@ -2,6 +2,7 @@
 import concurrent.futures
 import logging
 from typing import Dict, List, Set, Tuple
+from matplotlib.pyplot import axis
 import numpy as np
 from evosoro.softbot import SoftBot
 
@@ -12,12 +13,16 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class GenotypeDistanceEvaluator(IEvaluator, dict):
 
-    def __init__(self) -> None:
+    def __init__(self, orig_size_xyz = (6,6,6)) -> None:
         super().__init__()
         self.distance_cache : Dict[Tuple[str, str], List[float]] = {}
         self.input_tags : List[Set[str]] = []
         self.output_tags : List[Set[str]]= []
         self.io_tags_cached : bool = False
+        self.dx = 0
+        self.dy = 0
+        self.dz = 0
+        self.size_xyz = orig_size_xyz
 
 
     def __getitem__(self, __k: Tuple[str, str]) -> List[float]:
@@ -43,6 +48,12 @@ class GenotypeDistanceEvaluator(IEvaluator, dict):
                 self.output_tags += [set()]
                 for name in net.graph.nodes:
                     if net.graph.nodes[name]['type'] == 'input':
+                        if name == 'x':
+                            self.dx = (np.max(net.graph.nodes[name]['state']) - np.min(net.graph.nodes[name]['state'])) / self.size_xyz[0]
+                        elif name == 'y':
+                            self.dy = (np.max(net.graph.nodes[name]['state']) - np.min(net.graph.nodes[name]['state'])) / self.size_xyz[1]
+                        elif name == 'z':
+                            self.dz = (np.max(net.graph.nodes[name]['state']) - np.min(net.graph.nodes[name]['state'])) / self.size_xyz[2]
                         self.input_tags[-1].add(name)
                     elif net.graph.nodes[name]['type'] == 'output':
                         self.output_tags[-1].add(name)
@@ -50,13 +61,14 @@ class GenotypeDistanceEvaluator(IEvaluator, dict):
 
         logger.debug("Starting vector field distance calculation...")
 
+        dxdydz = self.dx*self.dy*self.dz
         with concurrent.futures.ProcessPoolExecutor() as executor:
             future_to_indexes = {}
             for i in range(len(X)):              
                 for j in range(i + 1, len(X)):
                     row_md5, col_md5 = X[i].md5, X[j].md5
                     if row_md5 != col_md5 and (row_md5, col_md5) not in self.distance_cache:
-                        future_to_indexes[executor.submit(vector_field_distance, X[i], X[j], self.output_tags)] = (row_md5, col_md5)
+                        future_to_indexes[executor.submit(vector_field_distance, X[i], X[j], self.output_tags, dxdydz)] = (row_md5, col_md5)
 
             for future in concurrent.futures.as_completed(future_to_indexes):
                 row_md5, col_md5 = future_to_indexes[future]
@@ -68,7 +80,7 @@ class GenotypeDistanceEvaluator(IEvaluator, dict):
 
 
 
-def vector_field_distance(ind1 : SoftBot, ind2 : SoftBot, output_tags : List[Set[str]]) -> List[float] :
+def vector_field_distance(ind1 : SoftBot, ind2 : SoftBot, output_tags : List[Set[str]], dxdydz : float) -> List[float] :
     
     gene_length = len(ind1.genotype)
     gene_distances = []
@@ -91,26 +103,34 @@ def vector_field_distance(ind1 : SoftBot, ind2 : SoftBot, output_tags : List[Set
 
         tensor1 = np.array(tensor1).T
         tensor2 = np.array(tensor2).T
+
+
         
-        t1_norm = np.sqrt(np.sum(tensor1**2, axis = 3))
-        t2_norm = np.sqrt(np.sum(tensor2**2, axis = 3))
-        cos_sim = (np.sum(tensor1 * tensor2, axis = 3))/(t1_norm*t2_norm)
-        cos_dist_gauss = np.exp(1 - cos_sim)
-        cos_dist_gauss_norm = (cos_dist_gauss - 1)/(np.exp(2) - 1)
+        # t1_norm = np.sqrt(np.sum(tensor1**2, axis = 3))
+        # t2_norm = np.sqrt(np.sum(tensor2**2, axis = 3))
+        # cos_sim = (np.sum(tensor1 * tensor2, axis = 3))/(t1_norm*t2_norm)
+        # cos_dist_gauss = np.exp(1 - cos_sim)
+        # cos_dist_gauss_norm = (cos_dist_gauss - 1)/(np.exp(2) - 1)
+
         # cos_sim_normalized = (cos_sim + 1)/2
         # cos_dist = 1 - cos_sim_normalized
 
         tensor_diff = tensor1 - tensor2
-        vect_dist = np.sqrt((np.sum(tensor_diff**2, axis=3)))
-        magn_dist_gauss = 1 - np.exp(-vect_dist)
+        vect_dist = np.sum(tensor_diff**2, axis=3)*dxdydz
+        # magn_dist_gauss = 1 - np.exp(-vect_dist)
+
         # magn_sim = np.abs(t1_norm - t2_norm)
         # magn_sim_normalized = np.nan_to_num((magn_sim - np.min(magn_sim))/(np.max(magn_sim) - np.min(magn_sim)), nan=1.)
         # magn_dist = 1 - magn_sim_normalized
 
         # dist = 1/2*(cos_dist + magn_dist)
 
-        dist = 1/2 * (cos_dist_gauss_norm + magn_dist_gauss)
-        gene_distances += [np.mean(dist)]
+        # dist = 1/2 * (cos_dist_gauss_norm + magn_dist_gauss)
+
+        # dist = np.sqrt(np.tensordot(tensor1 - tensor2, tensor1 - tensor2, axis = 3))
+        # dist = np.sqrt(np.sum((tensor1 - tensor2)**2, axis = 3))
+
+        gene_distances += [np.sqrt(np.sum(vect_dist))]
 
 
     return gene_distances     

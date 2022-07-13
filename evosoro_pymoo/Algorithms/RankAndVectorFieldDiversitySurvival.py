@@ -23,8 +23,8 @@ class RankAndVectorFieldDiversitySurvival(Survival):
     def __init__(self, nds=None, orig_size_xyz = (6,6,6)) -> None:
         super().__init__(filter_infeasible=True)
         self.nds = nds if nds is not None else NonDominatedSorting()
-        ranges = [list(range(orig_size_xyz[0])), list(range(orig_size_xyz[1])), list(range(orig_size_xyz[2]))]
-        self.indexes = [list(element) for element in itertools.product(*ranges)]
+        # ranges = [list(range(orig_size_xyz[0])), list(range(orig_size_xyz[1])), list(range(orig_size_xyz[2]))]
+        # self.indexes = [list(element) for element in itertools.product(*ranges)]
         self.input_tags = []
         self.output_tags = []
         self.io_tags_cached = False
