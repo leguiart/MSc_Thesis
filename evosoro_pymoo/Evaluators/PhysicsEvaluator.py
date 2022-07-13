@@ -431,7 +431,9 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                 # logger.info(process.returncode)
                 
                 if "CUDA Function Error: out of memory" in process.stdout:
-                    raise MemoryError("/voxcraft-sim/src/VX3/VX3_SimulationManager.cu(425): CUDA Function Error: out of memory")
+                    raise MemoryError("\033[91mvoxcraft-sim/src/VX3/VX3_SimulationManager.cu(425): CUDA Function Error: out of memory\033[0m")
+                if "CUDA Function Error: too many resources requested for launch" in process.stdout:
+                    raise ResourceWarning("\033[91mvoxcraft-sim/src/VX3/VX3_SimulationManager.cu(425): CUDA Function Error: too many resources requested for launch\033[0m")
                 # sub.run waits for the process to return
                 # after it does, we collect the results output by the simulator
                 fitness_report = etree.parse(f"{self.run_directory}/output.xml").getroot()
@@ -449,6 +451,10 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             except MemoryError as me:
                 logger.error(f"There was Memory error:")
                 logger.exception(me)
+                logger.error(f"Re-simulating this batch again...")
+            except ResourceWarning as re:
+                logger.error(f"There was resource usage error:")
+                logger.exception(re)
                 logger.error(f"Re-simulating this batch again...")
 
         def int64Convertion(num):
