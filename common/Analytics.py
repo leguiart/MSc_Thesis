@@ -8,7 +8,7 @@ from typing import List
 
 from common.Constants import *
 from common.IAnalytics import IAnalytics
-from common.Utils import getsize, save_json
+from common.Utils import getsize, save_json, timeit
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
 
 
@@ -144,7 +144,7 @@ class QD_Analytics(IAnalytics):
         return [x.finalX - x.initialX, x.finalY -  x.initialY]
 
     
-    
+    @timeit
     def notify(self, pop, problem):
 
 
