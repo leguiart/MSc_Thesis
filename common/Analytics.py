@@ -8,7 +8,7 @@ from typing import List
 
 from common.Constants import *
 from common.IAnalytics import IAnalytics
-from common.Utils import getsize, save_json
+from common.Utils import getsize, save_json, timeit
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
 
 
@@ -144,9 +144,11 @@ class QD_Analytics(IAnalytics):
         return [x.finalX - x.initialX, x.finalY -  x.initialY]
 
     
-    
+    @timeit
     def notify(self, pop, problem):
 
+        if "map_elites_archive_f" in problem.evaluators:
+            self.map_elites_archive_an = problem.evaluators["map_elites_archive_f"]
 
         for individual in problem.evaluators["aligned_novelty"].novelty_archive:
             self.indicator_mapping["aligned_novelty_archive_novelty"] += [individual.aligned_novelty]
@@ -190,7 +192,8 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["gene_diversity"] += [ind.X.gene_diversity]
             self.indicator_mapping["control_gene_div"] += [ind.X.control_gene_div]
             self.indicator_mapping["morpho_gene_div"] += [ind.X.morpho_gene_div]
-            self.map_elites_archive_f.try_add(ind.X)
+            if "map_elites_archive_f" not in problem.evaluators: 
+                self.map_elites_archive_f.try_add(ind.X)
             self.map_elites_archive_an.try_add(ind.X, quality_metric="aligned_novelty")
 
 

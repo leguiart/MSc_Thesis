@@ -1,7 +1,7 @@
 
 VOXELYZE_VERSION = '_voxcad'
 
-EXPERIMENT_TYPES = ["SO", "QN-MOEA", "NSLC", "MNSLC"]
+EXPERIMENT_TYPES = ["SO", "QN-MOEA", "MAP-ELITES", "NSLC", "MNSLC"]
 PHYSICS_SIM_TYPES = ["CPU", "GPU"]
 
 
@@ -42,6 +42,13 @@ RUN_DIR_NSLC = "experiments/BodyBrainNSLCData"  # Subdirectory where results are
 RUN_NAME_NSLC = "BodyBrainNSLC"
 SEEDS_JSON_NSLC = RUN_DIR_NSLC + "_seeds.json"
 ANALYTICS_JSON_NSLC = RUN_DIR_NSLC + "_analytics.json"
+
+
+#MAP-ELITES experiment
+RUN_DIR_ME = "experiments/BodyBrainMEData"  # Subdirectory where results are going to be generated
+RUN_NAME_ME = "BodyBrainME"
+SEEDS_JSON_ME = RUN_DIR_ME + "_seeds.json"
+ANALYTICS_JSON_ME = RUN_DIR_ME + "_analytics.json"
 
 #M-NSLC experiment
 RUN_DIR_MNSLC = "experiments/BodyBrainMNSLCData"  # Subdirectory where results are going to be generated

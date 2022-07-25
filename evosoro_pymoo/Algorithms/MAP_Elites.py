@@ -7,7 +7,7 @@ License: MIT.
 """
 
 
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+import glob
 import numpy as np
 import itertools
 import copy
@@ -16,20 +16,33 @@ import pickle
 import shutil
 from typing import List, Callable
 from sklearn.neighbors import KDTree
+from pymoo.algorithms.base.genetic import GeneticAlgorithm
+from pymoo.operators.mutation.pm import PolynomialMutation
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
 from common.Utils import readFromJson, writeToJson
-
-
-from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
-from evosoro.tools.algorithms import Optimizer
+from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro_pymoo.common.IStart import IStarter
 
-class MAP_ElitesOptimizer(Optimizer):
-    def __init__(self, sim, env, evaluation_func=...):
-        super().__init__(sim, env, evaluation_func=evaluation_func)
-    def run(self, *args, **kwargs):
-        return super().run(*args, **kwargs)
+class MAP_Elites(GeneticAlgorithm):
+    def __init__(self, 
+                batch_size=100, 
+                sampling=FloatRandomSampling(), 
+                selection=None, 
+                mutation=PolynomialMutation, 
+                survival=None, 
+                **kwargs):
+        super().__init__(batch_size, 
+                        sampling, 
+                        selection, 
+                        mutation, 
+                        survival, 
+                        advance_after_initial_infill = True, 
+                        **kwargs)
 
-class MAP_ElitesArchive(IStarter, object):
+
+class MAP_ElitesArchive(IStarter, IEvaluator, object):
     def __init__(self, name : str, base_path : str, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], resuming_run : bool = False) -> None:
         feats = []
         for min, max, granularity in min_max_gr_li:
@@ -54,9 +67,21 @@ class MAP_ElitesArchive(IStarter, object):
             if not self.resuming_run:
                 shutil.rmtree(self.archive_path)
                 os.mkdir(self.archive_path)
+            else:
+                self._recover_filled_elites()
         else:
             os.mkdir(self.archive_path)
 
+    def evaluate(self, X, *args, **kwargs):
+        for ind in X:
+            self.try_add(ind)
+        return X
+
+    def _recover_filled_elites(self):
+        stored_elites = glob.glob(f"{self.archive_path}/elite_*")
+        for elite in stored_elites:
+            i = int(elite.split('_')[-1].split('.')[0]) 
+            self.filled_elites_archive[i] = 1
 
     def feature_descriptor(self, x):
         return self.bc_space[self.feature_descriptor_idx(x)]
@@ -102,6 +127,7 @@ class MAP_ElitesArchive(IStarter, object):
 
         union_hashtable = {}
         union_matrix = []
+        archive_matrix = []
 
         # Compute the Union of Novelty archive and the population
         for individual in individual_batch + novelty_evaluator.novelty_archive:
@@ -113,47 +139,17 @@ class MAP_ElitesArchive(IStarter, object):
         kd_tree = KDTree(union_matrix)
         novelty_metric = novelty_evaluator.novelty_name
 
-        individuals_to_update = {}
-        qds_to_remove = []
-        qds_to_add = []
+        # qds_to_remove = []
+        # qds_to_add = []
 
-        def individualNoveltyUpdater(indx, qd_to_remove, qd_to_add):
-            current_elite = self[indx]
-            if not current_elite is None:
-                old_elite_novelty = getattr(current_elite, novelty_metric)
-                # self.qd_score -= old_elite_novelty
-                qd_to_remove += [old_elite_novelty]
-
-
-                if current_elite.md5 in union_hashtable:
-                    updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
-                else:
-                    distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
-                    updated_elite_novelty = np.mean(distances)
-
-                # self.qd_score += updated_elite_novelty
-                qd_to_add += [updated_elite_novelty]
-
-                setattr(current_elite, novelty_metric, updated_elite_novelty)
-            
-            return current_elite
-                
-
-        with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(individualNoveltyUpdater, indx, qds_to_remove, qds_to_add) : indx for indx in range(len(self))}
-            for future in as_completed(futures):
-                indx = futures[future]
-                current_elite = future.result()
-                if not current_elite is None:
-                    individuals_to_update[indx] = current_elite
-
-        self.qd_score = sum(qds_to_add) - sum(qds_to_remove)
-
-        # for indx in range(len(self)):
+        # def individualNoveltyUpdater(indx):
+        #     qd_to_remove = []
+        #     qd_to_add = []
         #     current_elite = self[indx]
         #     if not current_elite is None:
         #         old_elite_novelty = getattr(current_elite, novelty_metric)
-        #         # self.qd_score -= old_elite_novelty
+                
+        #         qd_to_remove += [old_elite_novelty]
 
         #         if current_elite.md5 in union_hashtable:
         #             updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
@@ -161,12 +157,42 @@ class MAP_ElitesArchive(IStarter, object):
         #             distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
         #             updated_elite_novelty = np.mean(distances)
 
-        #         # self.qd_score += updated_elite_novelty
+        #         qd_to_add += [updated_elite_novelty]
+
         #         setattr(current_elite, novelty_metric, updated_elite_novelty)
+            
+        #     return current_elite, qd_to_remove, qd_to_add
+                
+
+        # with ThreadPoolExecutor() as executor:
+        #     futures = {executor.submit(individualNoveltyUpdater, indx) : indx for indx in range(len(self))}
+        #     for future in as_completed(futures):
+        #         indx = futures[future]
+        #         updated_elite, qd_to_remove, qd_to_add = future.result()
+        #         qds_to_remove += qd_to_remove
+        #         qds_to_add += qd_to_add
+
+        #         if not updated_elite is None:
+        #             with open(f"{self.archive_path}/elite_{indx}.pickle", "wb") as fh:
+        #                 pickle.dump(updated_elite, fh, protocol=pickle.HIGHEST_PROTOCOL)
+
+        # self.qd_score = sum(qds_to_add) - sum(qds_to_remove)
+
+        for indx in range(len(self)):
+            current_elite = self[indx]
+            if not current_elite is None:
+                old_elite_novelty = getattr(current_elite, novelty_metric)
+                self.qd_score -= old_elite_novelty
+
+                if current_elite.md5 in union_hashtable:
+                    updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
+                else:
+                    distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
+                    updated_elite_novelty = np.mean(distances)
+
+                self.qd_score += updated_elite_novelty
+                setattr(current_elite, novelty_metric, updated_elite_novelty)
         
-        for indx, individual in individuals_to_update.items():
-            with open(f"{self.archive_path}/elite_{indx}.pickle", "wb") as fh:
-                pickle.dump(individual, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 

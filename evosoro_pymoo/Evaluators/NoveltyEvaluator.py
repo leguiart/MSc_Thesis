@@ -133,7 +133,9 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IStarter):
 
 
     def remove_individual_from_backup(self, individual):
-        os.remove(f"{self.archive_path}/individual_{individual.id}.pickle")
+        pickle_path = f"{self.archive_path}/individual_{individual.id}.pickle"
+        if os.path.exists(pickle_path):
+            os.remove(pickle_path)
 
 
     @timeit
@@ -189,7 +191,8 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IStarter):
 
             for _ in range(len(self.novelty_archive) - self.max_novelty_archive_size):
                 removed = self.novelty_archive.pop(0)
-                self.archive_hashset.remove(removed.md5)
+                if removed.md5 in self.archive_hashset:
+                    self.archive_hashset.remove(removed.md5)
                 self.remove_individual_from_backup(removed)
 
 
