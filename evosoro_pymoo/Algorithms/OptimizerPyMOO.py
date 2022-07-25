@@ -52,7 +52,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, IStarter):
         
         logger.info("Now creating new population")
         # ask the algorithm for the next solution to be evaluated
-        # basically, pymoo generates a new population by applying the variation operators (mutation and crossover)
+        # basically, pymoo generates a new population by applying the variation operators (mutation and crossover) from selected parent population
         pop = self.algorithm.ask()
 
 

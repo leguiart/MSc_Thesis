@@ -33,14 +33,14 @@ from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMO
 from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAndVectorFieldDiversitySurvival
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
-from evosoro_pymoo.Operators.Mutation import SoftbotMutation
+from evosoro_pymoo.Operators.Mutation import ME_SoftbotMutation, SoftbotMutation
 from common.Utils import readFromJson, setRandomSeed, writeToJson, countFileLines, readFirstJson
 from common.Analytics import QD_Analytics
 
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
 from evosoro.softbot import Population as SoftbotPopulation
-from SoftbotProblemDefs import MNSLCSoftbotProblemGPU, QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem, NSLCSoftbotProblem
+from SoftbotProblemDefs import MNSLCSoftbotProblemGPU, QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem, NSLCSoftbotProblem, MESoftbotProblem
 from Genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
 from BodyBrainCommon import runBodyBrain
 
@@ -198,7 +198,6 @@ def main(parser : argparse.ArgumentParser):
         if experiment == "SO":
             seeds_json = SEEDS_JSON_SO
             analytics_json = ANALYTICS_JSON_SO
-            analytics_csv = ANALYTICS_JSON_SO.replace(".json", ".csv")
             run_dir = RUN_DIR_SO
             run_name = RUN_NAME_SO
             softbot_problem_cls = QualitySoftbotProblem
@@ -206,7 +205,6 @@ def main(parser : argparse.ArgumentParser):
         elif experiment == "QN-MOEA":
             seeds_json = SEEDS_JSON_QN
             analytics_json = ANALYTICS_JSON_QN
-            analytics_csv = ANALYTICS_JSON_QN.replace(".json", ".csv")
             run_dir = RUN_DIR_QN
             run_name = RUN_NAME_QN
             softbot_problem_cls = QualityNoveltySoftbotProblem
@@ -214,7 +212,6 @@ def main(parser : argparse.ArgumentParser):
         elif experiment == "NSLC":
             seeds_json = SEEDS_JSON_NSLC
             analytics_json = ANALYTICS_JSON_NSLC
-            analytics_csv = ANALYTICS_JSON_NSLC.replace(".json", ".csv")
             run_dir = RUN_DIR_NSLC
             run_name = RUN_NAME_NSLC
             softbot_problem_cls = NSLCSoftbotProblem
@@ -222,10 +219,16 @@ def main(parser : argparse.ArgumentParser):
             objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
             objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
 
+        elif experiment == "MAP-ELITES":
+            seeds_json = SEEDS_JSON_ME
+            analytics_json = ANALYTICS_JSON_ME
+            run_dir = RUN_DIR_ME
+            run_name = RUN_NAME_ME
+            softbot_problem_cls = MESoftbotProblem
+
         elif experiment == "MNSLC":
             seeds_json = SEEDS_JSON_MNSLC
             analytics_json = ANALYTICS_JSON_MNSLC
-            analytics_csv = ANALYTICS_JSON_MNSLC.replace(".json", ".csv")
             run_dir = RUN_DIR_MNSLC
             run_name = RUN_NAME_MNSLC
             softbot_problem_cls = MNSLCSoftbotProblemGPU
@@ -245,7 +248,6 @@ def main(parser : argparse.ArgumentParser):
     
 
     for run in range(firstRun - 1, runs):
-        new_experiment = run + 1 == starting_run
 
         # Setting random seed
         logger.info(f"Starting run: {run + 1}")
@@ -254,7 +256,6 @@ def main(parser : argparse.ArgumentParser):
             writeToJson(seeds_json, runToSeedMapping)
         
         # Initializing the random number generator for reproducibility
-        # setRandomSeed(runToSeedMapping[str(run + 1)])
         numpy.random.seed(runToSeedMapping[str(run + 1)])
         random.seed(runToSeedMapping[str(run + 1)])  
 
@@ -300,7 +301,7 @@ def main(parser : argparse.ArgumentParser):
                 physics_sim.set_generation(starting_gen)
 
                 # Setting up Softbot optimization problem
-                softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path, orig_size_xyz=IND_SIZE)
+                softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path, orig_size_xyz=IND_SIZE) if not softbot_problem_cls is MESoftbotProblem else softbot_problem_cls(physics_sim, pop_size, run_path, resume_run, orig_size_xyz=IND_SIZE)
 
                 # Initializing a population of SoftBots
                 my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
@@ -318,8 +319,8 @@ def main(parser : argparse.ArgumentParser):
 
             # Setting up optimization algorithm
             algorithm = NSGA2(pop_size=pop_size, sampling=numpy.array(my_pop.individuals), 
-                            mutation=SoftbotMutation(my_pop.max_id), crossover=DummySoftbotCrossover(), 
-                            survival=nsga2_survival, eliminate_duplicates=False)
+                            mutation=SoftbotMutation(my_pop.max_id) if experiment != "MAP-ELITES" else ME_SoftbotMutation(my_pop.max_id, pop_size), 
+                            crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
             algorithm.setup(softbot_problem, termination=('n_gen', max_gens - starting_gen + 1))
             
             my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics)

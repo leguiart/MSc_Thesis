@@ -7,7 +7,6 @@ License: MIT.
 """
 
 
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import glob
 import numpy as np
 import itertools
@@ -17,20 +16,33 @@ import pickle
 import shutil
 from typing import List, Callable
 from sklearn.neighbors import KDTree
+from pymoo.algorithms.base.genetic import GeneticAlgorithm
+from pymoo.operators.mutation.pm import PolynomialMutation
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
 from common.Utils import readFromJson, writeToJson
-
-
-from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
-from evosoro.tools.algorithms import Optimizer
+from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro_pymoo.common.IStart import IStarter
 
-class MAP_ElitesOptimizer(Optimizer):
-    def __init__(self, sim, env, evaluation_func=...):
-        super().__init__(sim, env, evaluation_func=evaluation_func)
-    def run(self, *args, **kwargs):
-        return super().run(*args, **kwargs)
+class MAP_Elites(GeneticAlgorithm):
+    def __init__(self, 
+                batch_size=100, 
+                sampling=FloatRandomSampling(), 
+                selection=None, 
+                mutation=PolynomialMutation, 
+                survival=None, 
+                **kwargs):
+        super().__init__(batch_size, 
+                        sampling, 
+                        selection, 
+                        mutation, 
+                        survival, 
+                        advance_after_initial_infill = True, 
+                        **kwargs)
 
-class MAP_ElitesArchive(IStarter, object):
+
+class MAP_ElitesArchive(IStarter, IEvaluator, object):
     def __init__(self, name : str, base_path : str, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], resuming_run : bool = False) -> None:
         feats = []
         for min, max, granularity in min_max_gr_li:
@@ -59,6 +71,11 @@ class MAP_ElitesArchive(IStarter, object):
                 self._recover_filled_elites()
         else:
             os.mkdir(self.archive_path)
+
+    def evaluate(self, X, *args, **kwargs):
+        for ind in X:
+            self.try_add(ind)
+        return X
 
     def _recover_filled_elites(self):
         stored_elites = glob.glob(f"{self.archive_path}/elite_*")
