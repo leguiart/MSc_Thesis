@@ -148,7 +148,7 @@ class QD_Analytics(IAnalytics):
     def notify(self, pop, problem):
 
         if "map_elites_archive_f" in problem.evaluators:
-            self.map_elites_archive_an = problem.evaluators["map_elites_archive_f"]
+            self.map_elites_archive_f = problem.evaluators["map_elites_archive_f"]
 
         for individual in problem.evaluators["aligned_novelty"].novelty_archive:
             self.indicator_mapping["aligned_novelty_archive_novelty"] += [individual.aligned_novelty]
