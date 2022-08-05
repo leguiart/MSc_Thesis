@@ -6,6 +6,8 @@ import time
 import logging
 import numpy as np
 import sys
+import pickle
+import dill
 from functools import wraps
 from types import ModuleType, FunctionType
 from gc import get_referents
@@ -15,6 +17,7 @@ from common.Constants import *
 
 # create logger
 module_logger = logging.getLogger(f"__main__.timeit")
+
 
 def get_class_that_defined_method(method):
     method_name = method.__name__
@@ -30,7 +33,6 @@ def get_class_that_defined_method(method):
         else:
             classes = list(c.__bases__) + classes
     return None
-
 
 
 def timeit(method):
@@ -64,6 +66,32 @@ def writeToJson(filename, content):
         json.dump(content, fp)
 
 
+def saveToPickle(filename, content):
+    with open(filename, "wb") as fh:
+        pickle.dump(content, fh, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def readFromPickle(filename):
+    if os.path.exists(filename): 
+        with open(filename, 'rb') as handle:
+            content = pickle.load(handle)
+        return content
+    else:
+        return None
+
+def saveToDill(filename, content):
+    with open(filename, "wb") as fh:
+        dill.dump(content, fh, protocol=dill.HIGHEST_PROTOCOL)
+
+
+def readFromDill(filename):
+    if os.path.exists(filename): 
+        with open(filename, 'rb') as handle:
+            content = dill.load(handle)
+        return content
+    else:
+        return None
+
 
 def save_json(filename, content):
     if os.path.exists(filename): 
@@ -73,7 +101,6 @@ def save_json(filename, content):
     else:
         with open(filename, 'w') as fp:           
             json.dump(content, fp)
-
 
 
 def countFileLines(filename):
@@ -87,7 +114,6 @@ def countFileLines(filename):
         return 0
 
 
-
 def readFirstJson(filename):
     if os.path.exists(filename): 
         with open(filename, 'r') as fh:
@@ -96,7 +122,6 @@ def readFirstJson(filename):
             return j
     else:
         return {}
-
 
 
 def maxFromList(l):

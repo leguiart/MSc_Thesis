@@ -1,45 +1,50 @@
 
 import numpy as np
-import subprocess as sub
-import os
-import sys
+import pickle
 import logging
 
-from pymoo.core.callback import Callback
 from pymoo.core.evaluator import set_cv
 from pymoo.core.algorithm import Algorithm
-from common.IAnalytics import IAnalytics
+from pymoo.core.population import Population
 
 
-# sys.path.append(os.getcwd() + "/..")
-from evosoro.tools.logging import make_gen_directories, initialize_folders, write_gen_stats
+from evosoro.base import Env, Sim
 from evosoro.tools.algorithms import Optimizer
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
-from common.Utils import timeit
 from evosoro_pymoo.common.IStart import IStarter
+from common.Utils import saveToDill, saveToPickle, timeit
+from common.IAnalytics import IAnalytics
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
 class PopulationBasedOptimizerPyMOO(Optimizer, IStarter):
-    def __init__(self, sim, env, algorithm : Algorithm, problem : BaseSoftbotProblem, analytics : IAnalytics = None):
-        Optimizer.__init__(self, sim, env)
+    def __init__(self, sim : Sim, env : Env, 
+                algorithm : Algorithm, 
+                problem : BaseSoftbotProblem, 
+                analytics : IAnalytics = None, 
+                save_checkpoint = False,
+                checkpoint_path = '.'):
 
+        Optimizer.__init__(self, sim, env)
         self.algorithm = algorithm
         self.problem = problem
         self.analytics = analytics
+        self.save_to_checkpoint = save_checkpoint
+        self.checkpoint_path = checkpoint_path
 
-    def start(self):
-        self.problem.start()
-        self.analytics.start() 
+    def start(self, **kwargs):
+        resuming_run = kwargs["resuming_run"]
+        self.problem.start(resuming_run = resuming_run)
+        self.analytics.start(resuming_run = resuming_run) 
 
     @timeit
-    def run(self, evosoro_pop, save_pareto=False,
-            save_nets=False, continued_from_checkpoint=False):
+    def run(self):
 
         # while the algorithm has not terminated
         while self.algorithm.has_next():
-
-            self.ask_tell(evosoro_pop)
+            self.next()
+            if self.save_to_checkpoint :
+                saveToDill(f"{self.checkpoint_path}/algorithm_checkpoint", self.algorithm)
         
         # obtain the result objective from the algorithm
         res = self.algorithm.result()
@@ -47,39 +52,41 @@ class PopulationBasedOptimizerPyMOO(Optimizer, IStarter):
         return res
 
     @timeit
-    def ask_tell(self, evosoro_pop):
+    def next(self):
 
         
         logger.info("Now creating new population")
         # ask the algorithm for the next solution to be evaluated
-        # basically, pymoo generates a new population by applying the variation operators (mutation and crossover) from selected parent population
-        pop = self.algorithm.ask()
-
-
-        for i in range(len(evosoro_pop)):
-            evosoro_pop.individuals[i] = pop[i].X
-
-
+        # basically, pymoo generates a new population by applying 
+        # the variation operators (mutation and crossover) 
+        # from selected parent population
+        children_pop = self.algorithm.ask()
+        if self.algorithm.is_initialized:
+            parent_pop = self.algorithm.pop 
+            pop = Population.merge(parent_pop, children_pop)
+        else:
+            pop = children_pop
+            
         # evaluate the individuals using the algorithm's evaluator (necessary to count evaluations for termination)
         logger.info("Starting individuals evaluation")
         mat_pop = []
         for ind in pop:
             mat_pop += [np.array([ind])]
         mat_pop = np.array(mat_pop)
-        F, G, _ = self.algorithm.evaluator.eval(self.problem, mat_pop)
+
+        F, G, _ = self.algorithm.evaluator.eval(self.problem, mat_pop, pop_size = len(children_pop))
         pop.set("F", F)
         pop.set("G", G)
-        #pop.set("CV", CV)
         set_cv(pop)
 
         # Extract analytics
         if self.analytics is not None:
             logger.debug("Collecting analytics data")
-            self.analytics.notify(pop, self.problem)
+            self.analytics.notify(children_pop, self.problem)
             logger.debug("Finished collecting analytics data")
 
         logger.info("Individuals evaluation finished")  # record total eval time in log
 
         # returned the evaluated individuals which have been evaluated or even modified
-        self.algorithm.tell(infills=pop)
+        self.algorithm.tell(infills=children_pop)
 

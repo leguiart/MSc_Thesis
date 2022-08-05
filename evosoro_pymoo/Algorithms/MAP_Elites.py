@@ -21,7 +21,7 @@ from pymoo.operators.mutation.pm import PolynomialMutation
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
-from common.Utils import readFromJson, writeToJson
+from common.Utils import readFromJson, readFromPickle, saveToPickle, writeToJson
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro_pymoo.common.IStart import IStarter
 
@@ -43,7 +43,10 @@ class MAP_Elites(GeneticAlgorithm):
 
 
 class MAP_ElitesArchive(IStarter, IEvaluator, object):
-    def __init__(self, name : str, base_path : str, min_max_gr_li : List[tuple], extract_descriptors_func : Callable[[object], List], resuming_run : bool = False) -> None:
+    def __init__(self, name : str, base_path : str, 
+                min_max_gr_li : List[tuple], 
+                extract_descriptors_func : Callable[[object], List]) -> None:
+
         feats = []
         for min, max, granularity in min_max_gr_li:
             feats += [list(np.linspace(min, max, granularity))]
@@ -56,15 +59,21 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
         self.name = name
         self.base_path = base_path
         self.archive_path = os.path.join(self.base_path, self.name)
-        self.obj_properties_json_path = os.path.join(self.base_path, f"ME_{self.name}_properties_backup.json")
-        self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
-        self.coverage = 0 if "coverage" not in self.obj_properties_backup else self.obj_properties_backup["coverage"]
-        self.qd_score = 0 if "qd_score" not in self.obj_properties_backup else self.obj_properties_backup["qd_score"]
-        self.resuming_run = resuming_run
+        # self.obj_properties_json_path = os.path.join(self.base_path, f"ME_{self.name}_properties_backup.json")
+        # self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
+        # self.coverage = 0 if "coverage" not in self.obj_properties_backup else self.obj_properties_backup["coverage"]
+        # self.qd_score = 0 if "qd_score" not in self.obj_properties_backup else self.obj_properties_backup["qd_score"]
+        self.coverage = 0 
+        self.qd_score = 0 
+        # self.resuming_run = resuming_run
 
-    def start(self):
+        # self.save_checkpoint = save_checkpoint
+        # self.checkpoint_path = os.path.join(self.base_path, f"{name}_evaluator_checkpoint.pickle") if save_checkpoint  else ""
+
+    def start(self, **kwargs):
+        resuming_run = kwargs["resuming_run"]
         if os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
-            if not self.resuming_run:
+            if not resuming_run:
                 shutil.rmtree(self.archive_path)
                 os.mkdir(self.archive_path)
             else:
@@ -75,7 +84,14 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
     def evaluate(self, X, *args, **kwargs):
         for ind in X:
             self.try_add(ind)
+
+        # if self.save_checkpoint:
+        #     self.backup()
+        
         return X
+
+    # def backup(self):
+    #     saveToPickle(self.checkpoint_path, self)
 
     def _recover_filled_elites(self):
         stored_elites = glob.glob(f"{self.archive_path}/elite_*")
@@ -94,9 +110,7 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
 
     def __getitem__(self, i):
         if self.filled_elites_archive[i] != 0:
-            with open(f"{self.archive_path}/elite_{i}.pickle", 'rb') as handle:
-                x = pickle.load(handle)
-            return x
+            return readFromPickle(f"{self.archive_path}/elite_{i}.pickle")
         else:
             return None
 
@@ -113,15 +127,13 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
             else:
                 self.qd_score += getattr(x, quality_metric) - getattr(xe, quality_metric)
 
-            self.obj_properties_backup["coverage"] = self.coverage
-            self.obj_properties_backup["qd_score"] = self.qd_score
+            # self.obj_properties_backup["coverage"] = self.coverage
+            # self.obj_properties_backup["qd_score"] = self.qd_score
 
-            writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
+            # writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
 
             self.filled_elites_archive[i] = 1
-            with open(f"{self.archive_path}/elite_{i}.pickle", "wb") as fh:
-                pickle.dump(x, fh, protocol=pickle.HIGHEST_PROTOCOL)
-
+            saveToPickle(f"{self.archive_path}/elite_{i}.pickle", x)
 
     def update_existing(self, individual_batch, novelty_evaluator):
 
@@ -178,7 +190,8 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
 
         # self.qd_score = sum(qds_to_add) - sum(qds_to_remove)
 
-        for indx in range(len(self)):
+        for individual in individual_batch:
+            indx = self.feature_descriptor_idx(individual)
             current_elite = self[indx]
             if not current_elite is None:
                 old_elite_novelty = getattr(current_elite, novelty_metric)
@@ -187,11 +200,28 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
                 if current_elite.md5 in union_hashtable:
                     updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
                 else:
-                    distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
+                    distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors, len(union_matrix)))
                     updated_elite_novelty = np.mean(distances)
+                    # updated_elite_novelty, _ = novelty_evaluator._average_knn_distance([novelty_evaluator.vector_extractor(current_elite)], kd_tree)
 
                 self.qd_score += updated_elite_novelty
                 setattr(current_elite, novelty_metric, updated_elite_novelty)
+                saveToPickle(f"{self.archive_path}/elite_{indx}.pickle", current_elite)
+
+        # for indx in range(len(self)):
+        #     current_elite = self[indx]
+        #     if not current_elite is None:
+        #         old_elite_novelty = getattr(current_elite, novelty_metric)
+        #         self.qd_score -= old_elite_novelty
+
+        #         if current_elite.md5 in union_hashtable:
+        #             updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
+        #         else:
+        #             distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], min(novelty_evaluator.k_neighbors + 1, len(union_matrix)))
+        #             updated_elite_novelty = np.mean(distances)
+
+        #         self.qd_score += updated_elite_novelty
+        #         setattr(current_elite, novelty_metric, updated_elite_novelty)
         
 
 

@@ -13,6 +13,7 @@ from evosoro.networks import Network
 from evosoro.tools.logging import PrintLog
 from evosoro.tools.mutation import create_new_children_through_mutation
 from evosoro.tools.utils import sigmoid, xml_format, dominates
+from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
@@ -374,7 +375,7 @@ class SoftBot(object):
             pickle.dump(self, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-class Population(object):
+class Population(IStarter, object):
     """A population of SoftBots."""
 
     def __init__(self, objective_dict, genotype, phenotype, pop_size=30):
@@ -411,30 +412,34 @@ class Population(object):
         self.non_dominated_size = 0
 
 
-    def start(self, backup_path : str = None):
-        if backup_path is None or not os.path.exists(backup_path):
+    def start(self):
+        for i in range(self.pop_size):
+            self.append(self._get_random_individual(i))
+        self.max_id = len(self)
+        # if backup_path is None or not os.path.exists(backup_path):
+        # if not resuming_run:
             # with ProcessPoolExecutor() as executor:
             #     futures = {executor.submit(self._get_random_individual, i) for i in range(self.pop_size)}
             #     for future in as_completed(futures):
             #         self.append(future.result())
-            for i in range(self.pop_size):
-                self.append(self._get_random_individual(i))
-            self.max_id = len(self)
-        else:
-            for entry in os.listdir(backup_path):
-                if os.path.isfile(os.path.join(backup_path, entry)) and entry.endswith(".pickle"):
-                    with open(os.path.join(backup_path, entry), 'rb') as handle:
-                        individual = pickle.load(handle)
-                    self.append(individual)
-                    if self.max_id < individual.id:
-                        self.max_id = individual.id
-            if len(self) < self.pop_size and len(self) > 0:
-                while len(self) < self.pop_size:
-                    self.add_random_individual()
+        #     for i in range(self.pop_size):
+        #         self.append(self._get_random_individual(i))
+        #     self.max_id = len(self)
+        # else:
+        #     for entry in os.listdir(backup_path):
+        #         if os.path.isfile(os.path.join(backup_path, entry)) and entry.endswith(".pickle"):
+        #             with open(os.path.join(backup_path, entry), 'rb') as handle:
+        #                 individual = pickle.load(handle)
+        #             self.append(individual)
+        #             if self.max_id < individual.id:
+        #                 self.max_id = individual.id
+        #     if len(self) < self.pop_size and len(self) > 0:
+        #         while len(self) < self.pop_size:
+        #             self.add_random_individual()
                 
-            elif len(self) == 0:
-                return False
-        return True
+        #     elif len(self) == 0:
+        #         return False
+        # return True
         
 
     def __iter__(self):

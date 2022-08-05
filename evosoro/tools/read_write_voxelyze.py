@@ -56,7 +56,51 @@ def get_vxd(sim : Sim, env : Env, individual):
 
     vxd_stop_condition = etree.SubElement(root, "StopCondition")
     vxd_stop_condition.set('replace', "VXA.Simulator.StopCondition.mtSUB.mtCONST")
-    vxd_stop_condition.text = str(sim.stop_condition)
+    vxd_stop_condition.text = str(sim.simulation_time)
+
+    vxd_stop_condition_type = etree.SubElement(root, "StopConditionType")
+    vxd_stop_condition_type.set('replace', "VXA.Simulator.StopCondition.StopConditionType")
+    vxd_stop_condition_type.text = str(int(sim.stop_condition))
+
+    vxd_stop_condition_time = etree.SubElement(root, "StopConditionValue")
+    vxd_stop_condition_time.set('replace', "VXA.Simulator.StopCondition.StopConditionValue")
+    vxd_stop_condition_time.text = str(sim.simulation_time)
+
+    vxd_stop_condition_afterlife_time = etree.SubElement(root, "AfterlifeTime")
+    vxd_stop_condition_afterlife_time.set('replace', "VXA.Simulator.StopCondition.AfterlifeTime")
+    vxd_stop_condition_afterlife_time.text = str(sim.afterlife_time)
+
+    vxd_stop_condition_midlifefreeze_time = etree.SubElement(root, "MidlifeFreezeTime")
+    vxd_stop_condition_midlifefreeze_time.set('replace', "VXA.Simulator.StopCondition.MidLifeFreezeTime")
+    vxd_stop_condition_midlifefreeze_time.text = str(sim.mid_life_freeze_time)
+
+    vxd_stop_condition_initcmtime = etree.SubElement(root, "InitCmTime")
+    vxd_stop_condition_initcmtime.set('replace', "VXA.Simulator.StopCondition.InitCmTime")
+    vxd_stop_condition_initcmtime.text = str(sim.fitness_eval_init_time) 
+
+    vxd_equilibrum_mode = etree.SubElement(root, "EquilibriumMode")
+    vxd_equilibrum_mode.set('replace', "VXA.Simulator.EquilibriumMode.EquilibriumModeEnabled")
+    vxd_equilibrum_mode.text = str(sim.equilibrium_mode)
+
+    vxd_mintemp_fact = etree.SubElement(root, "MinTempFact")
+    vxd_mintemp_fact.set('replace', "VXA.Simulator.MinTempFact")
+    vxd_mintemp_fact.text = str(sim.min_temp_fact)
+
+    vxd_maxtemp_fact_change = etree.SubElement(root, "MaxTempFactChange")
+    vxd_maxtemp_fact_change.set('replace', "VXA.Simulator.MaxTempFactChange")
+    vxd_maxtemp_fact_change.text = str(sim.max_temp_fact_change)
+
+    vxd_max_stiff_change = etree.SubElement(root, "MaxStiffnessChange")
+    vxd_max_stiff_change.set('replace', "VXA.Simulator.MaxStiffnessChange")
+    vxd_max_stiff_change.text = str(sim.max_stiffness_change)
+
+    vxd_min_elastic_mod = etree.SubElement(root, "MinElasticMod")
+    vxd_min_elastic_mod.set('replace', "VXA.Simulator.MinElasticMod")
+    vxd_min_elastic_mod.text = str(sim.min_elastic_mod)
+
+    vxd_max_elastic_mod = etree.SubElement(root, "MaxElasticMod")
+    vxd_max_elastic_mod.set('replace', "VXA.Simulator.MaxElasticMod")
+    vxd_max_elastic_mod.text = str(sim.max_elastic_mod)
 
     vxd_enable_collision = etree.SubElement(root, "EnableCollision")
     vxd_enable_collision.set('replace', "VXA.Simulator.AttachDetach.EnableCollision")
@@ -70,6 +114,10 @@ def get_vxd(sim : Sim, env : Env, individual):
     vxd_floor_enabled.set('replace', "VXA.Environment.Gravity.FloorEnabled")
     vxd_floor_enabled.text = str(env.floor_enabled)
 
+    vxd_temp_enabled = etree.SubElement(root, "TempEnabled")
+    vxd_temp_enabled.set('replace', "VXA.Environment.Thermal.TempEnabled")
+    vxd_temp_enabled.text = str(env.temp_enabled)
+
     vxd_temp_amplitude = etree.SubElement(root, "TempAmplitude")
     vxd_temp_amplitude.set('replace', "VXA.Environment.Thermal.TempAmplitude")
     vxd_temp_amplitude.text = str(env.temp_amp)
@@ -78,41 +126,17 @@ def get_vxd(sim : Sim, env : Env, individual):
     vxd_temp_period.set('replace', "VXA.Environment.Thermal.TempPeriod")
     vxd_temp_period.text = str(1./env.frequency)
 
+    vxd_time_between_traces = etree.SubElement(root, "TimeBetweenTraces")
+    vxd_time_between_traces.set('replace', "VXA.Environment.TimeBetweenTraces")
+    vxd_time_between_traces.text = str(env.time_between_traces)
+
+    vxd_sticky_floor = etree.SubElement(root, "StickyFloor")
+    vxd_sticky_floor.set('replace', "VXA.Environment.StickyFloor")
+    vxd_sticky_floor.text = str(env.sticky_floor)
+
     vxd_lattice_dim = etree.SubElement(root, "Lattice_Dim")
     vxd_lattice_dim.set('replace', "VXA.VXC.Lattice.Lattice_Dim")
     vxd_lattice_dim.text = str(env.lattice_dimension)
-
-    # vxd_lattice_dim = etree.SubElement(root, "Lattice_Dim")
-    # vxd_lattice_dim.set('replace', "VXA.VXC.Lattice.Lattice_Dim")
-    # vxd_lattice_dim.text = str(int(sim.self_collisions_enabled))
-
-    # vxd_fat_stiffness = etree.SubElement(root, "EnableCollision")
-    # vxd_fat_stiffness.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
-    # vxd_fat_stiffness.text = str(int(sim.self_collisions_enabled))
-
-    # vxd_bone_stiffness = etree.SubElement(root, "EnableCollision")
-    # vxd_bone_stiffness.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
-    # vxd_bone_stiffness.text = str(int(sim.self_collisions_enabled))
-
-    # vxd_muscle_stiffness = etree.SubElement(root, "EnableCollision")
-    # vxd_muscle_stiffness.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
-    # vxd_muscle_stiffness.text = str(int(sim.self_collisions_enabled))
-
-    # vxd_actuation_variance = etree.SubElement(root, "EnableCollision")
-    # vxd_actuation_variance.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
-    # vxd_actuation_variance.text = str(int(sim.self_collisions_enabled))
-
-    # vxd_fat_stiffness2 = etree.SubElement(root, "EnableCollision")
-    # vxd_fat_stiffness2.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
-    # vxd_fat_stiffness2.text = str(int(sim.self_collisions_enabled))
-
-    # vxd_actuation_variance2 = etree.SubElement(root, "EnableCollision")
-    # vxd_actuation_variance2.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
-    # vxd_actuation_variance2.text = str(int(sim.self_collisions_enabled))
-
-    # vxd_muscle_stiffness2 = etree.SubElement(root, "EnableCollision")
-    # vxd_muscle_stiffness2.set('replace', "VXC.Simulator.AttachDetach.EnableCollision")
-    # vxd_muscle_stiffness2.text = str(int(sim.self_collisions_enabled))
 
 
     structure = etree.SubElement(root, "Structure")

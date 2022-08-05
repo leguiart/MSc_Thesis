@@ -8,13 +8,13 @@ from typing import List
 
 from common.Constants import *
 from common.IAnalytics import IAnalytics
-from common.Utils import getsize, save_json, timeit
+from common.Utils import getsize, save_json, saveToDill, saveToPickle, timeit
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
 
 
 
 class QD_Analytics(IAnalytics):
-    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path, resuming_run = False):
+    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path, save_checkpoint = False):
         super().__init__()
         self.json_base_path = json_base_path
         self.csv_base_path = csv_base_path
@@ -33,11 +33,14 @@ class QD_Analytics(IAnalytics):
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
         min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
         #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, min_max_gr, self.extract_morpho, resuming_run)
+        self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, min_max_gr, self.extract_morpho)
         #2.- Elites in terms of aligned novelty
-        self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho, resuming_run)
+        self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho)
         #3.- Elites in terms of both aligned novelty and fitness (Pareto-dominance)
         # self.map_elites_archive_anf = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "anf_elites")
+        self.save_checkpoint = save_checkpoint
+        self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint") if save_checkpoint  else ""
+
         self.indicator_stats_set = {
             "qd-score_f",
             "qd-score_an",
@@ -88,12 +91,13 @@ class QD_Analytics(IAnalytics):
             "morphology_passive"
         }
 
-    def set_generation(self, gen):
-        self.actual_generation = gen
+    # def set_generation(self, gen):
+    #     self.actual_generation = gen
 
-    def start(self):
-        self.map_elites_archive_f.start()
-        self.map_elites_archive_an.start()
+    def start(self, **kwargs):
+        resuming_run = kwargs["resuming_run"]
+        self.map_elites_archive_f.start(resuming_run = resuming_run)
+        self.map_elites_archive_an.start(resuming_run = resuming_run)
 
     def init_indicator_mapping(self):
         self.indicator_mapping = {
@@ -213,6 +217,9 @@ class QD_Analytics(IAnalytics):
 
         self.init_indicator_mapping()
         self.actual_generation+=1
+
+        if self.save_checkpoint:
+            saveToDill(self.checkpoint_path, self)
             
 
 
@@ -244,15 +251,18 @@ class QD_Analytics(IAnalytics):
 
 
     def indicator_stats_df(self):
-        d = {"Indicator":[], "Best":[], "Average":[], "STD":[], "Generation":[], "Run":[], "Method":[]}
+        d = {"Indicator":[], "Best":[], "Worst":[], "Average":[], "STD":[], "Median":[], "Generation":[], "Run":[], "Method":[]}
 
         for key in self.indicator_stats_set:
             # Population fitness
-            d["Indicator"] += [key.replace("_", " ")]
+            # d["Indicator"] += [key.replace("_", " ")]
+            d["Indicator"] += [key]
             arr = np.array(self.indicator_mapping[key])
-            d["Best"] += [np.max(arr)]
-            d["Average"] += [np.mean(arr)]
-            d["STD"] += [np.std(arr)]
+            d["Best"] += [np.nanmax(arr)]
+            d["Worst"] += [np.nanmin(arr)]
+            d["Average"] += [np.nanmean(arr)]
+            d["STD"] += [np.nanstd(arr)]
+            d["Median"] += [np.nanmedian(arr)]
             d["Generation"] += [self.actual_generation]
             d["Run"] += [self.run]
             d["Method"] += [self.method]
