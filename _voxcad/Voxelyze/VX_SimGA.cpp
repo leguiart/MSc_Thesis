@@ -37,12 +37,11 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML)
 	float COMdistX = COMdisplacement.x;
 	float COMdistY = COMdisplacement.y;
 
-    double finalDist = pow(pow(SS.CurCM.x-IniCM.x,2)+pow(SS.CurCM.y-IniCM.y,2),0.5)/LocalVXC.GetLatticeDim();
-	double normFinalDist = finalDist; // includes frozen time
+	double normFinalDist = COMtotalDisplacement2D/LocalVXC.GetLatticeDim(); // includes frozen time
+	double normFinalDistX  = (SS.CurCM.x - IniCM.x) / LocalVXC.GetLatticeDim();
+	double normfinalDistY = (SS.CurCM.y - IniCM.y) / LocalVXC.GetLatticeDim();
 	double normRegimeDist = SS.CurPosteriorDist - SS.EndOfLifetimePosteriorY;
 	double normFrozenDist = 0;
-	double finalDistX  = (SS.CurCM.x - IniCM.x) / LocalVXC.GetLatticeDim();
-	double finalDistY = (SS.CurCM.y-IniCM.y) / LocalVXC.GetLatticeDim();
 
 	double FallAdjPostY = SS.EndOfLifetimePosteriorY;
 
@@ -150,9 +149,13 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML)
 			pXML->Element("NormRegimeDist", normRegimeDist);
 			pXML->Element("NormFrozenDist", normFrozenDist);
 
-			pXML->Element("FinalDist", finalDist);
-			pXML->Element("finalDistX", finalDistX);
-			pXML->Element("finalDistY", finalDistY);
+			pXML->Element("FinalDist", COMtotalDisplacement2D);
+
+			pXML->Element("initialCenterOfMassX", IniCM.x);
+			pXML->Element("initialCenterOfMassY", IniCM.y);
+
+			pXML->Element("currentCenterOfMassX", SS.CurCM.x);
+			pXML->Element("currentCenterOfMassY", SS.CurCM.y);
 
 			pXML->Element("absoluteDisplacement2D", COMtotalDisplacement2D);
 			pXML->Element("distX", COMdistX);

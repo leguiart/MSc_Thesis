@@ -31,15 +31,15 @@ def aligned_distance_metric(a, b):
     b_vec = np.array([b.fitnessX, b.fitnessY])
     return np.sqrt(np.sum((a_vec - b_vec)**2))
 
-def aligned_vector(a):
-    return np.array([a.fitnessX, a.fitnessY])
+# def aligned_vector(a):
+#     return np.array([a.fitnessX, a.fitnessY])
 
 def aligned_distance_metric_gpu(a, b):
     a_vec = np.array([a.finalX - a.initialX, a.finalY - a.initialY])
     b_vec = np.array([b.finalX - b.initialX, b.finalY - b.initialY])
     return np.sqrt(np.sum((a_vec - b_vec)**2))
 
-def aligned_vector_gpu(a):
+def aligned_vector(a):
     return np.array([a.finalX, a.finalY])
 
 def is_valid_func(x : SoftBot):
@@ -78,13 +78,13 @@ class PopulationSaver(IEvaluator[SoftBot]):
 class QualitySoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
-        super().__init__(physics_evaluator, n_var=1, n_obj=1)
+        super().__init__(physics_evaluator, n_var=1, n_obj=1, save_checkpoint=True, base_path=backup_path)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
  
-        self.evaluators.update({"population_saver" : populationSaver,
-            "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, 
+        # self.evaluators.update({"population_saver" : populationSaver,
+        self.evaluators.update({"physics" : self.evaluators["physics"],
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector, 
                                                     min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
                                                     k_neighbors=20, novelty_threshold=.5), 
             "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", backup_path, "unaligned_novelty", unaligned_vector,
@@ -104,13 +104,14 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
 class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
-        super().__init__(physics_evaluator, n_var=1, n_obj=2)
+        super().__init__(physics_evaluator, n_var=1, n_obj=2, save_checkpoint=True, base_path=backup_path)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
  
-        self.evaluators.update({"population_saver" : populationSaver,
+        # self.evaluators.update({"population_saver" : populationSaver,
+        self.evaluators.update({
             "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, 
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector, 
                                                     min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
                                                     k_neighbors=20, novelty_threshold=.5), 
             "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", backup_path, "unaligned_novelty", unaligned_vector, 
@@ -129,13 +130,14 @@ class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 class NSLCSoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
-        super().__init__(physics_evaluator, n_var=1, n_obj=2)
+        super().__init__(physics_evaluator, n_var=1, n_obj=2, save_checkpoint=True, base_path=backup_path)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
 
-        self.evaluators.update({"population_saver" : populationSaver,
+        # self.evaluators.update({"population_saver" : populationSaver,
+        self.evaluators.update({
             "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, 
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector, 
                                                     min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
                                                     k_neighbors=20, novelty_threshold=.5), 
             "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", backup_path, "unaligned_novelty", unaligned_vector, 
@@ -153,20 +155,21 @@ class NSLCSoftbotProblem(BaseSoftbotProblem):
 class MESoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, resuming_run : bool, orig_size_xyz = (6,6,6)):
-        super().__init__(physics_evaluator, n_var=1, n_obj=1)
+        super().__init__(physics_evaluator, n_var=1, n_obj=1, save_checkpoint=True, base_path=backup_path)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
         total_voxels = np.prod(orig_size_xyz)
         min_max_gr = [(0, total_voxels, total_voxels), (0, total_voxels, total_voxels)]
 
-        self.evaluators.update({"population_saver" : populationSaver,
+        # self.evaluators.update({"population_saver" : populationSaver,
+        self.evaluators.update({
             "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, 
+            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector, 
                                                     min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
                                                     k_neighbors=20, novelty_threshold=.5), 
-            "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", backup_path, "unaligned_novelty", unaligned_vector, 
-                                            "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, 
-                                            k_neighbors=20, novelty_threshold=25.),
+            "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", backup_path, "unaligned_novelty", unaligned_vector, 
+                                                    min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, 
+                                                    k_neighbors=20, novelty_threshold=25.),
             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator),
             "map_elites_archive_f" : MAP_ElitesArchive("f_elites", backup_path, min_max_gr, self.extract_morpho, resuming_run)
@@ -185,11 +188,12 @@ class MESoftbotProblem(BaseSoftbotProblem):
 class MNSLCSoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
-        super().__init__(physics_evaluator, n_var=1, n_obj=3)
+        super().__init__(physics_evaluator, n_var=1, n_obj=3, save_checkpoint=True, base_path=backup_path)
         genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
 
-        self.evaluators.update({"population_saver" : populationSaver,
+        # self.evaluators.update({"population_saver" : populationSaver,
+        self.evaluators.update({
             "physics" : self.evaluators["physics"],
             "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector, 
                                                     min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
@@ -206,27 +210,27 @@ class MNSLCSoftbotProblem(BaseSoftbotProblem):
     # def _extractConstraints(self, x: SoftBot) -> List[float]:
     #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
 
-class MNSLCSoftbotProblemGPU(BaseSoftbotProblem):
+# class MNSLCSoftbotProblemGPU(BaseSoftbotProblem):
 
-    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
-        super().__init__(physics_evaluator, n_var=1, n_obj=3)
+#     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
+#         super().__init__(physics_evaluator, n_var=1, n_obj=3)
  
-        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
-        populationSaver = PopulationSaver(backup_path)
-        self.evaluators.update({"population_saver" : populationSaver,
-            "physics" : self.evaluators["physics"],
-            "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector_gpu, 
-                                                    min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
-                                                    k_neighbors=20, novelty_threshold=.5), 
-            "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", backup_path, "unaligned_novelty", unaligned_vector, 
-                                            "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, 
-                                            k_neighbors=20, novelty_threshold=25.),
-            "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
-            "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
+#         genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
+#         populationSaver = PopulationSaver(backup_path)
+#         self.evaluators.update({"population_saver" : populationSaver,
+#             "physics" : self.evaluators["physics"],
+#             "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector, 
+#                                                     min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
+#                                                     k_neighbors=20, novelty_threshold=.5), 
+#             "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", backup_path, "unaligned_novelty", unaligned_vector, 
+#                                             "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, 
+#                                             k_neighbors=20, novelty_threshold=25.),
+#             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
+#             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
         
 
-    def _extractObjectives(self, x: SoftBot) -> List[float]:
-        return [-x.nslc_quality, -x.aligned_novelty, -x.unaligned_novelty]
+#     def _extractObjectives(self, x: SoftBot) -> List[float]:
+#         return [-x.nslc_quality, -x.aligned_novelty, -x.unaligned_novelty]
 
     # def _extractConstraints(self, x: SoftBot) -> List[float]:
     #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.9*x.num_voxels]

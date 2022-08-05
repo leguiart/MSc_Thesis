@@ -14,4 +14,6 @@ class DummySoftbotCrossover(Crossover):
         super().__init__(2,2,0.0)
     
     def do(self, problem, pop, parents, **kwargs):
-        return pop
+        flattened_parents_indxs = parents.reshape(len(pop))
+
+        return pop[flattened_parents_indxs]

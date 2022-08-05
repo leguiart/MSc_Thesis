@@ -12,7 +12,7 @@ class StarterInterface(metaclass=abc.ABCMeta):
 @StarterInterface.register
 class IStarter:
 
-    def start(self):
+    def start(self, **kwargs):
         """
             Execute any starter code needed to configure an object after creation
         """

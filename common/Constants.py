@@ -8,7 +8,7 @@ PHYSICS_SIM_TYPES = ["CPU", "GPU"]
 NUM_RANDOM_INDS = 1  # Number of random individuals to insert each generation
 MAX_GENS = 1000  # Number of generations
 POPSIZE = 15  # Population size (number of individuals in the population)
-IND_SIZE = (6, 6, 6)  # Bounding box dimensions (x,y,z). e.g. IND_SIZE = (6, 6, 6) -> workspace is a cube of 6x6x6 voxels
+IND_SIZE = (5, 5, 5)  # Bounding box dimensions (x,y,z). e.g. IND_SIZE = (6, 6, 6) -> workspace is a cube of 6x6x6 voxels
 SIM_TIME = 5  # (seconds), including INIT_TIME!
 INIT_TIME = 1
 DT_FRAC = .9  # Fraction of the optimal integration step. The lower, the more stable (and slower) the simulation.

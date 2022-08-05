@@ -1,10 +1,12 @@
 
-import concurrent.futures
 import logging
+import os
 import numpy as np
+
 
 from evosoro_pymoo.Evaluators.GenotypeDistanceEvaluator import GenotypeDistanceEvaluator
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
+from common.Utils import saveToPickle
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
@@ -15,6 +17,9 @@ class GenotypeDiversityEvaluator(IEvaluator, object):
         super().__init__()
         self.genotypeDistanceEvaluator = GenotypeDistanceEvaluator(orig_size_xyz)
         self.gene_div_matrix = []
+        # self.save_checkpoint = save_checkpoint
+        # self.base_path = base_path
+        # self.checkpoint_path = os.path.join(self.base_path, f"genotypeDiversityEvaluatorCheckpoint.pickle") if save_checkpoint  else ""
 
 
     def __getitem__(self, n):
@@ -36,7 +41,8 @@ class GenotypeDiversityEvaluator(IEvaluator, object):
             gene_diversity = np.array(gene_diversity)
             gene_diversity = np.mean(gene_diversity, axis=0)
             self.gene_div_matrix += [list(gene_diversity)]
-
+        # if self.save_checkpoint:
+        #     saveToPickle(self.checkpoint_path, self)
         return X
 
             

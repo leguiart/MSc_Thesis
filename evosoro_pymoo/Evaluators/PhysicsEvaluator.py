@@ -10,7 +10,7 @@ from lxml import etree
 #sys.path.append(os.getcwd() + "/../..")
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, timeit, writeToJson
+from common.Utils import readFromJson, saveToPickle, timeit, writeToJson
 from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
@@ -76,8 +76,7 @@ def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
 class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
                 objective_dict, max_gens, num_env_cycles = 0, max_eval_time=60, 
-                time_to_try_again=10, save_lineages = True, save_nets = False, 
-                resuming_run = False):
+                time_to_try_again=10, save_lineages = True, save_nets = False):
         """Evaluate all individuals of the population in VoxCad.
 
         Parameters
@@ -128,39 +127,42 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
         self.max_eval_time = max_eval_time
         self.time_to_try_again = time_to_try_again
         self.save_lineages = save_lineages
-        self.resuming_run = resuming_run
+        # self.resuming_run = resuming_run
         
-        self.already_evaluated_json_path = os.path.join(self.run_directory, "already_evaluated.json")
-        self.obj_properties_json_path = os.path.join(self.run_directory, "physics_sim_properties_backup.json")
+        # self.already_evaluated_json_path = os.path.join(self.run_directory, "already_evaluated.json")
+        # self.obj_properties_json_path = os.path.join(self.run_directory, "physics_sim_properties_backup.json")
 
         
         self.already_evaluated = {}
-        self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
-        self.best_fit_so_far = objective_dict[0]["worst_value"] if not "best_fit_so_far" in self.obj_properties_backup else self.obj_properties_backup["best_fit_so_far"]
-        
+        # self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
+        # self.best_fit_so_far = objective_dict[0]["worst_value"] if not "best_fit_so_far" in self.obj_properties_backup else self.obj_properties_backup["best_fit_so_far"]
+        self.best_fit_so_far = objective_dict[0]["worst_value"] 
 
         self.all_evaluated_individuals_ids = []
         self.num_env_cycles = num_env_cycles
         self.curr_env_idx = 0
         self.n_batch = 1
         self.save_nets = save_nets
+        # self.save_checkpoint = save_checkpoint
+        # self.checkpoint_path = os.path.join(self.run_directory, "physics_evaluator_checkpoint.pickle") if save_checkpoint  else ""
         
-    def _read_already_evaluated_from_json(self):
-        self.already_evaluated = readFromJson(self.already_evaluated_json_path)
+    # def _read_already_evaluated_from_json(self):
+    #     self.already_evaluated = readFromJson(self.already_evaluated_json_path)
 
 
-    def _write_already_evaluated_to_json(self):
-        writeToJson(self.already_evaluated_json_path, self.already_evaluated)
+    # def _write_already_evaluated_to_json(self):
+    #     writeToJson(self.already_evaluated_json_path, self.already_evaluated)
  
 
-    def start(self):
-        initialize_folder_heirarchy(self.run_directory, self.save_nets, save_lineages=self.save_lineages, resuming_run=self.resuming_run)
+    def start(self, **kwargs):
+        resuming_run = kwargs["resuming_run"]
+        initialize_folder_heirarchy(self.run_directory, self.save_nets, save_lineages=self.save_lineages, resuming_run=resuming_run)
 
-        if self.resuming_run and os.path.exists(self.already_evaluated_json_path):
-            self._read_already_evaluated_from_json()
+        # if self.resuming_run and os.path.exists(self.already_evaluated_json_path):
+        #     self._read_already_evaluated_from_json()
 
-    def set_generation(self, gen):
-        self.n_batch = gen
+    # def set_generation(self, gen):
+    #     self.n_batch = gen
 
     def update_env(self):
         if self.num_env_cycles > 0:
@@ -168,7 +170,21 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
             self.curr_env_idx += 1 if self.n_batch % switch_every == 0 else 0
             self.curr_env_idx %= len(self.env)
             logger.info(" Using environment {0} of {1}".format(self.curr_env_idx+1, len(self.env)))
+            
 
+    @timeit
+    def evaluate(self, pop, *args, **kwargs):
+
+        self.update_env()
+        # self._write_already_evaluated_to_json()
+        # writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
+        
+        self.n_batch += 1
+
+        # if self.save_checkpoint:
+        #     saveToPickle(self.checkpoint_path, self)
+
+        return pop
 
 
 
@@ -177,25 +193,35 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
                 objective_dict, max_gens, num_env_cycles, max_eval_time=60, 
                 time_to_try_again=10, save_lineages=True, save_nets = False, 
-                resuming_run = False, sim_path = '_voxcad', experiments_path = '.'):
+                sim_path = '_voxcad', 
+                experiments_path = '.'):
         super().__init__(sim, env, save_vxa_every, run_directory, run_name, 
                         objective_dict, max_gens, num_env_cycles, max_eval_time, 
-                        time_to_try_again, save_lineages, save_nets, resuming_run)
+                        time_to_try_again, save_lineages, save_nets)
         self.sim_path = sim_path
         self.experiments_path = experiments_path
 
-    def start(self):
-        super().start()
-        sub.call("cp " + self.sim_path + "/voxelyzeMain/voxelyze " + self.experiments_path, shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+    def start(self, **kwargs):
+        super().start(**kwargs)
+        sub.call(f"cp {self.sim_path}/voxelyzeMain/voxelyze {self.experiments_path}", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
     @timeit
-    def evaluate(self, pop):
+    def evaluate(self, pop, *args, **kwargs):
+        pop_size = kwargs['pop_size']
+
+        if len(pop) == pop_size:
+            start_indx = 0
+        elif len(pop) > pop_size:
+            start_indx = len(pop) - pop_size
+
+        logger.info("Creating folders structure for this generation")
+        create_gen_directories(self.n_batch, self.run_directory, self.save_vxa_every, self.save_nets)
         logger.info("Starting voxelyze physics evaluation")
         start_time = time.time()
         num_evaluated_this_gen = 0
         ids_softbot_map = {}
 
-        for ind in pop:
+        for ind in pop[start_indx:]:
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
             ind.md5 = write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
 
@@ -226,7 +252,7 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                     sub.Popen("./voxelyze  -f " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id,
                             shell=True)
 
-        logger.info("Launched {0} voxelyze calls, out of {1} individuals".format(num_evaluated_this_gen, len(pop)))
+        logger.info("Launched {0} voxelyze calls, out of {1} individuals".format(num_evaluated_this_gen, pop_size))
 
         num_evals_finished = 0
         all_done = False
@@ -235,18 +261,23 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
         fitness_eval_start_time = time.time()
 
+        def int64Convertion(num):
+            if isinstance(num, np.integer):
+                return int(num)
+            return num
+
         while not all_done:
 
             time_waiting_for_fitness = time.time() - fitness_eval_start_time
             # this protects against getting stuck when voxelyze doesn't return a fitness value
             # (diverging self.simulations, crash, error reading .vxa)
 
-            if time_waiting_for_fitness > len(pop) * self.max_eval_time:
+            if time_waiting_for_fitness > pop_size * self.max_eval_time:
                 # TODO ** WARNING: This could in fact alter the self.sim and undermine the reproducibility **
                 all_done = False  # something bad with this individual, probably self.sim diverged
                 break
 
-            if time_waiting_for_fitness > len(pop) * self.time_to_try_again * redo_attempts:
+            if time_waiting_for_fitness > pop_size * self.time_to_try_again * redo_attempts:
                 # try to redo any self.simulations that crashed
                 redo_attempts += 1
                 non_analyzed_ids = [idx for idx in ids_softbot_map.keys() if idx not in already_analyzed_ids]
@@ -312,9 +343,9 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                                     state = details_phenotype["state"]
                                     setattr(ind, details["name"], details["node_func"](state))
 
-                    self.already_evaluated[ind.md5] = [getattr(ind, details["name"])
-                                                    for rank, details in
-                                                    self.objective_dict.items()]
+                    self.already_evaluated[ind.md5] = [int64Convertion(getattr(ind, details["name"]))
+                                                        for rank, details in
+                                                        self.objective_dict.items()]
                     self.all_evaluated_individuals_ids += [this_id]
 
                     # update the run statistics and file management
@@ -343,13 +374,9 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
         logger.info("\nAll Voxelyze evals finished in {} seconds".format(time.time() - start_time))
         logger.info("num_evaluated_this_gen: {0}".format(num_evaluated_this_gen))
-
         logger.info("Finished voxelyze physics evaluation")
-        self.update_env()
-        self.n_batch += 1
 
-
-        return pop
+        return super().evaluate(pop)
 
 
 
@@ -358,22 +385,29 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
                 objective_dict, max_gens, num_env_cycles, max_eval_time=60, 
                 time_to_try_again=10, save_lineages=True, save_nets = False, 
-                resuming_run = False, sim_path = '_voxcraft-sim', 
+                sim_path = '_voxcraft-sim', 
                 experiments_path = 'experiments'):
         super().__init__(sim, env, save_vxa_every, run_directory, run_name, 
                         objective_dict, max_gens, num_env_cycles, max_eval_time, 
-                        time_to_try_again, save_lineages, save_nets, resuming_run)
+                        time_to_try_again, save_lineages, save_nets)
         self.sim_path = sim_path
         self.experiments_path = experiments_path
 
-    def start(self):
-        super().start()
+    def start(self, **kwargs):
+        super().start(**kwargs)
         sub.call(f"cp {self.sim_path}/build/voxcraft-sim .", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
         sub.call(f"cp {self.sim_path}/build/vx3_node_worker .", shell=True)
         sub.call(f"cp {self.sim_path}/demos/voxelyze/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
 
     @timeit
-    def evaluate(self, pop):
+    def evaluate(self, pop, *args, **kwargs):
+        pop_size = kwargs['pop_size']
+
+        if len(pop) == pop_size:
+            start_indx = 0
+        elif len(pop) > pop_size:
+            start_indx = len(pop) - pop_size
+
         start_time = time.time()
         num_evaluated_this_gen = 0
         # ids_to_analyze = []
@@ -383,7 +417,7 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
         logger.info("Starting voxcraft physics evaluation")
 
             
-        for ind in pop:
+        for ind in pop[start_indx:]:
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
             ind.md5, root = get_vxd(self.sim, self.env[self.curr_env_idx], ind)
 
@@ -396,6 +430,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                 
                 for rank, goal in self.objective_dict.items():
                     if goal["tag"] is not None:
+                        if goal["name"] == "fitness":
+                            logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
@@ -421,7 +457,7 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
         while not all_done:
             time_waiting_for_fitness = time.time() - fitness_eval_start_time
-            if time_waiting_for_fitness > len(pop) * self.max_eval_time:
+            if time_waiting_for_fitness > pop_size * self.max_eval_time:
                 break
             try:
                 process = sub.run(f"./voxcraft-sim -f -i {self.run_directory}/voxelyzeFiles -o {self.run_directory}/output.xml", universal_newlines=True, stdout=sub.PIPE, stderr=sub.PIPE, shell=True)
@@ -474,6 +510,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
             for rank, details in self.objective_dict.items():
                 if results[rank] is not None:
+                    if details["name"] == "fitness":
+                        logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{results[rank]}")
                     setattr(ind, details["name"], results[rank])
                 else:
                     for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
@@ -495,7 +533,7 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             # update the run statistics and file management
             if ind.fitness > self.best_fit_so_far:
                 self.best_fit_so_far = ind.fitness
-                self.obj_properties_backup["best_fit_so_far"] = ind.fitness
+                # self.obj_properties_backup["best_fit_so_far"] = ind.fitness
                 sub.call("cp " + ind_filename_vxa + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
                         "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
                         (self.n_batch, ind.fitness, ind_id), shell=True)
@@ -509,11 +547,6 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)
 
-        self._write_already_evaluated_to_json()
-        writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
-        
-        self.n_batch += 1
-
         if not all_done:
             logger.warning("Couldn't get a fitness value in time for some individuals. "
                             "The min fitness was assigned for these individuals")
@@ -523,4 +556,4 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
         logger.info("Finished voxcraft physics evaluation")
 
-        return pop
+        return super().evaluate(pop)

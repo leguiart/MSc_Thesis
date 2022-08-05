@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <VXA Version="1.1">
     <GPU>
-        <HeapSize>0.3</HeapSize>
+        <HeapSize>0.5</HeapSize>
     </GPU>
     <Simulator>
         <FitnessFunction>
@@ -34,12 +34,30 @@
                     <mtCONST>5</mtCONST>
                 </mtSUB>
             </StopConditionFormula>
+            <StopConditionType>2</StopConditionType>
+            <StopConditionValue>5</StopConditionValue>
+            <AfterlifeTime>0</AfterlifeTime>
+            <MidlifeFreezeTime>0</MidlifeFreezeTime>
+            <InitCmTime>1</InitCmTime>
         </StopCondition>
+        <EquilibriumMode>
+            <EquilibriumModeEnabled>0</EquilibriumModeEnabled>
+        </EquilibriumMode>
+        <MinTempFact>0.1</MinTempFact>
+        <MaxTempFactChange>1e-05</MaxTempFactChange>
+        <MaxStiffnessChange>10000</MaxStiffnessChange>
+        <MinElasticMod>5000000.0</MinElasticMod>
+        <MaxElasticMod>500000000.0</MaxElasticMod>
+        <ErrorThreshold>0</ErrorThreshold>
+        <ThresholdTime>0</ThresholdTime>
+        <MaxKP>0</MaxKP>
+        <MaxKI>0</MaxKI>
+        <MaxANTIWINDUP>0</MaxANTIWINDUP>
         <EnableExpansion>1</EnableExpansion>
         <AttachDetach>
             <EnableCollision>1</EnableCollision>
-            <!-- <CollisionMode>1</CollisionMode> -->
-            <!-- <watchDistance>1.25</watchDistance> -->
+            <CollisionMode>1</CollisionMode> 
+            <watchDistance>1.25</watchDistance>
             <Collisions>
                 <SelfColEnabled>1</SelfColEnabled>
                 <ColSystem>3</ColSystem>
@@ -99,13 +117,13 @@
     <VXC Version="0.94">
         <Lattice>
             <Lattice_Dim>0.01</Lattice_Dim>
-            <!-- <X_Dim_Adj>1</X_Dim_Adj>
+            <X_Dim_Adj>1</X_Dim_Adj>
             <Y_Dim_Adj>1</Y_Dim_Adj>
             <Z_Dim_Adj>1</Z_Dim_Adj>
             <X_Line_Offset>0</X_Line_Offset>
             <Y_Line_Offset>0</Y_Line_Offset>
             <X_Layer_Offset>0</X_Layer_Offset>
-            <Y_Layer_Offset>0</Y_Layer_Offset> -->
+            <Y_Layer_Offset>0</Y_Layer_Offset>
         </Lattice>
         <Voxel>
             <Vox_Name>BOX</Vox_Name>
