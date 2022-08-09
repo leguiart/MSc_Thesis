@@ -5,8 +5,8 @@ import abc
 class StarterInterface(metaclass=abc.ABCMeta):
     @classmethod
     def __subclasshook__(cls, subclass):
-        return (hasattr(subclass, 'evaluate') and 
-                callable(subclass.evaluate))
+        return (hasattr(subclass, 'start') and 
+                callable(subclass.start))
 
 
 @StarterInterface.register

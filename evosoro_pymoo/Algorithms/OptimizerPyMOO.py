@@ -1,4 +1,5 @@
 
+import copy
 import numpy as np
 import pickle
 import logging
@@ -11,13 +12,14 @@ from pymoo.core.population import Population
 from evosoro.base import Env, Sim
 from evosoro.tools.algorithms import Optimizer
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
-from evosoro_pymoo.common.IStart import IStarter
-from common.Utils import saveToDill, saveToPickle, timeit
+from evosoro_pymoo.common.ICheckpoint import ICheckpoint
+from common.Utils import readFromDill, saveToDill, saveToPickle, timeit
 from common.IAnalytics import IAnalytics
+from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
-class PopulationBasedOptimizerPyMOO(Optimizer, IStarter):
+class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
     def __init__(self, sim : Sim, env : Env, 
                 algorithm : Algorithm, 
                 problem : BaseSoftbotProblem, 
@@ -34,8 +36,18 @@ class PopulationBasedOptimizerPyMOO(Optimizer, IStarter):
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
+        if resuming_run:
+            self.algorithm = readFromDill(f"{self.checkpoint_path}/algorithm_checkpoint")
+            self.analytics  = self.analytics.file_recovery()
+
         self.problem.start(resuming_run = resuming_run)
         self.analytics.start(resuming_run = resuming_run) 
+
+    def backup(self):
+        if self.save_to_checkpoint :
+            saveToDill(f"{self.checkpoint_path}/algorithm_checkpoint", self.algorithm)
+            self.problem.backup()
+            self.analytics.backup()
 
     @timeit
     def run(self):
@@ -43,8 +55,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, IStarter):
         # while the algorithm has not terminated
         while self.algorithm.has_next():
             self.next()
-            if self.save_to_checkpoint :
-                saveToDill(f"{self.checkpoint_path}/algorithm_checkpoint", self.algorithm)
+            self.backup()
         
         # obtain the result objective from the algorithm
         res = self.algorithm.result()

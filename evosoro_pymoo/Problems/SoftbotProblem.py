@@ -6,20 +6,20 @@ import logging
 from typing import List
 from abc import ABC, abstractmethod
 from pymoo.core.problem import Problem
-from common.Utils import saveToDill, saveToPickle
+from common.Utils import readFromPickle, saveToDill, saveToPickle
 
 from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import BaseSoftBotPhysicsEvaluator
+from evosoro_pymoo.common.ICheckpoint import ICheckpoint
+from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
-class BaseSoftbotProblem(Problem, ABC, IStarter):
+class BaseSoftbotProblem(Problem, ABC, ICheckpoint, IStarter):
 
-    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, n_var=-1, n_obj=1, n_constr=0, save_checkpoint = False, base_path = "."):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, n_var=-1, n_obj=1, n_constr=0):
         super().__init__(n_var, n_obj, n_constr)
-        self.save_checkpoint = save_checkpoint
-        self.checkpoint_path = os.path.join(base_path, f"SoftbotProblem_checkpoint") if save_checkpoint  else ""
         self.evaluators = {"physics" : physics_evaluator}
 
     def _evaluate(self, x, out, *args, **kwargs):
@@ -35,8 +35,7 @@ class BaseSoftbotProblem(Problem, ABC, IStarter):
         if constraints_mat:
             out["G"] = np.array(constraints_mat, dtype=float)
         
-        if self.save_checkpoint:
-            saveToDill(self.checkpoint_path, self)
+        self.backup()
     
     def _doEvaluations(self, X : List[SoftBot], *args, **kwargs):
         for _, evaluator in self.evaluators.items():
@@ -52,7 +51,15 @@ class BaseSoftbotProblem(Problem, ABC, IStarter):
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
+        for k in self.evaluators.keys():
+            if issubclass(type(self.evaluators[k]), IFileRecovery):
+                if resuming_run:
+                    self.evaluators[k] = self.evaluators[k].file_recovery()
+            if issubclass(type(self.evaluators[k]), IStarter):
+                self.evaluators[k].start(resuming_run = resuming_run)
+    
+    def backup(self, *args, **kwargs):
         for _, evaluator in self.evaluators.items():
-            if issubclass(type(evaluator), IStarter):
-                evaluator.start(resuming_run = resuming_run)
+            if issubclass(type(evaluator), ICheckpoint):
+                evaluator.backup(*args, **kwargs)
 

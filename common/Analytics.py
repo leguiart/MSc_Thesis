@@ -8,13 +8,13 @@ from typing import List
 
 from common.Constants import *
 from common.IAnalytics import IAnalytics
-from common.Utils import getsize, save_json, saveToDill, saveToPickle, timeit
+from common.Utils import getsize, readFromDill, save_json, saveToDill, saveToPickle, timeit
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
 
 
 
 class QD_Analytics(IAnalytics):
-    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path, save_checkpoint = False):
+    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path):
         super().__init__()
         self.json_base_path = json_base_path
         self.csv_base_path = csv_base_path
@@ -38,10 +38,9 @@ class QD_Analytics(IAnalytics):
         self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho)
         #3.- Elites in terms of both aligned novelty and fitness (Pareto-dominance)
         # self.map_elites_archive_anf = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "anf_elites")
-        self.save_checkpoint = save_checkpoint
-        self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint") if save_checkpoint  else ""
+        self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint")
 
-        self.indicator_stats_set = {
+        self.indicator_stats_set = list({
             "qd-score_f",
             "qd-score_an",
             "coverage", 
@@ -67,9 +66,9 @@ class QD_Analytics(IAnalytics):
             "aligned_novelty_archive_fit",
             "unaligned_novelty_archive_novelty",
             "aligned_novelty_archive_novelty",
-        }
+        })
 
-        self.indicator_set = {
+        self.indicator_set = list({
             "id",
             "md5",
             "fitness",
@@ -83,21 +82,42 @@ class QD_Analytics(IAnalytics):
             "trayectory_div",
             "endpoint_x",
             "endpoint_y",
+            "endpoint_z",
             "inipoint_x",
             "inipoint_y",
+            "inipoint_z",
             "trayectory_x",
             "trayectory_y",
             "morphology_active",
             "morphology_passive"
-        }
+        })
 
-    # def set_generation(self, gen):
-    #     self.actual_generation = gen
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
+   
         self.map_elites_archive_f.start(resuming_run = resuming_run)
         self.map_elites_archive_an.start(resuming_run = resuming_run)
+
+        if not resuming_run:
+            if os.path.exists(self.indicators_csv_path):
+                os.remove(self.indicators_csv_path)
+            
+            if os.path.exists(self.stats_csv_path):
+                os.remove(self.stats_csv_path)
+        else:
+            if os.path.exists(self.indicators_csv_path):
+                # Don't load the whole csv onto memory
+                with pd.read_csv(self.indicators_csv_path, chunksize=10) as reader:
+                    for df in reader:
+                        self.indicator_set = df.columns.values.tolist()
+                        break
+                
+    def backup(self):
+        saveToDill(self.checkpoint_path, self)
+
+    def file_recovery(self, *args, **kwargs):
+        return readFromDill(self.checkpoint_path)
 
     def init_indicator_mapping(self):
         self.indicator_mapping = {
@@ -125,8 +145,10 @@ class QD_Analytics(IAnalytics):
             "trayectory_div" : [],
             "endpoint_x": [],
             "endpoint_y": [],
+            "endpoint_z": [],
             "inipoint_x": [],
             "inipoint_y": [],
+            "inipoint_z": [],
             "trayectory_x": [],
             "trayectory_y": [],
             "morphology_active": [],
@@ -139,10 +161,10 @@ class QD_Analytics(IAnalytics):
         return [x.active, x.passive]
 
     def extract_endpoint(self, x):
-        return [x.finalX, x.finalY]
+        return [x.finalX, x.finalY, x.finalZ]
 
     def extract_initpoint(self, x):
-        return [x.initialX, x.initialY]
+        return [x.initialX, x.initialY, x.initialZ]
 
     def extract_trayectory(self, x):
         return [x.finalX - x.initialX, x.finalY -  x.initialY]
@@ -184,8 +206,10 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["morphology"] += [morphology]
             self.indicator_mapping["endpoint_x"] += [endpoint[0]]
             self.indicator_mapping["endpoint_y"] += [endpoint[1]]
+            self.indicator_mapping["endpoint_z"] += [endpoint[2]]
             self.indicator_mapping["inipoint_x"] += [inipoint[0]]
             self.indicator_mapping["inipoint_y"] += [inipoint[1]]
+            self.indicator_mapping["inipoint_z"] += [inipoint[2]]
             self.indicator_mapping["trayectory_x"] += [trayectory[0]]
             self.indicator_mapping["trayectory_y"] += [trayectory[1]]
             self.indicator_mapping["morphology_active"] += [morphology[0]]
@@ -218,8 +242,8 @@ class QD_Analytics(IAnalytics):
         self.init_indicator_mapping()
         self.actual_generation+=1
 
-        if self.save_checkpoint:
-            saveToDill(self.checkpoint_path, self)
+        # if self.save_checkpoint:
+        #     saveToDill(self.checkpoint_path, self)
             
 
 
