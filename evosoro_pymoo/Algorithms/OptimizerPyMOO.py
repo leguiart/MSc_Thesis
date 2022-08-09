@@ -44,10 +44,9 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         self.analytics.start(resuming_run = resuming_run) 
 
     def backup(self):
-        if self.save_to_checkpoint :
-            saveToDill(f"{self.checkpoint_path}/algorithm_checkpoint", self.algorithm)
-            self.problem.backup()
-            self.analytics.backup()
+        saveToDill(f"{self.checkpoint_path}/algorithm_checkpoint", self.algorithm)
+        self.problem.backup()
+        self.analytics.backup()
 
     @timeit
     def run(self):
@@ -55,8 +54,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         # while the algorithm has not terminated
         while self.algorithm.has_next():
             self.next()
-            self.backup()
-        
+    
         # obtain the result objective from the algorithm
         res = self.algorithm.result()
 
@@ -68,9 +66,10 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         
         logger.info("Now creating new population")
         # ask the algorithm for the next solution to be evaluated
-        # basically, pymoo generates a new population by applying 
+        # basically, pymoo generates a new population of children by applying 
         # the variation operators (mutation and crossover) 
-        # from selected parent population
+        # to the set of parents which are selected (binary tournament, proportional, etc.)
+        # from the parent population
         children_pop = self.algorithm.ask()
         if self.algorithm.is_initialized:
             parent_pop = self.algorithm.pop 
@@ -99,5 +98,10 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         logger.info("Individuals evaluation finished")  # record total eval time in log
 
         # returned the evaluated individuals which have been evaluated or even modified
+        # here we produce the next generation parent population by applying a survival technique
+        # (elitism, ranking, ordering, replacement, etc.)
         self.algorithm.tell(infills=children_pop)
+
+        if self.save_to_checkpoint:
+            self.backup()
 
