@@ -8,7 +8,7 @@ from typing import List
 
 from common.Constants import *
 from common.IAnalytics import IAnalytics
-from common.Utils import getsize, readFromDill, save_json, saveToDill, saveToPickle, timeit
+from common.Utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
 
 
@@ -38,7 +38,7 @@ class QD_Analytics(IAnalytics):
         self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho)
         #3.- Elites in terms of both aligned novelty and fitness (Pareto-dominance)
         # self.map_elites_archive_anf = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "anf_elites")
-        self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint")
+        self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
 
         self.indicator_stats_set = list({
             "qd-score_f",
@@ -114,12 +114,14 @@ class QD_Analytics(IAnalytics):
                         break
                 
     def backup(self):
-        saveToDill(self.checkpoint_path, self)
+        saveToPickle(self.checkpoint_path, self)
 
     def file_recovery(self, *args, **kwargs):
-        return readFromDill(self.checkpoint_path)
+        return readFromPickle(self.checkpoint_path)
 
     def init_indicator_mapping(self):
+        # if self.indicator_mapping:
+        #     del self.indicator_mapping
         self.indicator_mapping = {
             "qd-score_f" : [0],
             "qd-score_an" : [0],
@@ -189,8 +191,6 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["unaligned_novelty_archive_novelty"] += [individual.unaligned_novelty]
             self.indicator_mapping["unaligned_novelty_archive_fit"] += [individual.fitness]
 
-
-
         self.map_elites_archive_an.update_existing([ind.X for ind in pop], problem.evaluators["aligned_novelty"])
 
         for ind in pop:
@@ -242,11 +242,7 @@ class QD_Analytics(IAnalytics):
         self.init_indicator_mapping()
         self.actual_generation+=1
 
-        # if self.save_checkpoint:
-        #     saveToDill(self.checkpoint_path, self)
-            
-
-
+    
     def save_archives(self):
 
         archives = {
@@ -268,11 +264,9 @@ class QD_Analytics(IAnalytics):
         save_json(self.archives_json_path, archives)
 
 
-
     def indicator_df(self):
         return pd.DataFrame({k : self.indicator_mapping[k] for k in self.indicator_set})
             
-
 
     def indicator_stats_df(self):
         d = {"Indicator":[], "Best":[], "Worst":[], "Average":[], "STD":[], "Median":[], "Generation":[], "Run":[], "Method":[]}

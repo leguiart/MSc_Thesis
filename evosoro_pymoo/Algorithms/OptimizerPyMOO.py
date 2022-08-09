@@ -37,14 +37,14 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
         if resuming_run:
-            self.algorithm = readFromDill(f"{self.checkpoint_path}/algorithm_checkpoint")
+            self.algorithm = readFromDill(f"{self.checkpoint_path}/algorithm_checkpoint.pickle")
             self.analytics  = self.analytics.file_recovery()
 
         self.problem.start(resuming_run = resuming_run)
         self.analytics.start(resuming_run = resuming_run) 
 
     def backup(self):
-        saveToDill(f"{self.checkpoint_path}/algorithm_checkpoint", self.algorithm)
+        saveToPickle(f"{self.checkpoint_path}/algorithm_checkpoint.pickle", self.algorithm)
         self.problem.backup()
         self.analytics.backup()
 

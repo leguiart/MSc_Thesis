@@ -321,7 +321,7 @@ def main(parser : argparse.ArgumentParser):
         sim = Sim(dt_frac=DT_FRAC, simulation_time=SIM_TIME, fitness_eval_init_time=INIT_TIME)
 
         # Setting up the environment object
-        env = Env(sticky_floor=0, time_between_traces=0, lattice_dimension=0.02)
+        env = Env(sticky_floor=0, time_between_traces=0, lattice_dimension=0.015)
 
         run_path = run_dir + str(run + 1)
         resume_run = False
