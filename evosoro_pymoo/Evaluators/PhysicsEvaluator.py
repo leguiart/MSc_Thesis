@@ -10,7 +10,9 @@ from lxml import etree
 #sys.path.append(os.getcwd() + "/../..")
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, saveToPickle, timeit, writeToJson
+from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit, writeToJson
+from evosoro_pymoo.common.ICheckpoint import ICheckpoint
+from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter
 
 logger = logging.getLogger(f"__main__.{__name__}")
@@ -73,7 +75,7 @@ def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
         sub.call("mkdir " + run_directory + "/network_gml/Gen_%04i" % gen, shell=True)
 
 
-class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
+class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecovery):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
                 objective_dict, max_gens, num_env_cycles = 0, max_eval_time=60, 
                 time_to_try_again=10, save_lineages = True, save_nets = False):
@@ -127,15 +129,9 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
         self.max_eval_time = max_eval_time
         self.time_to_try_again = time_to_try_again
         self.save_lineages = save_lineages
-        # self.resuming_run = resuming_run
-        
-        # self.already_evaluated_json_path = os.path.join(self.run_directory, "already_evaluated.json")
-        # self.obj_properties_json_path = os.path.join(self.run_directory, "physics_sim_properties_backup.json")
 
         
         self.already_evaluated = {}
-        # self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
-        # self.best_fit_so_far = objective_dict[0]["worst_value"] if not "best_fit_so_far" in self.obj_properties_backup else self.obj_properties_backup["best_fit_so_far"]
         self.best_fit_so_far = objective_dict[0]["worst_value"] 
 
         self.all_evaluated_individuals_ids = []
@@ -144,25 +140,14 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
         self.n_batch = 1
         self.save_nets = save_nets
         # self.save_checkpoint = save_checkpoint
-        # self.checkpoint_path = os.path.join(self.run_directory, "physics_evaluator_checkpoint.pickle") if save_checkpoint  else ""
+        self.checkpoint_path = os.path.join(self.run_directory, "physics_evaluator_checkpoint.pickle")
         
-    # def _read_already_evaluated_from_json(self):
-    #     self.already_evaluated = readFromJson(self.already_evaluated_json_path)
-
-
-    # def _write_already_evaluated_to_json(self):
-    #     writeToJson(self.already_evaluated_json_path, self.already_evaluated)
- 
-
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
         initialize_folder_heirarchy(self.run_directory, self.save_nets, save_lineages=self.save_lineages, resuming_run=resuming_run)
 
-        # if self.resuming_run and os.path.exists(self.already_evaluated_json_path):
-        #     self._read_already_evaluated_from_json()
-
-    # def set_generation(self, gen):
-    #     self.n_batch = gen
+    def backup(self, *args, **kwargs):
+        saveToPickle(self.checkpoint_path, self)
 
     def update_env(self):
         if self.num_env_cycles > 0:
@@ -170,20 +155,14 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, IStarter):
             self.curr_env_idx += 1 if self.n_batch % switch_every == 0 else 0
             self.curr_env_idx %= len(self.env)
             logger.info(" Using environment {0} of {1}".format(self.curr_env_idx+1, len(self.env)))
-            
+    
+    def file_recovery(self):
+        return readFromPickle(self.checkpoint_path)           
 
     @timeit
     def evaluate(self, pop, *args, **kwargs):
-
-        self.update_env()
-        # self._write_already_evaluated_to_json()
-        # writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
-        
+        self.update_env()        
         self.n_batch += 1
-
-        # if self.save_checkpoint:
-        #     saveToPickle(self.checkpoint_path, self)
-
         return pop
 
 

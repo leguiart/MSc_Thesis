@@ -21,8 +21,10 @@ from evosoro.softbot import SoftBot
 
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, saveToPickle, timeit, writeToJson
+from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit, writeToJson
+from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IStart import IStarter
+
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
@@ -30,7 +32,7 @@ def std_is_valid(x):
     return True
 
 
-class NoveltyEvaluatorKD(IEvaluator[SoftBot]):
+class NoveltyEvaluatorKD(IEvaluator[SoftBot], ICheckpoint, IStarter):
     """
     Novelty-search based phenotype evaluator.
     ...
@@ -78,9 +80,8 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot]):
         self.novelty_name = novelty_name
         self.base_path = base_path
         self.archive_path = os.path.join(self.base_path, self.name)
-        # self.obj_properties_json_path = os.path.join(self.base_path, f"NS_{self.name}_properties_backup.json")
-        # self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
-        # self.novelty_threshold = novelty_threshold if "novelty_threshold" not in self.obj_properties_backup else self.obj_properties_backup["novelty_threshold"]
+        self.obj_properties_json_path = os.path.join(self.base_path, f"NS_{self.name}_properties_backup.json")
+
         self.novelty_threshold = novelty_threshold
         self.novelty_floor = novelty_floor
         self.min_novelty_archive_size = min_novelty_archive_size
@@ -88,36 +89,43 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot]):
         self.max_novelty_archive_size = max_novelty_archive_size
         self.max_iter = max_iter
         self.items_added_in_generation = 0
-        # self.time_out = 0 if "time_out" not in self.obj_properties_backup else self.obj_properties_backup["time_out"]
-        # self.its = 0 if "its" not in self.obj_properties_backup else self.obj_properties_backup["its"]
+
         self.time_out = 0
         self.its = 0
-        # self.obj_properties_json_path = os.path.join(self.base_path, f"NS_{self.name}_properties_backup.json")
-        # self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
 
         self.novelty_archive = []
         self.vector_extractor = vector_extractor
-        self.archive_hashset = set()
-
-        # self.save_checkpoint = save_checkpoint
-        # self.checkpoint_path = os.path.join(self.base_path, f"{name}_evaluator_checkpoint.pickle") if save_checkpoint  else ""
+        self.individuals_added = []
 
 
-    def start(self):
-        if os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
+    def start(self, **kwargs):
+        resuming_run = kwargs["resuming_run"]
+        self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
+        if "novelty_threshold" in self.obj_properties_backup:
+            self.novelty_threshold = self.obj_properties_backup["novelty_threshold"]
+        if "time_out" in self.obj_properties_backup:
+            self.time_out = self.obj_properties_backup["time_out"]
+        if "its" in self.obj_properties_backup:
+            self.its = self.obj_properties_backup["its"]
+        if resuming_run and os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
             dir_contents = [file for file in os.listdir(self.archive_path) if os.path.isfile(os.path.join(self.archive_path, file))]
-            if not dir_contents:
-                shutil.rmtree(self.archive_path)
-                os.mkdir(self.archive_path)
-            else:
+            if dir_contents:
                 for filename in dir_contents:
                     if filename.endswith(".pickle"):
-                        with open(os.path.join(self.archive_path, filename), 'rb') as handle:
-                            individual = pickle.load(handle)
+                        individual = readFromPickle(os.path.join(self.archive_path, filename))
                         self.novelty_archive += [individual]
-                        self.archive_hashset.add(individual.md5)
+
         else:
             os.mkdir(self.archive_path)
+
+
+    def backup(self):
+        self.obj_properties_backup["its"] = self.its
+        self.obj_properties_backup["time_out"] = self.time_out
+        self.obj_properties_backup["novelty_threshold"] = self.novelty_threshold
+        for ind in self.individuals_added:
+            self.pickle_individual(ind)
+        writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
 
 
     def _evaluate_novelty(self, individuals):
@@ -132,15 +140,14 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot]):
         return self._average_knn_distance(kd_matrix, kd_tree)
 
 
-    # def pickle_individual(self, individual):
-    #     with open(f"{self.archive_path}/individual_{individual.id}.pickle", "wb") as fh:
-    #         pickle.dump(individual, fh, protocol=pickle.HIGHEST_PROTOCOL)
+    def pickle_individual(self, individual):
+        saveToPickle(f"{self.archive_path}/individual_{individual.id}.pickle", individual)
 
 
-    # def remove_individual_from_backup(self, individual):
-    #     pickle_path = f"{self.archive_path}/individual_{individual.id}.pickle"
-    #     if os.path.exists(pickle_path):
-    #         os.remove(pickle_path)
+    def remove_individual_from_backup(self, individual):
+        pickle_path = f"{self.archive_path}/individual_{individual.id}.pickle"
+        if os.path.exists(pickle_path):
+            os.remove(pickle_path)
 
 
     @timeit
@@ -160,13 +167,12 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot]):
             if i < len(X):
                 # Set novelty
                 setattr(X[i], self.novelty_name, novelty)   
-                if X[i].md5 not in self.archive_hashset:
-                    if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
-                        self.items_added_in_generation+=1
-                        self.novelty_archive += [copy.deepcopy(X[i])]
-                        self.archive_hashset.add(X[i].md5)
-                        # self.pickle_individual(X[i])
-
+                if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
+                    self.items_added_in_generation+=1
+                    ind_copy = copy.deepcopy(X[i])
+                    self.novelty_archive += [ind_copy]
+                    self.individuals_added += [ind_copy]
+                        
             else:
                 setattr(self.novelty_archive[i%len(X)], self.novelty_name, novelty)
 
@@ -177,16 +183,7 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot]):
         logger.debug("Finished novelty evaluation")
 
         self._adjust_archive_settings()
-
-        # self.obj_properties_backup["its"] = self.its
-        # self.obj_properties_backup["time_out"] = self.time_out
-        # self.obj_properties_backup["novelty_threshold"] = self.novelty_threshold
-
-        # writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
-
-        # if self.save_checkpoint:
-        #     saveToPickle(self.checkpoint_path, self)
-        
+      
         return X
     
 
@@ -198,9 +195,7 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot]):
 
             for _ in range(len(self.novelty_archive) - self.max_novelty_archive_size):
                 removed = self.novelty_archive.pop(0)
-                if removed.md5 in self.archive_hashset:
-                    self.archive_hashset.remove(removed.md5)
-                # self.remove_individual_from_backup(removed)
+                self.remove_individual_from_backup(removed)
 
 
         if self.items_added_in_generation == 0:
@@ -258,8 +253,9 @@ class NSLCEvaluator(NoveltyEvaluatorKD):
 
                 if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
                     self.items_added_in_generation+=1
-                    self.novelty_archive += [copy.deepcopy(X[i])]
-                    # self.pickle_individual(X[i])
+                    ind_copy = copy.deepcopy(X[i])
+                    self.novelty_archive += [ind_copy]
+                    self.individuals_added += [ind_copy]
             else:
 
                 setattr(self.novelty_archive[i%len(X)], self.novelty_name, novelty)
@@ -272,14 +268,6 @@ class NSLCEvaluator(NoveltyEvaluatorKD):
         logger.debug("Finished novelty search with local competition evaluation")
 
         self._adjust_archive_settings()
-        # self.obj_properties_backup["its"] = self.its
-        # self.obj_properties_backup["time_out"] = self.time_out
-        # self.obj_properties_backup["novelty_threshold"] = self.novelty_threshold
 
-        # writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
-
-
-        # if self.save_checkpoint:
-        #     saveToPickle(self.checkpoint_path, self)
 
         return X

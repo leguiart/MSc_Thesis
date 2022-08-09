@@ -234,8 +234,10 @@ def main(parser : argparse.ArgumentParser):
 
         objective_dict.add_objective(name="initialX", maximize=True, tag="initialCenterOfMass/x")
         objective_dict.add_objective(name="initialY", maximize=True, tag="initialCenterOfMass/y")
+        objective_dict.add_objective(name="initialZ", maximize=True, tag="initialCenterOfMass/z")
         objective_dict.add_objective(name="finalX", maximize=True, tag="currentCenterOfMass/x")
         objective_dict.add_objective(name="finalY", maximize=True, tag="currentCenterOfMass/y")
+        objective_dict.add_objective(name="finalZ", maximize=True, tag="currentCenterOfMass/z")
         objective_dict.add_objective(name="fitnessX", maximize=True, tag=None)
         objective_dict.add_objective(name="fitnessY", maximize=True, tag=None)
         
@@ -311,7 +313,10 @@ def main(parser : argparse.ArgumentParser):
 
         random_seed = runToSeedMapping[str(run + 1)]
 
-        
+        # Initializing the random number generator for reproducibility
+        np.random.seed(random_seed)
+        random.seed(random_seed) 
+
         # Setting up the simulation object
         sim = Sim(dt_frac=DT_FRAC, simulation_time=SIM_TIME, fitness_eval_init_time=INIT_TIME)
 
@@ -337,58 +342,37 @@ def main(parser : argparse.ArgumentParser):
                 starting_gen = gen_lst[-1]
                 print (f"Resuming run {run + 1} at generation {starting_gen}.\n"
                     "****************************************************\n")
+        
         if starting_gen <= max_gens:
             start_success = False
             start_attempts = 0
+            # Setting up analytics
+            analytics = QD_Analytics(run + 1, experiment, run_name, run_path, 'experiments')
+
+            # Setting up physics simulation
+            physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_path, run_name, objective_dict, 
+                                            max_gens, 0, max_eval_time= MAX_EVAL_TIME, time_to_try_again= TIME_TO_TRY_AGAIN, 
+                                            save_lineages = SAVE_LINEAGES)
+
+            # Setting up Softbot optimization problem
+            softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path, orig_size_xyz=IND_SIZE)
+
+            # Initializing a population of SoftBots
+            my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
+            # Setting up optimization algorithm
+            algorithm = CustomNSGA2(pop_size=pop_size,
+                            mutation=SoftbotMutation(my_pop.max_id) if experiment != "MAP-ELITES" else ME_SoftbotMutation(my_pop.max_id, pop_size), 
+                            crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
+            algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
+
             while not start_success and start_attempts < 5:
                 start_attempts += 1
-                # Initializing the random number generator for reproducibility
-                np.random.seed(random_seed)
-                random.seed(random_seed) 
-                if resume_run:
-                    algorithm_checkpoint_path = f"{run_path}/algorithm_checkpoint"
-                    problem_checkpoint_path = f"{run_path}/SoftbotProblem_checkpoint"
-                    analytics_checkpoint_path = f"{run_path}/analytics_checkpoint"
 
-                    analytics = readFromDill(analytics_checkpoint_path)
-                    softbot_problem = readFromDill(problem_checkpoint_path)
-                    algorithm = readFromDill(algorithm_checkpoint_path)
-
-                    # resume_success = my_pop.start(run_path + "/pickledPops")
-                    # if not resume_success:
-                    #     print("Insufficient data to resume run execution.\nRestarting run...")
-                    #     resume_run = False
-                    #     starting_gen = 1
-                    #     continue
-                else:
-
-                    # Setting up analytics
-                    analytics = QD_Analytics(run + 1, experiment, run_name, run_path, 'experiments', save_checkpoint=True)
-                    # analytics.set_generation(starting_gen)
-
-                    # Setting up physics simulation
-                    physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_path, run_name, objective_dict, 
-                                                    max_gens, 0, max_eval_time= MAX_EVAL_TIME, time_to_try_again= TIME_TO_TRY_AGAIN, 
-                                                    save_lineages = SAVE_LINEAGES)
-                    # physics_sim.set_generation(starting_gen)
-
-                    # Setting up Softbot optimization problem
-                    softbot_problem = softbot_problem_cls(physics_sim, pop_size, run_path, orig_size_xyz=IND_SIZE) if not softbot_problem_cls is MESoftbotProblem else softbot_problem_cls(physics_sim, pop_size, run_path, orig_size_xyz=IND_SIZE)
-                    # Initializing a population of SoftBots
-                    my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
-                    
-                    # Setting up optimization algorithm
-                    algorithm = CustomNSGA2(pop_size=pop_size,
-                                    mutation=SoftbotMutation(my_pop.max_id) if experiment != "MAP-ELITES" else ME_SoftbotMutation(my_pop.max_id, pop_size), 
-                                    crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
-                    # algorithm.setup(softbot_problem, termination=('n_gen', max_gens - starting_gen + 1))
-                    algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
+                if not resume_run:
                     my_pop.start()
                     algorithm.initialization.sampling = np.array(my_pop.individuals)
-                
-                # Population.new("X", my_pop)
-                start_success = True
 
+                start_success = True
 
 
             my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics, save_checkpoint=True, checkpoint_path=run_path)

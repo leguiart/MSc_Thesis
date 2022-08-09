@@ -23,6 +23,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 
 from common.Utils import readFromJson, readFromPickle, saveToPickle, writeToJson
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
+from evosoro_pymoo.common.ICheckpoint import ICheckpoint
+from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter
 
 class MAP_Elites(GeneticAlgorithm):
@@ -42,7 +44,7 @@ class MAP_Elites(GeneticAlgorithm):
                         **kwargs)
 
 
-class MAP_ElitesArchive(IStarter, IEvaluator, object):
+class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
     def __init__(self, name : str, base_path : str, 
                 min_max_gr_li : List[tuple], 
                 extract_descriptors_func : Callable[[object], List]) -> None:
@@ -59,16 +61,11 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
         self.name = name
         self.base_path = base_path
         self.archive_path = os.path.join(self.base_path, self.name)
-        # self.obj_properties_json_path = os.path.join(self.base_path, f"ME_{self.name}_properties_backup.json")
-        # self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
-        # self.coverage = 0 if "coverage" not in self.obj_properties_backup else self.obj_properties_backup["coverage"]
-        # self.qd_score = 0 if "qd_score" not in self.obj_properties_backup else self.obj_properties_backup["qd_score"]
+
         self.coverage = 0 
         self.qd_score = 0 
-        # self.resuming_run = resuming_run
 
-        # self.save_checkpoint = save_checkpoint
-        # self.checkpoint_path = os.path.join(self.base_path, f"{name}_evaluator_checkpoint.pickle") if save_checkpoint  else ""
+        self.checkpoint_path = os.path.join(self.base_path, f"{name}_evaluator_checkpoint.pickle")
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
@@ -77,21 +74,21 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
                 shutil.rmtree(self.archive_path)
                 os.mkdir(self.archive_path)
             else:
-                self._recover_filled_elites()
+                self = readFromPickle(self.checkpoint_path)
         else:
             os.mkdir(self.archive_path)
+
+    def file_recovery(self):
+        return readFromPickle(self.checkpoint_path)
+
+    def backup(self, *args, **kwargs):
+        saveToPickle(self.checkpoint_path, self)
 
     def evaluate(self, X, *args, **kwargs):
         for ind in X:
             self.try_add(ind)
-
-        # if self.save_checkpoint:
-        #     self.backup()
-        
+     
         return X
-
-    # def backup(self):
-    #     saveToPickle(self.checkpoint_path, self)
 
     def _recover_filled_elites(self):
         stored_elites = glob.glob(f"{self.archive_path}/elite_*")
@@ -126,11 +123,6 @@ class MAP_ElitesArchive(IStarter, IEvaluator, object):
                 self.qd_score += getattr(x, quality_metric)
             else:
                 self.qd_score += getattr(x, quality_metric) - getattr(xe, quality_metric)
-
-            # self.obj_properties_backup["coverage"] = self.coverage
-            # self.obj_properties_backup["qd_score"] = self.qd_score
-
-            # writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
 
             self.filled_elites_archive[i] = 1
             saveToPickle(f"{self.archive_path}/elite_{i}.pickle", x)
