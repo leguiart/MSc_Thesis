@@ -4,6 +4,7 @@ import logging
 from typing import Dict, List, Set, Tuple
 from matplotlib.pyplot import axis
 import numpy as np
+from common.Utils import timeit
 from evosoro.softbot import SoftBot
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
@@ -40,7 +41,7 @@ class GenotypeDistanceEvaluator(IEvaluator, dict):
     def __contains__(self, __o: Tuple[str, str]) -> bool:
         return (__o[0], __o[1]) not in self.distance_cache and (__o[1], __o[0]) not in self.distance_cache
 
-
+    @timeit
     def evaluate(self, X : List[SoftBot], *args, **kwargs) -> List[SoftBot]:
         if not self.io_tags_cached:            
             for net in X[0].genotype:

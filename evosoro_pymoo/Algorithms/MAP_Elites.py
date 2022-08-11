@@ -73,8 +73,6 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
             if not resuming_run:
                 shutil.rmtree(self.archive_path)
                 os.mkdir(self.archive_path)
-            else:
-                self = readFromPickle(self.checkpoint_path)
         else:
             os.mkdir(self.archive_path)
 
