@@ -14,6 +14,7 @@
 import glob
 import random
 import re
+import subprocess
 import numpy as np
 import os
 import sys
@@ -155,6 +156,7 @@ def main(parser : argparse.ArgumentParser):
     pop_size = argv.population_size
     max_gens = argv.generations
     physics_sim = argv.physics
+    isNewExperiment = argv.new_experiment
 
 
     if experiment not in EXPERIMENT_TYPES or physics_sim not in PHYSICS_SIM_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
@@ -252,14 +254,12 @@ def main(parser : argparse.ArgumentParser):
 
     if experiment == "SO":
         seeds_json = SEEDS_JSON_SO
-        analytics_json = ANALYTICS_JSON_SO
         run_dir = RUN_DIR_SO
         run_name = RUN_NAME_SO
         softbot_problem_cls = QualitySoftbotProblem
     
     elif experiment == "QN-MOEA":
         seeds_json = SEEDS_JSON_QN
-        analytics_json = ANALYTICS_JSON_QN
         run_dir = RUN_DIR_QN
         run_name = RUN_NAME_QN
         softbot_problem_cls = QualityNoveltySoftbotProblem
@@ -267,7 +267,6 @@ def main(parser : argparse.ArgumentParser):
 
     elif experiment == "NSLC":
         seeds_json = SEEDS_JSON_NSLC
-        analytics_json = ANALYTICS_JSON_NSLC
         run_dir = RUN_DIR_NSLC
         run_name = RUN_NAME_NSLC
         softbot_problem_cls = NSLCSoftbotProblem
@@ -277,14 +276,12 @@ def main(parser : argparse.ArgumentParser):
 
     elif experiment == "MAP-ELITES":
         seeds_json = SEEDS_JSON_ME
-        analytics_json = ANALYTICS_JSON_ME
         run_dir = RUN_DIR_ME
         run_name = RUN_NAME_ME
         softbot_problem_cls = MESoftbotProblem
 
     elif experiment == "MNSLC":
         seeds_json = SEEDS_JSON_MNSLC
-        analytics_json = ANALYTICS_JSON_MNSLC
         run_dir = RUN_DIR_MNSLC
         run_name = RUN_NAME_MNSLC
         softbot_problem_cls = MNSLCSoftbotProblem
@@ -292,19 +289,20 @@ def main(parser : argparse.ArgumentParser):
         objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
         objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
     
+
+    if isNewExperiment:
+        run_dirs = glob.glob(run_dir+"*")
+
+        for dir in run_dirs:
+            subprocess.call("rm -rf " + dir, shell=True)
+
+
     runToSeedMapping = readFromJson(seeds_json)
-    runsSoFar = countFileLines(analytics_json)
+    firstRun = starting_run
 
-    if runsSoFar > 0:
-        runToAnalyticsMapping = readFirstJson(analytics_json)
-        firstRun = list(runToAnalyticsMapping.keys())
-        firstRun = int(firstRun[0]) + runsSoFar
-    else:
-        firstRun = starting_run
     
-
     for run in range(firstRun - 1, runs):
-
+        
         # Setting random seed
         logger.info(f"Starting run: {run + 1}")
         if not str(run + 1) in runToSeedMapping.keys():
@@ -324,6 +322,8 @@ def main(parser : argparse.ArgumentParser):
         env = Env(sticky_floor=0, time_between_traces=0, lattice_dimension=0.015)
 
         run_path = run_dir + str(run + 1)
+        
+
         resume_run = False
         starting_gen = 1
 
@@ -332,8 +332,15 @@ def main(parser : argparse.ArgumentParser):
                             "** WARNING ** A directory named " + run_path + " may exist already.\n"
                             "Would you like to resume possibly pending run? (y/n): ")
             if not (("Y" in response) or ("y" in response)):
-                print(f"Restarting run {run + 1}.\n"
+                response = input("****************************************************\n"
+                "Would you like to skip the run? (y/n): ")
+                if not (("Y" in response) or ("y" in response)):
+                    print(f"Restarting run {run + 1}.\n"
                      "****************************************************\n\n")
+                else:
+                    print(f"Skipping run {run + 1}.\n"
+                     "****************************************************\n\n")
+                    continue
             else:
                 resume_run = True
                 stored_bots = glob.glob(run_path + "/Gen_*")
@@ -376,8 +383,8 @@ def main(parser : argparse.ArgumentParser):
 
 
             my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics, save_checkpoint=True, checkpoint_path=run_path)
-            my_optimization.start(resuming_run = resume_run)
-
+            my_optimization.start(resuming_run = resume_run, isNewExperiment = isNewExperiment)
+            isNewExperiment = False
             # Start optimization
             my_optimization.run()
             analytics.save_archives()
@@ -398,6 +405,7 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--population_size', type=int, default=5, help="Size of the population")
     parser.add_argument('-g','--generations', type=int, default=20, help="Number of iterations the optimization algorithm will execute")
     parser.add_argument('--physics', type=str, default='CPU', help = "Type of physics engine to use: CPU (default), GPU")
+    parser.add_argument('--new_experiment', action='store_true', help = "Use in order to start an experiment from zero, i.e. purge any existing data")
     # parser.add_argument('-o', '--outputDir', type=str, default=None, help = "Path of the output log files")
 
     main(parser)

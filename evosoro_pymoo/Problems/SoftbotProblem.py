@@ -56,7 +56,7 @@ class BaseSoftbotProblem(Problem, ABC, ICheckpoint, IStarter):
                 if resuming_run:
                     self.evaluators[k] = self.evaluators[k].file_recovery()
             if issubclass(type(self.evaluators[k]), IStarter):
-                self.evaluators[k].start(resuming_run = resuming_run)
+                self.evaluators[k].start(**kwargs)
     
     def backup(self, *args, **kwargs):
         for _, evaluator in self.evaluators.items():

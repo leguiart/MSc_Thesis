@@ -40,10 +40,7 @@ class QD_Analytics(IAnalytics):
         # self.map_elites_archive_anf = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "anf_elites")
         self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
 
-        self.indicator_stats_set = list({
-            "qd-score_f",
-            "qd-score_an",
-            "coverage", 
+        self.indicator_stats_set = [
             "fitness",
             "morphology",
             "unaligned_novelty",
@@ -54,22 +51,28 @@ class QD_Analytics(IAnalytics):
             "morpho_div",
             "endpoint_div",
             "trayectory_div",
-            "endpoint_x",
-            "endpoint_y",
             "inipoint_x",
             "inipoint_y",
+            "inipoint_z",
+            "endpoint_x",
+            "endpoint_y",
+            "endpoint_z",
             "trayectory_x",
             "trayectory_y",
+            "trayectory_z",
             "morphology_active",
             "morphology_passive",
             "unaligned_novelty_archive_fit",
             "aligned_novelty_archive_fit",
             "unaligned_novelty_archive_novelty",
             "aligned_novelty_archive_novelty",
-        })
+            "qd-score_f",
+            "qd-score_an",
+            "coverage"]
 
-        self.indicator_set = list({
-            "id",
+        self.indicator_set = ["id",
+            "generation",
+            "run",
             "md5",
             "fitness",
             "unaligned_novelty",
@@ -80,32 +83,34 @@ class QD_Analytics(IAnalytics):
             "morpho_div",
             "endpoint_div",
             "trayectory_div",
-            "endpoint_x",
-            "endpoint_y",
-            "endpoint_z",
             "inipoint_x",
             "inipoint_y",
             "inipoint_z",
+            "endpoint_x",
+            "endpoint_y",
+            "endpoint_z",
             "trayectory_x",
             "trayectory_y",
+            "trayectory_z",
             "morphology_active",
-            "morphology_passive"
-        })
+            "morphology_passive"]
 
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
-   
+        isNewExperiment = kwargs["isNewExperiment"]
+
         self.map_elites_archive_f.start(resuming_run = resuming_run)
         self.map_elites_archive_an.start(resuming_run = resuming_run)
 
-        if not resuming_run:
+        if isNewExperiment:
             if os.path.exists(self.indicators_csv_path):
                 os.remove(self.indicators_csv_path)
             
             if os.path.exists(self.stats_csv_path):
                 os.remove(self.stats_csv_path)
-        else:
+        
+        if resuming_run:
             if os.path.exists(self.indicators_csv_path):
                 # Don't load the whole csv onto memory
                 with pd.read_csv(self.indicators_csv_path, chunksize=10) as reader:
@@ -127,6 +132,8 @@ class QD_Analytics(IAnalytics):
             "qd-score_an" : [0],
             "coverage" : [0], 
             "id" : [],
+            "generation" : [],
+            "run" : [],
             "md5" : [],
             "fitness" : [],
             "morphology" : [],
@@ -153,6 +160,7 @@ class QD_Analytics(IAnalytics):
             "inipoint_z": [],
             "trayectory_x": [],
             "trayectory_y": [],
+            "trayectory_z" : [],
             "morphology_active": [],
             "morphology_passive": []
         }
@@ -169,7 +177,7 @@ class QD_Analytics(IAnalytics):
         return [x.initialX, x.initialY, x.initialZ]
 
     def extract_trayectory(self, x):
-        return [x.finalX - x.initialX, x.finalY -  x.initialY]
+        return [x.finalX - x.initialX, x.finalY -  x.initialY, x.finalZ - x.finalY]
 
     
     @timeit
@@ -199,6 +207,8 @@ class QD_Analytics(IAnalytics):
             trayectory = self.extract_trayectory(ind.X)
             morphology = self.extract_morpho(ind.X)
             self.indicator_mapping["id"] += [ind.X.id]
+            self.indicator_mapping["generation"] += [self.actual_generation]
+            self.indicator_mapping["run"] += [self.run]
             self.indicator_mapping["md5"] += [ind.X.md5]
             self.indicator_mapping["endpoint"] += [endpoint]
             self.indicator_mapping["inipoint"] += [inipoint]
@@ -212,6 +222,7 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["inipoint_z"] += [inipoint[2]]
             self.indicator_mapping["trayectory_x"] += [trayectory[0]]
             self.indicator_mapping["trayectory_y"] += [trayectory[1]]
+            self.indicator_mapping["trayectory_z"] += [trayectory[2]]
             self.indicator_mapping["morphology_active"] += [morphology[0]]
             self.indicator_mapping["morphology_passive"] += [morphology[1]]
             self.indicator_mapping["fitness"] += [ind.X.fitness]
