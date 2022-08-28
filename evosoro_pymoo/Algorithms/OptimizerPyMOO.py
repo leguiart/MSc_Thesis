@@ -24,8 +24,9 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
                 algorithm : Algorithm, 
                 problem : BaseSoftbotProblem, 
                 analytics : IAnalytics = None, 
-                save_checkpoint = False,
-                checkpoint_path = '.'):
+                save_checkpoint : bool = False,
+                save_networks : bool = False,
+                checkpoint_path : str = '.'):
 
         Optimizer.__init__(self, sim, env)
         self.algorithm = algorithm
@@ -33,6 +34,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         self.analytics = analytics
         self.save_to_checkpoint = save_checkpoint
         self.checkpoint_path = checkpoint_path
+        self.save_networks = save_networks
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
@@ -56,9 +58,11 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
             self.next()
     
         # obtain the result objective from the algorithm
-        res = self.algorithm.result()
+        result_set = {}
+        result_set['res'] = self.algorithm.result()
+        result_set.update(self.problem.results())
 
-        return res
+        return result_set
 
     @timeit
     def next(self):
@@ -88,6 +92,11 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         pop.set("F", F)
         pop.set("G", G)
         set_cv(pop)
+
+        # Save networks
+        if self.save_networks:
+            pop_networks = [(ind.X.id, ind.X.genotype) for ind in pop]
+            saveToPickle(f"{self.checkpoint_path}/Gen_{self.algorithm.n_gen:04d}/Gen_{self.algorithm.n_gen:04d}_networks.pickle", pop_networks)
 
         # Extract analytics
         if self.analytics is not None:

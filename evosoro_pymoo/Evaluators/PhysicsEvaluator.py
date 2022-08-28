@@ -144,6 +144,10 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecove
         
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
+        usePhysicsCache = kwargs["usePhysicsCache"]
+        if not resuming_run:
+            if usePhysicsCache:
+                self.already_evaluated = readFromJson('experiments/physics_evaluator_cache.json')
         initialize_folder_heirarchy(self.run_directory, self.save_nets, save_lineages=self.save_lineages, resuming_run=resuming_run)
 
     def backup(self, *args, **kwargs):
@@ -399,7 +403,7 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
         for ind in pop[start_indx:]:
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
             ind.md5, root = get_vxd(self.sim, self.env[self.curr_env_idx], ind)
-
+            write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
             # don't evaluate if invalid
             if not ind.phenotype.is_valid():
                 logger.info("Skipping invalid individual")
@@ -415,14 +419,13 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     source_file = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id 
+                    dest_file = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i--md5_%s.vxa" % (self.n_batch, ind.fitness, ind.id, ind.md5)
                     if os.path.exists(source_file):
                         sub.call("cp " + source_file +
-                                " " + self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name +
-                                "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind.id), shell=True)
+                                " " + dest_file, shell=True)
 
             # otherwise evaluate with voxcraft
             else:
-                md5 = write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
 
                 if ind.id not in ids_softbot_map:
                     num_evaluated_this_gen += 1
@@ -431,8 +434,10 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                         root_str = etree.tostring(root)
                         vxd.write(root_str.decode('utf-8'))
 
-        all_done = False
+        all_done = len(ids_softbot_map) == 0
         fitness_eval_start_time = time.time()
+
+
 
         while not all_done:
             time_waiting_for_fitness = time.time() - fitness_eval_start_time
@@ -504,6 +509,9 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                                                 for rank, details in
                                                 self.objective_dict.items()]
 
+
+        # for ind in pop[start_indx:]:
+        #     ind_id = ind.id
             ind_filename_vxd = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind_id
             ind_filename_vxa = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind_id
             if os.path.exists(ind_filename_vxd):
@@ -512,17 +520,16 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             # update the run statistics and file management
             if ind.fitness > self.best_fit_so_far:
                 self.best_fit_so_far = ind.fitness
-                # self.obj_properties_backup["best_fit_so_far"] = ind.fitness
-                sub.call("cp " + ind_filename_vxa + " " + self.run_directory + "/bestSoFar/fitOnly/" + self.run_name +
-                        "--Gen_%04i--fit_%.08f--id_%05i.vxa" %
-                        (self.n_batch, ind.fitness, ind_id), shell=True)
+                file_destination = self.run_directory + "/bestSoFar/fitOnly/" + self.run_name + "--Gen_%04i--fit_%.08f--id_%05i--md5_%s.vxa" % (self.n_batch, ind.fitness, ind_id, ind.md5)
+
+                if os.path.exists(ind_filename_vxa):
+                    sub.call("cp " + ind_filename_vxa + " " + file_destination, shell=True)
 
 
             if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
-                file_source = ind_filename_vxa
-                if os.path.exists(file_source):
-                    file_destination = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i.vxa" % (self.n_batch, ind.fitness, ind_id)
-                    sub.call("mv " + file_source + " " + file_destination, shell=True)
+                if os.path.exists(ind_filename_vxa):
+                    file_destination = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i--md5_%s.vxa" % (self.n_batch, ind.fitness, ind_id, ind.md5)
+                    sub.call("mv " + ind_filename_vxa + " " + file_destination, shell=True)
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)
 

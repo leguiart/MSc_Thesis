@@ -10,8 +10,8 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["--physics", "GPU", "-e", "QN-MOEA", "-p", "10", "-g", "5000", "-r", "20"]
+            "justMyCode": true,
+            "args": ["--physics", "GPU", "-e", "NSLC", "-p", "10", "-g", "5000", "-r", "20"]
         }
     ]
 }
