@@ -36,8 +36,7 @@ class QD_Analytics(IAnalytics):
         self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, min_max_gr, self.extract_morpho)
         #2.- Elites in terms of aligned novelty
         self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho)
-        #3.- Elites in terms of both aligned novelty and fitness (Pareto-dominance)
-        # self.map_elites_archive_anf = MOMAP_ElitesArchive(min_max_gr, self.extract_morpho, "anf_elites")
+
         self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
 
         self.indicator_stats_set = [
@@ -68,7 +67,16 @@ class QD_Analytics(IAnalytics):
             "aligned_novelty_archive_novelty",
             "qd-score_f",
             "qd-score_an",
-            "coverage"]
+            "coverage",            
+            "control_cppn_nodes",
+            "control_cppn_edges",
+            "control_cppn_ws",
+            "morpho_cppn_nodes",
+            "morpho_cppn_edges",
+            "morpho_cppn_ws",
+            "simplified_gene_div",
+            "simplified_gene_ne_div",
+            "simplified_gene_nws_div"]
 
         self.indicator_set = ["id",
             "generation",
@@ -93,7 +101,16 @@ class QD_Analytics(IAnalytics):
             "trayectory_y",
             "trayectory_z",
             "morphology_active",
-            "morphology_passive"]
+            "morphology_passive",
+            "control_cppn_nodes",
+            "control_cppn_edges",
+            "control_cppn_ws",
+            "morpho_cppn_nodes",
+            "morpho_cppn_edges",
+            "morpho_cppn_ws",
+            "simplified_gene_div",
+            "simplified_gene_ne_div",
+            "simplified_gene_nws_div"]
 
 
     def start(self, **kwargs):
@@ -162,7 +179,19 @@ class QD_Analytics(IAnalytics):
             "trayectory_y": [],
             "trayectory_z" : [],
             "morphology_active": [],
-            "morphology_passive": []
+            "morphology_passive": [],
+            "control_cppn_nodes": [],
+            "control_cppn_edges": [],
+            "control_cppn_ws": [],
+            "morpho_cppn_nodes": [],
+            "morpho_cppn_edges": [],
+            "morpho_cppn_ws":[],
+            "simplified_gene":[],
+            "simplified_gene_no_edges":[],
+            "simplified_gene_no_ws":[],
+            "simplified_gene_div":[],
+            "simplified_gene_ne_div":[],
+            "simplified_gene_nws_div":[]
         }
 
 
@@ -231,6 +260,28 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["gene_diversity"] += [ind.X.gene_diversity]
             self.indicator_mapping["control_gene_div"] += [ind.X.control_gene_div]
             self.indicator_mapping["morpho_gene_div"] += [ind.X.morpho_gene_div]
+            control_cppn = ind.X.genotype.networks[0].graph
+            morpho_cppn = ind.X.genotype.networks[1].graph
+            self.indicator_mapping["control_cppn_nodes"] = control_cppn.number_of_nodes()
+            self.indicator_mapping["control_cppn_edges"] = control_cppn.number_of_edges()
+            self.indicator_mapping["control_cppn_ws"] = sum([tup[2] for tup in list(control_cppn.edges.data('weight'))])
+            self.indicator_mapping["morpho_cppn_nodes"] = morpho_cppn.number_of_nodes()
+            self.indicator_mapping["morpho_cppn_edges"] = morpho_cppn.number_of_edges()
+            self.indicator_mapping["morpho_cppn_ws"] = sum([tup[2] for tup in list(morpho_cppn.edges.data('weight'))])
+            self.indicator_mapping["simplified_gene"] += [[self.indicator_mapping["control_cppn_nodes"],
+                                                            self.indicator_mapping["control_cppn_edges"],
+                                                            self.indicator_mapping["control_cppn_ws"],
+                                                            self.indicator_mapping["morpho_cppn_nodes"],
+                                                            self.indicator_mapping["morpho_cppn_edges"],
+                                                            self.indicator_mapping["morpho_cppn_ws"]]]
+            self.indicator_mapping["simplified_gene_no_edges"] += [[self.indicator_mapping["control_cppn_nodes"],
+                                                self.indicator_mapping["control_cppn_ws"],
+                                                self.indicator_mapping["morpho_cppn_nodes"],
+                                                self.indicator_mapping["morpho_cppn_ws"]]]
+            self.indicator_mapping["simplified_gene_no_ws"] += [[self.indicator_mapping["control_cppn_nodes"],
+                                                self.indicator_mapping["control_cppn_edges"],
+                                                self.indicator_mapping["morpho_cppn_nodes"],
+                                                self.indicator_mapping["morpho_cppn_edges"]]]
             if "map_elites_archive_f" not in problem.evaluators: 
                 self.map_elites_archive_f.try_add(ind.X)
             self.map_elites_archive_an.try_add(ind.X, quality_metric="aligned_novelty")
@@ -239,7 +290,9 @@ class QD_Analytics(IAnalytics):
         self.indicator_mapping["morpho_div"]= list(np.mean(distance_matrix(self.indicator_mapping["morphology"], self.indicator_mapping["morphology"]), axis=1))
         self.indicator_mapping["endpoint_div"] = list(np.mean(distance_matrix(self.indicator_mapping["endpoint"], self.indicator_mapping["endpoint"]), axis=1))
         self.indicator_mapping["trayectory_div"] = list(np.mean(distance_matrix(self.indicator_mapping["trayectory"], self.indicator_mapping["trayectory"]), axis=1))
-
+        self.indicator_mapping["simplified_gene_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene"], self.indicator_mapping["simplified_gene"]), axis=1))
+        self.indicator_mapping["simplified_gene_ne_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene_no_edges"], self.indicator_mapping["simplified_gene_no_edges"]), axis=1))
+        self.indicator_mapping["simplified_gene_nws_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene_no_ws"], self.indicator_mapping["simplified_gene_no_ws"]), axis=1))
         self.indicator_mapping["coverage"][0] = self.map_elites_archive_f.coverage
         self.indicator_mapping["qd-score_f"][0] = self.map_elites_archive_f.qd_score
         self.indicator_mapping["qd-score_an"][0] = self.map_elites_archive_an.qd_score

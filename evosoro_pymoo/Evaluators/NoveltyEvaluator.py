@@ -23,6 +23,7 @@ from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit, writeToJson
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
+from evosoro_pymoo.common.IResults import IResults
 from evosoro_pymoo.common.IStart import IStarter
 
 
@@ -32,7 +33,7 @@ def std_is_valid(x):
     return True
 
 
-class NoveltyEvaluatorKD(IEvaluator[SoftBot], ICheckpoint, IStarter):
+class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
     """
     Novelty-search based phenotype evaluator.
     ...
@@ -149,6 +150,8 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], ICheckpoint, IStarter):
         if os.path.exists(pickle_path):
             os.remove(pickle_path)
 
+    def results(self, *args, **kwargs):
+        return self.novelty_archive
 
     @timeit
     def evaluate(self, X, *args, **kwargs):
@@ -223,12 +226,11 @@ class NSLCEvaluator(NoveltyEvaluatorKD):
 
     def __init__(self, name, base_path, novelty_name, vector_extractor, nslc_quality_name, 
                 fitness_name, novelty_threshold=30, novelty_floor=0.25, min_novelty_archive_size=1, 
-                k_neighbors=10, max_novelty_archive_size=None, max_iter=100, save_checkpoint = False):
+                k_neighbors=10, max_novelty_archive_size=None, max_iter=100):
 
         super().__init__(name, base_path, novelty_name, vector_extractor,
                         novelty_threshold, novelty_floor, min_novelty_archive_size, 
-                        k_neighbors, max_novelty_archive_size, max_iter, 
-                        save_checkpoint=save_checkpoint)
+                        k_neighbors, max_novelty_archive_size, max_iter)
         self.nslc_quality_name = nslc_quality_name
         self.fitness_name = fitness_name
 

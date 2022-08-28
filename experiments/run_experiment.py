@@ -37,7 +37,7 @@ from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAnd
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import ME_SoftbotMutation, SoftbotMutation
-from common.Utils import readFromDill, readFromJson, readFromPickle, writeToJson, countFileLines, readFirstJson
+from common.Utils import readFromDill, readFromJson, readFromPickle, saveToPickle, writeToJson, countFileLines, readFirstJson
 from common.Analytics import QD_Analytics
 
 from evosoro.base import Sim, Env, ObjectiveDict
@@ -157,6 +157,7 @@ def main(parser : argparse.ArgumentParser):
     max_gens = argv.generations
     physics_sim = argv.physics
     isNewExperiment = argv.new_experiment
+    usePhysicsCache = argv.physics_cache
 
 
     if experiment not in EXPERIMENT_TYPES or physics_sim not in PHYSICS_SIM_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
@@ -214,11 +215,10 @@ def main(parser : argparse.ArgumentParser):
     elif physics_sim == 'GPU':
         # Now specifying the objectives for the optimization.
         # Adding an objective named "fitness". This information is returned by Voxelyze
-        # in a fitness .xml file, with a tag named "NormFinalDist"
+        # in a fitness .xml file, with a tag named "fitness_score"
         objective_dict.add_objective(name="fitness", maximize=True, tag="fitness_score")
 
-        # This information is not returned by Voxelyze (tag=None): it is instead computed in Python
-        # Adding another objective called "num_voxels" for constraint reasons
+        # This information is not returned by voxcraft (tag=None): it is instead computed in Python
         objective_dict.add_objective(name="num_voxels", maximize=True, tag=None,
                                         node_func=np.count_nonzero, output_node_name="material")
 
@@ -382,11 +382,13 @@ def main(parser : argparse.ArgumentParser):
                 start_success = True
 
 
-            my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics, save_checkpoint=True, checkpoint_path=run_path)
-            my_optimization.start(resuming_run = resume_run, isNewExperiment = isNewExperiment)
+            my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics, save_networks=True, checkpoint_path=run_path)
+            my_optimization.start(resuming_run = resume_run, isNewExperiment = isNewExperiment, usePhysicsCache = usePhysicsCache)
             isNewExperiment = False
             # Start optimization
-            my_optimization.run()
+            result_set = my_optimization.run()
+            saveToPickle(os.path.join(run_path, "results_set.pickle"), result_set)
+
             analytics.save_archives()
         
     sys.exit()
@@ -405,7 +407,7 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--population_size', type=int, default=5, help="Size of the population")
     parser.add_argument('-g','--generations', type=int, default=20, help="Number of iterations the optimization algorithm will execute")
     parser.add_argument('--physics', type=str, default='CPU', help = "Type of physics engine to use: CPU (default), GPU")
+    parser.add_argument('--physics_cache', action='store_true', help = "Use existing physics cache")
     parser.add_argument('--new_experiment', action='store_true', help = "Use in order to start an experiment from zero, i.e. purge any existing data")
-    # parser.add_argument('-o', '--outputDir', type=str, default=None, help = "Path of the output log files")
 
     main(parser)
