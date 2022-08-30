@@ -418,11 +418,12 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
-                    source_file = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id 
-                    dest_file = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i--md5_%s.vxa" % (self.n_batch, ind.fitness, ind.id, ind.md5)
+                    source_file = f"{self.run_directory}/voxelyzeFiles/{self.run_name}--id_{ind.id:05d}.vxa" 
+                    dest_file = f"{self.run_directory}/Gen_{self.n_batch:04d}/{self.run_name}--Gen_{self.n_batch:04d}--fit_{ind.fitness:.08f}--id_{ind.id:05d}--md5_{ind.md5}.vxa"
                     if os.path.exists(source_file):
-                        sub.call("cp " + source_file +
+                        sub.call("mv " + source_file +
                                 " " + dest_file, shell=True)
+                        
 
             # otherwise evaluate with voxcraft
             else:
@@ -528,8 +529,9 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
             if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                 if os.path.exists(ind_filename_vxa):
-                    file_destination = self.run_directory + "/Gen_%04i/" % self.n_batch+ self.run_name + "--Gen_%04i--fit_%.08f--id_%05i--md5_%s.vxa" % (self.n_batch, ind.fitness, ind_id, ind.md5)
+                    file_destination = f"{self.run_directory}/Gen_{self.n_batch:04d}/{self.run_name}--Gen_{self.n_batch:04d}--fit_{ind.fitness:.08f}--id_{ind.id:05d}--md5_{ind.md5}.vxa"
                     sub.call("mv " + ind_filename_vxa + " " + file_destination, shell=True)
+                    # sub.call("rm " + ind_filename_vxa, shell=True)
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)
 

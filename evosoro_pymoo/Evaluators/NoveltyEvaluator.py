@@ -127,6 +127,7 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
         for ind in self.individuals_added:
             self.pickle_individual(ind)
         writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
+        self.individuals_added = []
 
 
     def _evaluate_novelty(self, individuals):
@@ -163,6 +164,7 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
         logger.debug("Starting novelty evaluation")
 
         novelty_scores, _ = self._evaluate_novelty(X)
+        
 
         for i in range(len(novelty_scores)):
             novelty = novelty_scores[i]
@@ -182,7 +184,7 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
         
         logger.debug(f"{self.items_added_in_generation} were added to {self.name} evaluator")
         logger.debug(f"{self.name} evaluator has {self.novelty_threshold} novelty threshold")
-        logger.debug(f"{self.name} evaluator has currently has {len(self.novelty_archive)} elements")
+        logger.debug(f"{self.name} evaluator currently has {len(self.novelty_archive)} elements")
         logger.debug("Finished novelty evaluation")
 
         self._adjust_archive_settings()

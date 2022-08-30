@@ -158,6 +158,9 @@ def main(parser : argparse.ArgumentParser):
     physics_sim = argv.physics
     isNewExperiment = argv.new_experiment
     usePhysicsCache = argv.physics_cache
+    save_checkpoint = argv.save_checkpoint
+    save_every = argv.save_every
+    save_networks = argv.save_networks
 
 
     if experiment not in EXPERIMENT_TYPES or physics_sim not in PHYSICS_SIM_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
@@ -382,12 +385,19 @@ def main(parser : argparse.ArgumentParser):
                 start_success = True
 
 
-            my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics, save_networks=True, checkpoint_path=run_path)
+            my_optimization = PopulationBasedOptimizerPyMOO(sim, env, algorithm, softbot_problem, analytics, save_checkpoint=save_checkpoint, 
+                                                            save_every=save_every, checkpoint_path=run_path, save_networks=save_networks)
             my_optimization.start(resuming_run = resume_run, isNewExperiment = isNewExperiment, usePhysicsCache = usePhysicsCache)
             isNewExperiment = False
             # Start optimization
             result_set = my_optimization.run()
+            # Save returned results to pickle
             saveToPickle(os.path.join(run_path, "results_set.pickle"), result_set)
+            # Save physics sim backup regardless of checkpoints being activated or not,
+            # in case of recovery of physics sim cache being done later on.
+            physics_sim.backup()
+            physics_evaluator_cache = physics_sim.already_evaluated
+            writeToJson('experiments/physics_evaluator_cache.json', physics_evaluator_cache)
 
             analytics.save_archives()
         
@@ -407,7 +417,10 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--population_size', type=int, default=5, help="Size of the population")
     parser.add_argument('-g','--generations', type=int, default=20, help="Number of iterations the optimization algorithm will execute")
     parser.add_argument('--physics', type=str, default='CPU', help = "Type of physics engine to use: CPU (default), GPU")
-    parser.add_argument('--physics_cache', action='store_true', help = "Use existing physics cache")
     parser.add_argument('--new_experiment', action='store_true', help = "Use in order to start an experiment from zero, i.e. purge any existing data")
+    parser.add_argument('--physics_cache', action='store_true', help = "Use existing physics cache")
+    parser.add_argument('--save_checkpoint', action='store_true', help = "Use to save checkpoints from which to continue in case the program is stopped")
+    parser.add_argument('-se', '--save_every', type=int, default=1, help="Save checkpoints every given number of generations")
+    parser.add_argument('--save_networks', action='store_true', help = "Use to save networks each generation")
 
     main(parser)
