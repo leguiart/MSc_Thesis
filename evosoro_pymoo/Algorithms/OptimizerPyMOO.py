@@ -24,15 +24,17 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
                 algorithm : Algorithm, 
                 problem : BaseSoftbotProblem, 
                 analytics : IAnalytics = None, 
-                save_checkpoint : bool = False,
-                save_networks : bool = False,
-                checkpoint_path : str = '.'):
+                save_checkpoint : bool = False, 
+                save_every : int = 1,
+                checkpoint_path : str = '.',
+                save_networks : bool = False):
 
         Optimizer.__init__(self, sim, env)
         self.algorithm = algorithm
         self.problem = problem
         self.analytics = analytics
         self.save_to_checkpoint = save_checkpoint
+        self.save_checkpoint_every = save_every
         self.checkpoint_path = checkpoint_path
         self.save_networks = save_networks
 
@@ -111,6 +113,6 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         # (elitism, ranking, ordering, replacement, etc.)
         self.algorithm.tell(infills=children_pop)
 
-        if self.save_to_checkpoint:
+        if self.save_to_checkpoint and self.algorithm.n_gen % self.save_checkpoint_every == 0:
             self.backup()
 

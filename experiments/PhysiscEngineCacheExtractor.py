@@ -16,7 +16,7 @@ from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, 
 
 physics_evaluator_cache = {}
 
-for experiment_type in EXPERIMENT_TYPES:
+for experiment_type in ["SO", "QN", "ME", "NSLC", "MNSLC"]:
     if experiment_type != "SO":
         run_dir_prefix = f"experiments/BodyBrain{experiment_type}Data"
     else:

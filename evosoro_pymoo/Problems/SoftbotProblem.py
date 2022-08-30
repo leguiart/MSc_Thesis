@@ -33,9 +33,7 @@ class BaseSoftbotProblem(Problem, ABC, ICheckpoint, IStarter, IResults):
         out["F"] = np.array(objectives_mat, dtype=float)
         if constraints_mat:
             out["G"] = np.array(constraints_mat, dtype=float)
-        
-        self.backup()
-    
+            
     def _doEvaluations(self, X : List[SoftBot], *args, **kwargs):
         for _, evaluator in self.evaluators.items():
             X = evaluator.evaluate(X, *args, **kwargs)
