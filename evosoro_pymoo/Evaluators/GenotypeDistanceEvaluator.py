@@ -67,13 +67,13 @@ class GenotypeDistanceEvaluator(IEvaluator, dict):
             future_to_indexes = {}
             for i in range(len(X)):              
                 for j in range(i + 1, len(X)):
-                    row_md5, col_md5 = X[i].md5, X[j].md5
-                    if row_md5 != col_md5 and (row_md5, col_md5) not in self.distance_cache:
-                        future_to_indexes[executor.submit(vector_field_distance, X[i], X[j], self.output_tags, dxdydz)] = (row_md5, col_md5)
+                    row_id, col_id = X[i].id, X[j].id
+                    if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
+                        future_to_indexes[executor.submit(vector_field_distance, X[i], X[j], self.output_tags, dxdydz)] = (row_id, col_id)
 
             for future in concurrent.futures.as_completed(future_to_indexes):
-                row_md5, col_md5 = future_to_indexes[future]
-                self[(row_md5, col_md5)] = future.result()
+                row_id, col_id = future_to_indexes[future]
+                self[(row_id, col_id)] = future.result()
 
         logger.debug("Finished vector field distance calculation...")
 
