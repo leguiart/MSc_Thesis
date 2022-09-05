@@ -133,9 +133,9 @@ def vector_field_diversity(front_indxs, fronts_indxs, pop, dist_dict):
         distance_sum = 0
         for indx2 in fronts_indxs:
             if indx1 != indx2:
-                ind1_md5 = pop[indx1].md5
-                ind2_md5 = pop[indx2].md5
-                distance_sum += np.mean(dist_dict[(ind1_md5, ind2_md5)])
+                ind1_id = pop[indx1].id
+                ind2_id = pop[indx2].id
+                distance_sum += np.mean(dist_dict[(ind1_id, ind2_id)])
 
         front_diversity += [distance_sum/len(fronts_indxs)]
     return np.array(front_diversity)

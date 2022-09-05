@@ -262,26 +262,26 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["morpho_gene_div"] += [ind.X.morpho_gene_div]
             control_cppn = ind.X.genotype.networks[0].graph
             morpho_cppn = ind.X.genotype.networks[1].graph
-            self.indicator_mapping["control_cppn_nodes"] = control_cppn.number_of_nodes()
-            self.indicator_mapping["control_cppn_edges"] = control_cppn.number_of_edges()
-            self.indicator_mapping["control_cppn_ws"] = sum([tup[2] for tup in list(control_cppn.edges.data('weight'))])
-            self.indicator_mapping["morpho_cppn_nodes"] = morpho_cppn.number_of_nodes()
-            self.indicator_mapping["morpho_cppn_edges"] = morpho_cppn.number_of_edges()
-            self.indicator_mapping["morpho_cppn_ws"] = sum([tup[2] for tup in list(morpho_cppn.edges.data('weight'))])
-            self.indicator_mapping["simplified_gene"] += [[self.indicator_mapping["control_cppn_nodes"],
-                                                            self.indicator_mapping["control_cppn_edges"],
-                                                            self.indicator_mapping["control_cppn_ws"],
-                                                            self.indicator_mapping["morpho_cppn_nodes"],
-                                                            self.indicator_mapping["morpho_cppn_edges"],
-                                                            self.indicator_mapping["morpho_cppn_ws"]]]
-            self.indicator_mapping["simplified_gene_no_edges"] += [[self.indicator_mapping["control_cppn_nodes"],
-                                                self.indicator_mapping["control_cppn_ws"],
-                                                self.indicator_mapping["morpho_cppn_nodes"],
-                                                self.indicator_mapping["morpho_cppn_ws"]]]
-            self.indicator_mapping["simplified_gene_no_ws"] += [[self.indicator_mapping["control_cppn_nodes"],
-                                                self.indicator_mapping["control_cppn_edges"],
-                                                self.indicator_mapping["morpho_cppn_nodes"],
-                                                self.indicator_mapping["morpho_cppn_edges"]]]
+            self.indicator_mapping["control_cppn_nodes"] += [control_cppn.number_of_nodes()]
+            self.indicator_mapping["control_cppn_edges"] += [control_cppn.number_of_edges()]
+            self.indicator_mapping["control_cppn_ws"] += [sum([tup[2] for tup in list(control_cppn.edges.data('weight'))])]
+            self.indicator_mapping["morpho_cppn_nodes"] += [morpho_cppn.number_of_nodes()]
+            self.indicator_mapping["morpho_cppn_edges"] += [morpho_cppn.number_of_edges()]
+            self.indicator_mapping["morpho_cppn_ws"] += [sum([tup[2] for tup in list(morpho_cppn.edges.data('weight'))])]
+            self.indicator_mapping["simplified_gene"] += [[self.indicator_mapping["control_cppn_nodes"][-1],
+                                                            self.indicator_mapping["control_cppn_edges"][-1],
+                                                            self.indicator_mapping["control_cppn_ws"][-1],
+                                                            self.indicator_mapping["morpho_cppn_nodes"][-1],
+                                                            self.indicator_mapping["morpho_cppn_edges"][-1],
+                                                            self.indicator_mapping["morpho_cppn_ws"][-1]]]
+            self.indicator_mapping["simplified_gene_no_edges"] += [[self.indicator_mapping["control_cppn_nodes"][-1],
+                                                self.indicator_mapping["control_cppn_ws"][-1],
+                                                self.indicator_mapping["morpho_cppn_nodes"][-1],
+                                                self.indicator_mapping["morpho_cppn_ws"][-1]]]
+            self.indicator_mapping["simplified_gene_no_ws"] += [[self.indicator_mapping["control_cppn_nodes"][-1],
+                                                self.indicator_mapping["control_cppn_edges"][-1],
+                                                self.indicator_mapping["morpho_cppn_nodes"][-1],
+                                                self.indicator_mapping["morpho_cppn_edges"][-1]]]
             if "map_elites_archive_f" not in problem.evaluators: 
                 self.map_elites_archive_f.try_add(ind.X)
             self.map_elites_archive_an.try_add(ind.X, quality_metric="aligned_novelty")

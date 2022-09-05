@@ -412,10 +412,9 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             elif self.env[self.curr_env_idx].actuation_variance == 0 and ind.md5 in self.already_evaluated:
                 
                 for rank, goal in self.objective_dict.items():
-                    if goal["tag"] is not None:
-                        if goal["name"] == "fitness":
-                            logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
-                        setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
+                    if goal["name"] == "fitness":
+                        logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
+                    setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     source_file = f"{self.run_directory}/voxelyzeFiles/{self.run_name}--id_{ind.id:05d}.vxa" 
@@ -485,29 +484,37 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
         for ind_id, ind in ids_softbot_map.items():
             
-            results = {rank: None for rank in range(len(self.objective_dict))}
-            for rank, details in self.objective_dict.items():
+            # results = {rank: None for rank in range(len(self.objective_dict))}
+            for _, details in self.objective_dict.items():
                 tag = details["tag"]
                 if tag is not None:
                     tag = tag.lstrip('<').rstrip('>')
                     tag_ocurrences = fitness_report.findall("./detail/" + self.run_name + "--id_%05i" % ind_id + "/" + tag)
-                    results[rank] = float(tag_ocurrences[0].text)
-
-            for rank, details in self.objective_dict.items():
-                if results[rank] is not None:
                     if details["name"] == "fitness":
-                        logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{results[rank]}")
-                    setattr(ind, details["name"], results[rank])
+                        logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{tag_ocurrences[0].text}")
+                    # results[rank] = float(tag_ocurrences[0].text)
+                    setattr(ind, details["name"], float(tag_ocurrences[0].text))
                 else:
                     for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
                         if name == details["output_node_name"]:
                             state = details_phenotype["state"]
                             setattr(ind, details["name"], details["node_func"](state))
 
+            # for rank, details in self.objective_dict.items():
+            #     if results[rank] is not None:
+            #         if details["name"] == "fitness":
+            #             logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{results[rank]}")
+            #         setattr(ind, details["name"], results[rank])
+            #     else:
+            #         for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
+            #             if name == details["output_node_name"]:
+            #                 state = details_phenotype["state"]
+            #                 setattr(ind, details["name"], details["node_func"](state))
+
 
 
             self.already_evaluated[ind.md5] = [int64Convertion(getattr(ind, details["name"]))
-                                                for rank, details in
+                                                for _, details in
                                                 self.objective_dict.items()]
 
 
