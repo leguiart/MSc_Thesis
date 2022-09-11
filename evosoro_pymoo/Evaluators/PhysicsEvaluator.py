@@ -161,7 +161,10 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecove
             logger.info(" Using environment {0} of {1}".format(self.curr_env_idx+1, len(self.env)))
     
     def file_recovery(self):
-        return readFromPickle(self.checkpoint_path)           
+        physics_sim = readFromPickle(self.checkpoint_path)   
+        physics_sim.run_directory = self.run_directory
+        physics_sim.checkpoint_path = self.checkpoint_path
+        return physics_sim
 
     @timeit
     def evaluate(self, pop, *args, **kwargs):

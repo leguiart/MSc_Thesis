@@ -14,12 +14,11 @@ from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesA
 
 
 class QD_Analytics(IAnalytics):
-    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path):
-        super().__init__()
+
+    def init_paths(self, experiment_name, json_base_path, csv_base_path):
         self.json_base_path = json_base_path
         self.csv_base_path = csv_base_path
-        self.run = run
-        self.method = method
+
         self.experiment_name = experiment_name
         self.archives_json_name = self.experiment_name + "_archives.json"
         self.archives_json_path = os.path.join(self.json_base_path, self.archives_json_name)
@@ -38,6 +37,15 @@ class QD_Analytics(IAnalytics):
         self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho)
 
         self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
+
+    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path):
+        super().__init__()
+
+        self.init_paths(experiment_name, json_base_path, csv_base_path)
+
+        self.run = run
+        self.method = method
+ 
 
         self.indicator_stats_set = [
             "fitness",
@@ -139,7 +147,9 @@ class QD_Analytics(IAnalytics):
         saveToPickle(self.checkpoint_path, self)
 
     def file_recovery(self, *args, **kwargs):
-        return readFromPickle(self.checkpoint_path)
+        analytics_from_bkp = readFromPickle(self.checkpoint_path)
+        analytics_from_bkp.init_paths(self.experiment_name, self.json_base_path, self.csv_base_path)
+        return analytics_from_bkp
 
     def init_indicator_mapping(self):
         # if self.indicator_mapping:

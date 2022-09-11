@@ -43,6 +43,9 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         if resuming_run:
             self.algorithm = readFromDill(f"{self.checkpoint_path}/algorithm_checkpoint.pickle")
             self.analytics  = self.analytics.file_recovery()
+            gen = min(self.analytics.actual_generation, self.algorithm.n_gen)
+            self.algorithm.n_gen = gen
+            self.analytics.actual_generation = gen
 
         self.problem.start(**kwargs)
         self.analytics.start(**kwargs) 
@@ -51,6 +54,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         saveToPickle(f"{self.checkpoint_path}/algorithm_checkpoint.pickle", self.algorithm)
         self.problem.backup()
         self.analytics.backup()
+
 
     @timeit
     def run(self):

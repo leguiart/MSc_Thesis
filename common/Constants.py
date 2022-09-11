@@ -11,7 +11,7 @@ POPSIZE = 15  # Population size (number of individuals in the population)
 IND_SIZE = (5, 5, 5)  # Bounding box dimensions (x,y,z). e.g. IND_SIZE = (6, 6, 6) -> workspace is a cube of 6x6x6 voxels
 SIM_TIME = 5  # (seconds), including INIT_TIME!
 INIT_TIME = 1
-DT_FRAC = .9  # Fraction of the optimal integration step. The lower, the more stable (and slower) the simulation.
+DT_FRAC = .95  # Fraction of the optimal integration step. The lower, the more stable (and slower) the simulation.
 
 TIME_TO_TRY_AGAIN = 30  # (seconds) wait this long before assuming simulation crashed and resending
 MAX_EVAL_TIME = 60  # (seconds) wait this long before giving up on evaluating this individual
@@ -31,7 +31,7 @@ ANALYTICS_JSON_SO = RUN_DIR_SO + "_analytics.json"
 # ANALYTICS_FILENAME_SO = RUN_DIR_SO + "_analytics"
 
 #QN-MOEA experiment
-RUN_DIR_QN = "experiments/BodyBrainQNData"  # Subdirectory where results are going to be generated
+RUN_DIR_QN = "/media/leguiart/LuisExtra/ExperimentsData2/BodyBrainQNData"  # Subdirectory where results are going to be generated
 RUN_NAME_QN = "BodyBrainQN"
 SEEDS_JSON_QN = RUN_DIR_QN + "_seeds.json"
 ANALYTICS_JSON_QN = RUN_DIR_QN + "_analytics.json"
