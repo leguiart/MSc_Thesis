@@ -28,7 +28,7 @@ class QD_Analytics(IAnalytics):
         self.stats_csv_path = os.path.join(self.csv_base_path, self.stats_csv_name)
         self.total_voxels = IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2]
         self.init_indicator_mapping()
-        self.actual_generation = 1
+        
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
         min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
         #1.- Elites in terms of fitness
@@ -42,7 +42,7 @@ class QD_Analytics(IAnalytics):
         super().__init__()
 
         self.init_paths(experiment_name, json_base_path, csv_base_path)
-
+        self.actual_generation = 1
         self.run = run
         self.method = method
  

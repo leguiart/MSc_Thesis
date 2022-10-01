@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--physics", "GPU", "-e", "SO", "-p", "30", "-g", "3000", "-r", "20", "--physics_cache", "--save_checkpoint", "--save_every", "10", "--save_networks"]
+            "args": ["--physics", "GPU", "-e", "NSLC", "-p", "30", "-g", "3000", "-r", "20", "--physics_cache", "--save_checkpoint", "--save_every", "10", "--save_networks"]
         }
     ]
 }

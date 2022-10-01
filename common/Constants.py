@@ -31,7 +31,7 @@ ANALYTICS_JSON_SO = RUN_DIR_SO + "_analytics.json"
 # ANALYTICS_FILENAME_SO = RUN_DIR_SO + "_analytics"
 
 #QN-MOEA experiment
-RUN_DIR_QN = "/media/leguiart/LuisExtra/ExperimentsData2/BodyBrainQNData"  # Subdirectory where results are going to be generated
+RUN_DIR_QN = "experiments/BodyBrainQNData"  # Subdirectory where results are going to be generated
 RUN_NAME_QN = "BodyBrainQN"
 SEEDS_JSON_QN = RUN_DIR_QN + "_seeds.json"
 ANALYTICS_JSON_QN = RUN_DIR_QN + "_analytics.json"
