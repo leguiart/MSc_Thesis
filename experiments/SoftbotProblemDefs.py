@@ -56,9 +56,9 @@ class GenotypeDiversityExtractor(IEvaluator[SoftBot]):
 
     def evaluate(self, X : List[SoftBot], *args, **kwargs) -> List[SoftBot]:
         for indx, individual in enumerate(X):
-            individual.gene_diversity = np.mean(self.genotypeDiversityEvaluator[indx])
             individual.control_gene_div = self.genotypeDiversityEvaluator[indx][0]
             individual.morpho_gene_div = self.genotypeDiversityEvaluator[indx][1]
+            individual.gene_diversity = self.genotypeDiversityEvaluator[indx][2]
         return X
             
 
@@ -79,7 +79,7 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
         super().__init__(physics_evaluator, n_var=1, n_obj=1)
-        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(backup_path, orig_size_xyz)
+        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
  
         # self.evaluators.update({"population_saver" : populationSaver,
@@ -108,7 +108,7 @@ class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
         super().__init__(physics_evaluator, n_var=1, n_obj=2)
-        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(backup_path, orig_size_xyz)
+        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
  
         # self.evaluators.update({"population_saver" : populationSaver,
@@ -137,7 +137,7 @@ class NSLCSoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
         super().__init__(physics_evaluator, n_var=1, n_obj=2)
-        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(backup_path, orig_size_xyz)
+        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
 
         # self.evaluators.update({"population_saver" : populationSaver,
@@ -165,7 +165,7 @@ class MESoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
         super().__init__(physics_evaluator, n_var=1, n_obj=1)
-        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(backup_path, orig_size_xyz)
+        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
         total_voxels = np.prod(orig_size_xyz)
         min_max_gr = [(0, total_voxels, total_voxels), (0, total_voxels, total_voxels)]
@@ -200,7 +200,7 @@ class MNSLCSoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
         super().__init__(physics_evaluator, n_var=1, n_obj=3)
-        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(backup_path, orig_size_xyz)
+        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
 
         # self.evaluators.update({"population_saver" : populationSaver,

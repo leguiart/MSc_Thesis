@@ -86,54 +86,94 @@ def vector_field_distance(ind1 : SoftBot, ind2 : SoftBot, output_tags : List[Set
     gene_length = len(ind1.genotype)
     gene_distances = []
 
+    # Distances between each chromosome
     for gene_index in range(gene_length):
 
-        # 1.- Form output tensors
-        # Each graph can have multiple output nodes and each output node
-        # has an associated state which contains all outputs given the design space
-        # in the form of a 3D matrix.
-        # We need to concatenate the matrices, and form a 4D tensor.
         g1 = ind1.genotype[gene_index].graph
         g2 = ind2.genotype[gene_index].graph
-        tensor1 = []
-        tensor2 = []
+        matrix1 = []
+        matrix2 = []
 
         for output_name in output_tags[gene_index]:
-            tensor1 += [g1.nodes[output_name]["state"]]
-            tensor2 += [g2.nodes[output_name]["state"]]
+            matrix1 += [g1.nodes[output_name]["state"].flatten()]
+            matrix2 += [g2.nodes[output_name]["state"].flatten()]
 
-        tensor1 = np.array(tensor1).T
-        tensor2 = np.array(tensor2).T
-
-
+        # tensor1 = np.array(tensor1).T
+        # tensor2 = np.array(tensor2).T
         
-        # t1_norm = np.sqrt(np.sum(tensor1**2, axis = 3))
-        # t2_norm = np.sqrt(np.sum(tensor2**2, axis = 3))
-        # cos_sim = (np.sum(tensor1 * tensor2, axis = 3))/(t1_norm*t2_norm)
-        # cos_dist_gauss = np.exp(1 - cos_sim)
-        # cos_dist_gauss_norm = (cos_dist_gauss - 1)/(np.exp(2) - 1)
+        matrix1 = np.array(matrix1)
+        matrix2 = np.array(matrix2)
 
-        # cos_sim_normalized = (cos_sim + 1)/2
-        # cos_dist = 1 - cos_sim_normalized
+        matrix_diff = matrix1 - matrix2
+        vect_dist = np.sum(matrix_diff**2, axis=0)*dxdydz
 
-        tensor_diff = tensor1 - tensor2
-        vect_dist = np.sum(tensor_diff**2, axis=3)*dxdydz
-        # magn_dist_gauss = 1 - np.exp(-vect_dist)
-
-        # magn_sim = np.abs(t1_norm - t2_norm)
-        # magn_sim_normalized = np.nan_to_num((magn_sim - np.min(magn_sim))/(np.max(magn_sim) - np.min(magn_sim)), nan=1.)
-        # magn_dist = 1 - magn_sim_normalized
-
-        # dist = 1/2*(cos_dist + magn_dist)
-
-        # dist = 1/2 * (cos_dist_gauss_norm + magn_dist_gauss)
-
-        # dist = np.sqrt(np.tensordot(tensor1 - tensor2, tensor1 - tensor2, axis = 3))
-        # dist = np.sqrt(np.sum((tensor1 - tensor2)**2, axis = 3))
 
         gene_distances += [np.sqrt(np.sum(vect_dist))]
+    
+    matrix1 = []
+    matrix2 = []
+    # Distances between all chromosomes
+    for gene_index in range(gene_length):
+
+        g1 = ind1.genotype[gene_index].graph
+        g2 = ind2.genotype[gene_index].graph
+
+
+        for output_name in output_tags[gene_index]:
+            matrix1 += [g1.nodes[output_name]["state"].flatten()]
+            matrix2 += [g2.nodes[output_name]["state"].flatten()]
+        
+    matrix1 = np.array(matrix1)
+    matrix2 = np.array(matrix2)
+
+    tensor_diff = matrix1 - matrix2
+    vect_dist = np.sum(tensor_diff**2, axis=0)*dxdydz
+
+
+    gene_distances += [np.sqrt(np.sum(vect_dist))]
 
 
     return gene_distances     
 
  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# t1_norm = np.sqrt(np.sum(tensor1**2, axis = 3))
+# t2_norm = np.sqrt(np.sum(tensor2**2, axis = 3))
+# cos_sim = (np.sum(tensor1 * tensor2, axis = 3))/(t1_norm*t2_norm)
+# cos_dist_gauss = np.exp(1 - cos_sim)
+# cos_dist_gauss_norm = (cos_dist_gauss - 1)/(np.exp(2) - 1)
+
+# cos_sim_normalized = (cos_sim + 1)/2
+# cos_dist = 1 - cos_sim_normalized
+
+# magn_dist_gauss = 1 - np.exp(-vect_dist)
+
+# magn_sim = np.abs(t1_norm - t2_norm)
+# magn_sim_normalized = np.nan_to_num((magn_sim - np.min(magn_sim))/(np.max(magn_sim) - np.min(magn_sim)), nan=1.)
+# magn_dist = 1 - magn_sim_normalized
+
+# dist = 1/2*(cos_dist + magn_dist)
+
+# dist = 1/2 * (cos_dist_gauss_norm + magn_dist_gauss)
+
+# dist = np.sqrt(np.tensordot(tensor1 - tensor2, tensor1 - tensor2, axis = 3))
+# dist = np.sqrt(np.sum((tensor1 - tensor2)**2, axis = 3))
