@@ -223,6 +223,7 @@ def main():
                             generation_nns = None
                         if generation_nns:
                             genotypeDiversityEvaluator.evaluate(generation_nns)
+                            generation_nns = sorted(generation_nns, key=lambda x : x[0])
                             for id, _ in generation_nns:
                                 diversity = genotypeDiversityEvaluator[id]
                                 df_dict["Id"] += [id]
