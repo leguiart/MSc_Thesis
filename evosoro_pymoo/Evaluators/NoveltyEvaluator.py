@@ -198,7 +198,9 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
 
             self.novelty_archive.sort(key = lambda x : getattr(x, self.novelty_name))
 
-            for _ in range(len(self.novelty_archive) - self.max_novelty_archive_size):
+            novelty_archive_size = len(self.novelty_archive)
+
+            for _ in range(novelty_archive_size - self.max_novelty_archive_size):
                 removed = self.novelty_archive.pop(0)
                 self.remove_individual_from_backup(removed)
 

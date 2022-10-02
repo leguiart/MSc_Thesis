@@ -8,11 +8,12 @@ from common.Utils import timeit
 from evosoro.softbot import SoftBot
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
+from evosoro_pymoo.common.IStateCleaner import IStateCleaning
 
 logger = logging.getLogger(f"__main__.{__name__}")
 np.seterr(divide='ignore', invalid='ignore')
 
-class GenotypeDistanceEvaluator(IEvaluator, dict):
+class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
 
     def __init__(self, orig_size_xyz = (6,6,6)) -> None:
         super().__init__()
@@ -63,21 +64,37 @@ class GenotypeDistanceEvaluator(IEvaluator, dict):
         logger.debug("Starting vector field distance calculation...")
 
         dxdydz = self.dx*self.dy*self.dz
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            future_to_indexes = {}
-            for i in range(len(X)):              
-                for j in range(i + 1, len(X)):
-                    row_id, col_id = X[i].id, X[j].id
-                    if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
-                        future_to_indexes[executor.submit(vector_field_distance, X[i], X[j], self.output_tags, dxdydz)] = (row_id, col_id)
+        for i in range(len(X)):              
+            for j in range(i + 1, len(X)):
+                row_id, col_id = X[i].id, X[j].id
+                if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
+                    self[(row_id, col_id)] = vector_field_distance(X[i], X[j], self.output_tags, dxdydz)
+        # with concurrent.futures.ProcessPoolExecutor() as executor:
+        #     future_to_indexes = {}
+        #     for i in range(len(X)):              
+        #         for j in range(i + 1, len(X)):
+        #             row_id, col_id = X[i].id, X[j].id
+        #             if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
+        #                 future_to_indexes[executor.submit(vector_field_distance, X[i], X[j], self.output_tags, dxdydz)] = (row_id, col_id)
 
-            for future in concurrent.futures.as_completed(future_to_indexes):
-                row_id, col_id = future_to_indexes[future]
-                self[(row_id, col_id)] = future.result()
+        #     for future in concurrent.futures.as_completed(future_to_indexes):
+        #         row_id, col_id = future_to_indexes[future]
+        #         self[(row_id, col_id)] = future.result()
 
         logger.debug("Finished vector field distance calculation...")
 
         return X
+
+    def clean(self, X : List[SoftBot], pop_size : int):
+        new_dist_dict = {}
+        for i in range(pop_size):
+            id1 = X[i].id
+            for j in range(i + 1, pop_size):
+                id2 = X[j].id
+                if (id1, id2) in self:
+                    new_dist_dict[(id1, id2)] = self[(id2, id2)]
+        self.distance_cache = new_dist_dict
+
 
 
 
