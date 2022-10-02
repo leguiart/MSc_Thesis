@@ -109,13 +109,19 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
 
         # Save networks
         if self.save_networks:
-            pop_networks = [(ind.X.id, ind.X.genotype) for ind in pop]
+            if self.algorithm.is_initialized:
+                pop_networks = [(ind.X.id, ind.X.genotype) for ind in parent_pop]
+            else:
+                pop_networks = [(ind.X.id, ind.X.genotype) for ind in pop]
             saveToPickle(f"{self.checkpoint_path}/Gen_{self.algorithm.n_gen:04d}/Gen_{self.algorithm.n_gen:04d}_networks.pickle", pop_networks)
 
         # Extract analytics
         if self.analytics is not None:
             logger.debug("Collecting analytics data")
-            self.analytics.notify(children_pop, self.problem)
+            if self.algorithm.is_initialized:
+                self.analytics.notify(parent_pop, self.problem)
+            else:
+                self.analytics.notify(pop, self.problem)
             logger.debug("Finished collecting analytics data")
 
         logger.info("Individuals evaluation finished")  # record total eval time in log

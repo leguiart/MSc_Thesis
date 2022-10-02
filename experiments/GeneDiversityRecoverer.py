@@ -207,23 +207,29 @@ def main():
         div_csv_path = "/media/leguiart/LuisExtra/ExperimentsData2/gene_div.csv"
         for run_index, run_dir in enumerate(run_dirs):
             df_dict = {"Id":[], "control_div":[], "morpho_div":[], "gene_div":[], "Generation":[], "Run":[], "Method":[]}
+            res_set_path = os.path.join(run_dir, "results_set.pickle")
+
             if os.path.isdir(run_dir):
                 genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz = IND_SIZE)
                 stored_bots = glob.glob(run_dir + "/Gen_*")
                 gen_lst = [int(str.lstrip(str(str.split(stored_bot, '_')[-1]), '0')) for stored_bot in stored_bots]
                 gen_lst.sort()
                 max_gens = min(3000, len(gen_lst))
-                for gen in gen_lst[0:max_gens]:
+
+                for gen in gen_lst[:max_gens]:
                     gen_path = os.path.join(run_dir, f"Gen_{gen:04d}")
                     if os.path.isdir(gen_path):
                         nn_backup_path = os.path.join(gen_path, f"Gen_{gen:04d}_networks.pickle")
+                        
                         try:
                             generation_nns = readFromPickle(nn_backup_path)
                         except:
                             generation_nns = None
                         if generation_nns:
                             genotypeDiversityEvaluator.evaluate(generation_nns)
-                            for id, _ in generation_nns:
+                            parents = generation_nns[:len(generation_nns)//2]
+                            
+                            for id, _ in parents:
                                 diversity = genotypeDiversityEvaluator[id]
                                 df_dict["Id"] += [id]
                                 df_dict["control_div"] += [diversity[0]]
@@ -232,6 +238,28 @@ def main():
                                 df_dict["Generation"] += [gen]
                                 df_dict["Run"] += [run_index + 1]
                                 df_dict["Method"] += [experiment_type]
+                
+                try:
+                    res_set = readFromPickle(res_set_path)
+                except:
+                    res_set = None
+
+                if res_set:
+                    res_pop = res_set['res'].pop
+                    res_pop = [(ind.X.id, ind.X.genotype) for ind in res_pop]
+                    genotypeDiversityEvaluator.evaluate(res_pop)
+                    parents = res_pop[:len(res_pop)//2]
+                    for id, _ in parents:
+                        diversity = genotypeDiversityEvaluator[id]
+                        df_dict["Id"] += [id]
+                        df_dict["control_div"] += [diversity[0]]
+                        df_dict["morpho_div"] += [diversity[1]]
+                        df_dict["gene_div"] += [diversity[2]]
+                        df_dict["Generation"] += [max_gens]
+                        df_dict["Run"] += [run_index + 1]
+                        df_dict["Method"] += [experiment_type]
+     
+
                 pd.DataFrame(df_dict).to_csv(div_csv_path, mode='a', header=not os.path.exists(div_csv_path), index = False)
 
                             
