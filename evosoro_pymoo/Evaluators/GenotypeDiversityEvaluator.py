@@ -7,11 +7,12 @@ import numpy as np
 from evosoro_pymoo.Evaluators.GenotypeDistanceEvaluator import GenotypeDistanceEvaluator
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit
+from evosoro_pymoo.common.IStateCleaner import IStateCleaning
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
 
-class GenotypeDiversityEvaluator(IEvaluator, object):
+class GenotypeDiversityEvaluator(IEvaluator, IStateCleaning, object):
 
     def __init__(self, orig_size_xyz = (6,6,6)) -> None:
         super().__init__()
@@ -39,6 +40,9 @@ class GenotypeDiversityEvaluator(IEvaluator, object):
             self.gene_div_matrix += [list(gene_diversity)]
 
         return X
+
+    def clean(self, *args, **kwargs):
+        self.genotypeDistanceEvaluator.clean(args[0], kwargs['pop_size'])
 
             
  

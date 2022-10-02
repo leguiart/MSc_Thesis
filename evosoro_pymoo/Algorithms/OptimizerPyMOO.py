@@ -16,6 +16,7 @@ from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from common.Utils import readFromDill, saveToDill, saveToPickle, timeit
 from common.IAnalytics import IAnalytics
 from evosoro_pymoo.common.IStart import IStarter
+from evosoro_pymoo.common.IStateCleaner import IStateCleaning
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
@@ -90,9 +91,16 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         # evaluate the individuals using the algorithm's evaluator (necessary to count evaluations for termination)
         logger.info("Starting individuals evaluation")
         mat_pop = []
+        lst_pop = []
         for ind in pop:
+            lst_pop += [ind.X for ind in pop]
             mat_pop += [np.array([ind])]
         mat_pop = np.array(mat_pop)
+
+        if issubclass(type(self.problem), IStateCleaning):
+            if self.algorithm.is_initialized:
+                self.problem.clean(lst_pop, pop_size = len(parent_pop))
+
 
         F, G, _ = self.algorithm.evaluator.eval(self.problem, mat_pop, pop_size = len(children_pop))
         pop.set("F", F)

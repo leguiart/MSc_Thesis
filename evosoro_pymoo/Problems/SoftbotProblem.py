@@ -12,10 +12,11 @@ from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IResults import IResults
 from evosoro_pymoo.common.IStart import IStarter
+from evosoro_pymoo.common.IStateCleaner import IStateCleaning
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
-class BaseSoftbotProblem(Problem, ABC, ICheckpoint, IStarter, IResults):
+class BaseSoftbotProblem(Problem, ICheckpoint, IStarter, IResults, IStateCleaning, ABC):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, n_var=-1, n_obj=1, n_constr=0):
         super().__init__(n_var, n_obj, n_constr)
@@ -67,4 +68,8 @@ class BaseSoftbotProblem(Problem, ABC, ICheckpoint, IStarter, IResults):
                 result_set[k] = self.evaluators[k].results(*args, **kwargs)
         return result_set
 
+    def clean(self, *args, **kwargs):
+        for k in self.evaluators.keys():
+            if issubclass(type(self.evaluators[k]), IStateCleaning):
+                self.evaluators[k].clean(*args, **kwargs)
 
