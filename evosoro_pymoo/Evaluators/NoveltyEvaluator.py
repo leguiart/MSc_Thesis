@@ -127,7 +127,6 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
         for ind in self.individuals_added:
             self.pickle_individual(ind)
         writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
-        self.individuals_added = []
 
 
     def _evaluate_novelty(self, individuals):
@@ -162,7 +161,8 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
         """
 
         logger.debug("Starting novelty evaluation")
-
+        
+        self.individuals_added = []
         novelty_scores, _ = self._evaluate_novelty(X)
         
 
