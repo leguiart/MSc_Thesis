@@ -25,24 +25,27 @@ import pickle
 from functools import partial
 from pymoo.core.evaluator import Evaluator
 from pymoo.util.misc import termination_from_tuple
-from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival
+from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival, TournamentSelection, binary_tournament
 from dotenv import load_dotenv
+from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive
+from evosoro_pymoo.Algorithms.ME_Selection import MESelection
+from evosoro_pymoo.Algorithms.ME_Survival import MESurvival
 
 load_dotenv()
 sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
 
-from common.Constants import *
+from experiments.Constants import *
 from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
 from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAndVectorFieldDiversitySurvival
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
 from evosoro_pymoo.Operators.Mutation import ME_SoftbotMutation, SoftbotMutation
 from common.Utils import readFromDill, readFromJson, readFromPickle, saveToPickle, writeToJson, countFileLines, readFirstJson
-from common.Analytics import QD_Analytics
+from experiments.Analytics.Analytics import QD_Analytics
 
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
-from evosoro.softbot import Population as SoftbotPopulation
+from evosoro.softbot import Population as SoftbotPopulation, SoftBot
 from SoftbotProblemDefs import QualitySoftbotProblem, QualityNoveltySoftbotProblem, MNSLCSoftbotProblem, NSLCSoftbotProblem, MESoftbotProblem
 from Genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
 # from BodyBrainCommon import runBodyBrain
@@ -146,6 +149,9 @@ class CustomNSGA2(NSGA2):
 
         return self 
 
+def extract_morpho(x : SoftBot):
+    return [x.active, x.passive]  
+
 def main(parser : argparse.ArgumentParser):
 
 
@@ -170,7 +176,8 @@ def main(parser : argparse.ArgumentParser):
     
     genotype_cls = BodyBrainGenotypeIndirect
     phenotype_cls = SimplePhenotypeIndirect
-    nsga2_survival = RankAndCrowdingSurvival()
+    ga_survival = RankAndCrowdingSurvival()
+    ga_selection = TournamentSelection(func_comp=binary_tournament)
     softbot_problem_cls = None
     physics_sim_cls = None
 
@@ -251,8 +258,6 @@ def main(parser : argparse.ArgumentParser):
         objective_dict.add_objective(name="morpho_gene_div", maximize=True, tag=None)
 
 
-        
-
         physics_sim_cls = VoxcraftPhysicsEvaluator
 
     if experiment == "SO":
@@ -273,7 +278,7 @@ def main(parser : argparse.ArgumentParser):
         run_dir = RUN_DIR_NSLC
         run_name = RUN_NAME_NSLC
         softbot_problem_cls = NSLCSoftbotProblem
-        nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
+        ga_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
         objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
         objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
 
@@ -281,14 +286,16 @@ def main(parser : argparse.ArgumentParser):
         seeds_json = SEEDS_JSON_ME
         run_dir = RUN_DIR_ME
         run_name = RUN_NAME_ME
-        softbot_problem_cls = MESoftbotProblem
+        # softbot_problem_cls = MESoftbotProblem
+        softbot_problem_cls = QualitySoftbotProblem
+
 
     elif experiment == "MNSLC":
         seeds_json = SEEDS_JSON_MNSLC
         run_dir = RUN_DIR_MNSLC
         run_name = RUN_NAME_MNSLC
         softbot_problem_cls = MNSLCSoftbotProblem
-        nsga2_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
+        ga_survival = RankAndVectorFieldDiversitySurvival(orig_size_xyz=IND_SIZE)
         objective_dict.add_objective(name="unaligned_neighbors", maximize=True, tag=None)
         objective_dict.add_objective(name="nslc_quality", maximize=True, tag=None)
     
@@ -326,6 +333,13 @@ def main(parser : argparse.ArgumentParser):
 
         run_path = run_dir + str(run + 1)
         
+        if experiment == "MAP-ELITES":
+            total_voxels = np.prod(IND_SIZE)
+            min_max_gr = [(0, total_voxels, total_voxels), (0, total_voxels, total_voxels)]       
+
+            me_archive = MAP_ElitesArchive("f_elites", run_path, min_max_gr, extract_morpho)
+            ga_survival = MESurvival(me_archive)
+            ga_selection = MESelection(me_archive)
 
         resume_run = False
         starting_gen = 1
@@ -369,11 +383,21 @@ def main(parser : argparse.ArgumentParser):
 
             # Initializing a population of SoftBots
             my_pop = SoftbotPopulation(objective_dict, genotype_cls, phenotype_cls, pop_size=pop_size)
+
+            # if experiment == "MAP-ELITES":
+            #     softbot_mutation = ME_SoftbotMutation(my_pop.max_id, pop_size)     
+            # else:
+            softbot_mutation = SoftbotMutation(my_pop.max_id)
+
             # Setting up optimization algorithm
             algorithm = CustomNSGA2(pop_size=pop_size,
-                            mutation=SoftbotMutation(my_pop.max_id) if experiment != "MAP-ELITES" else ME_SoftbotMutation(my_pop.max_id, pop_size), 
-                            crossover=DummySoftbotCrossover(), survival=nsga2_survival, eliminate_duplicates=False)
-            algorithm.setup(softbot_problem, termination=('n_gen', max_gens))
+                            mutation=softbot_mutation, 
+                            crossover=DummySoftbotCrossover(), 
+                            survival=ga_survival, 
+                            selection=ga_selection, 
+                            eliminate_duplicates=False)
+
+            algorithm.setup(softbot_problem, termination=('n_gen', max_gens + 1))
 
             while not start_success and start_attempts < 5:
                 start_attempts += 1

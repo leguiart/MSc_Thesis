@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 # create file handler which logs only warning level messages
 fh = logging.FileHandler('diversity.log')
-fh.setLevel(logging.INFO)
+fh.setLevel(logging.WARNING)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
@@ -32,7 +32,7 @@ logger.addHandler(ch)
 load_dotenv()
 sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
 
-from common.Constants import *
+from experiments.Constants import *
 from common.Utils import readFromPickle, timeit, writeToJson
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro.softbot import Genotype, Phenotype
@@ -209,12 +209,34 @@ def main():
             df_dict = {"Id":[], "control_div":[], "morpho_div":[], "gene_div":[], "Generation":[], "Run":[], "Method":[]}
             res_set_path = os.path.join(run_dir, "results_set.pickle")
 
+     
             if os.path.isdir(run_dir):
                 genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz = IND_SIZE)
                 stored_bots = glob.glob(run_dir + "/Gen_*")
                 gen_lst = [int(str.lstrip(str(str.split(stored_bot, '_')[-1]), '0')) for stored_bot in stored_bots]
                 gen_lst.sort()
                 max_gens = min(3000, len(gen_lst))
+                try:
+                    res_set = readFromPickle(res_set_path)
+                except:
+                    res_set = None
+
+                if res_set:
+                    res_pop = res_set['res'].pop
+                    res_pop = [(ind.X.id, ind.X.genotype) for ind in res_pop]
+                    genotypeDiversityEvaluator.evaluate(res_pop)
+                    for id, _ in res_pop:
+                        diversity = genotypeDiversityEvaluator[id]
+                        df_dict["Id"] += [id]
+                        df_dict["control_div"] += [diversity[0]]
+                        df_dict["morpho_div"] += [diversity[1]]
+                        df_dict["gene_div"] += [diversity[2]]
+                        df_dict["Generation"] += [max_gens]
+                        df_dict["Run"] += [run_index + 1]
+                        df_dict["Method"] += [experiment_type]
+
+                pd.DataFrame(df_dict).to_csv(div_csv_path, mode='a', header=not os.path.exists(div_csv_path), index = False)
+                run_not_included = False
 
                 for gen in gen_lst[:max_gens]:
                     gen_path = os.path.join(run_dir, f"Gen_{gen:04d}")
@@ -238,29 +260,13 @@ def main():
                                 df_dict["Generation"] += [gen]
                                 df_dict["Run"] += [run_index + 1]
                                 df_dict["Method"] += [experiment_type]
+                        else:
+                            run_not_included = True
+                            break
                 
-                try:
-                    res_set = readFromPickle(res_set_path)
-                except:
-                    res_set = None
 
-                if res_set:
-                    res_pop = res_set['res'].pop
-                    res_pop = [(ind.X.id, ind.X.genotype) for ind in res_pop]
-                    genotypeDiversityEvaluator.evaluate(res_pop)
-                    parents = res_pop[:len(res_pop)//2]
-                    for id, _ in parents:
-                        diversity = genotypeDiversityEvaluator[id]
-                        df_dict["Id"] += [id]
-                        df_dict["control_div"] += [diversity[0]]
-                        df_dict["morpho_div"] += [diversity[1]]
-                        df_dict["gene_div"] += [diversity[2]]
-                        df_dict["Generation"] += [max_gens]
-                        df_dict["Run"] += [run_index + 1]
-                        df_dict["Method"] += [experiment_type]
-     
 
-                pd.DataFrame(df_dict).to_csv(div_csv_path, mode='a', header=not os.path.exists(div_csv_path), index = False)
+                
 
                             
 

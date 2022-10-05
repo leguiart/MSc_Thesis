@@ -169,7 +169,6 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecove
     @timeit
     def evaluate(self, pop, *args, **kwargs):
         self.update_env()        
-        self.n_batch += 1
         return pop
 
 
@@ -194,7 +193,7 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
     @timeit
     def evaluate(self, pop, *args, **kwargs):
         pop_size = kwargs['pop_size']
-
+        self.n_batch = kwargs['n_gen']
         if len(pop) == pop_size:
             start_indx = 0
         elif len(pop) > pop_size:
@@ -388,6 +387,7 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
     @timeit
     def evaluate(self, pop, *args, **kwargs):
         pop_size = kwargs['pop_size']
+        self.n_batch = kwargs['n_gen']
 
         if len(pop) == pop_size:
             start_indx = 0

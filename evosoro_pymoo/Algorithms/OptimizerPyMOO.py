@@ -14,7 +14,7 @@ from evosoro.tools.algorithms import Optimizer
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from common.Utils import readFromDill, saveToDill, saveToPickle, timeit
-from common.IAnalytics import IAnalytics
+from evosoro_pymoo.common.IAnalytics import IAnalytics
 from evosoro_pymoo.common.IStart import IStarter
 from evosoro_pymoo.common.IStateCleaner import IStateCleaning
 
@@ -102,7 +102,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
                 self.problem.clean(lst_pop, pop_size = len(parent_pop))
 
 
-        F, G, _ = self.algorithm.evaluator.eval(self.problem, mat_pop, pop_size = len(children_pop))
+        F, G, _ = self.algorithm.evaluator.eval(self.problem, mat_pop, pop_size = len(children_pop), n_gen = self.algorithm.n_gen)
         pop.set("F", F)
         pop.set("G", G)
         set_cv(pop)
@@ -110,18 +110,16 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         # Save networks
         if self.save_networks:
             if self.algorithm.is_initialized:
-                pop_networks = [(ind.X.id, ind.X.genotype) for ind in parent_pop]
-            else:
                 pop_networks = [(ind.X.id, ind.X.genotype) for ind in pop]
-            saveToPickle(f"{self.checkpoint_path}/Gen_{self.algorithm.n_gen:04d}/Gen_{self.algorithm.n_gen:04d}_networks.pickle", pop_networks)
+                saveToPickle(f"{self.checkpoint_path}/Gen_{self.algorithm.n_gen:04d}/Gen_{self.algorithm.n_gen:04d}_networks.pickle", pop_networks)
 
         # Extract analytics
         if self.analytics is not None:
             logger.debug("Collecting analytics data")
             if self.algorithm.is_initialized:
-                self.analytics.notify(parent_pop, self.problem)
+                self.analytics.notify(self.algorithm, pop = parent_pop, child_pop = children_pop)
             else:
-                self.analytics.notify(pop, self.problem)
+                self.analytics.notify(self.algorithm, pop = pop, child_pop = pop)
             logger.debug("Finished collecting analytics data")
 
         logger.info("Individuals evaluation finished")  # record total eval time in log

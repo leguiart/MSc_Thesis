@@ -1,13 +1,15 @@
 
+from inspect import isclass
 import numpy as np
 import pandas as pd
 import os
 from scipy.spatial import distance_matrix
 from pymoo.core.callback import Callback
 from typing import List
+from evosoro_pymoo.Algorithms.ME_Survival import MESurvival
 
-from common.Constants import *
-from common.IAnalytics import IAnalytics
+from experiments.Constants import *
+from evosoro_pymoo.common.IAnalytics import IAnalytics
 from common.Utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
 
@@ -220,10 +222,28 @@ class QD_Analytics(IAnalytics):
 
     
     @timeit
-    def notify(self, pop, problem):
+    def notify(self, algorithm, **kwargs):
+        problem = algorithm.problem
+        self.actual_generation = algorithm.n_gen
+        pop = kwargs['pop']
+        child_pop = kwargs['child_pop']
+        
+        self.init_indicator_mapping()
 
-        if "map_elites_archive_f" in problem.evaluators:
-            self.map_elites_archive_f = problem.evaluators["map_elites_archive_f"]
+        self.map_elites_archive_an.update_existing([ind.X for ind in child_pop], problem.evaluators["aligned_novelty"])
+
+        add_to_me_archive = True
+        if issubclass(type(algorithm.survival), MESurvival):
+            add_to_me_archive = False
+            self.map_elites_archive_f = algorithm.survival.me_archive
+
+        for ind in child_pop:
+            if add_to_me_archive: 
+                self.map_elites_archive_f.try_add(ind.X)
+            self.map_elites_archive_an.try_add(ind.X, quality_metric="aligned_novelty")
+
+        if not algorithm.is_initialized:
+            return
 
         for individual in problem.evaluators["aligned_novelty"].novelty_archive:
             self.indicator_mapping["aligned_novelty_archive_novelty"] += [individual.aligned_novelty]
@@ -238,7 +258,7 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["unaligned_novelty_archive_novelty"] += [individual.unaligned_novelty]
             self.indicator_mapping["unaligned_novelty_archive_fit"] += [individual.fitness]
 
-        self.map_elites_archive_an.update_existing([ind.X for ind in pop], problem.evaluators["aligned_novelty"])
+
 
         for ind in pop:
             endpoint = self.extract_endpoint(ind.X)
@@ -292,9 +312,9 @@ class QD_Analytics(IAnalytics):
                                                 self.indicator_mapping["control_cppn_edges"][-1],
                                                 self.indicator_mapping["morpho_cppn_nodes"][-1],
                                                 self.indicator_mapping["morpho_cppn_edges"][-1]]]
-            if "map_elites_archive_f" not in problem.evaluators: 
-                self.map_elites_archive_f.try_add(ind.X)
-            self.map_elites_archive_an.try_add(ind.X, quality_metric="aligned_novelty")
+            
+        
+
 
 
         self.indicator_mapping["morpho_div"]= list(np.mean(distance_matrix(self.indicator_mapping["morphology"], self.indicator_mapping["morphology"]), axis=1))
@@ -313,8 +333,7 @@ class QD_Analytics(IAnalytics):
         stats_df = self.indicator_stats_df()
         stats_df.to_csv(self.stats_csv_path, mode='a', header=not os.path.exists(self.stats_csv_path), index = False)
 
-        self.init_indicator_mapping()
-        self.actual_generation+=1
+        
 
     
     def save_archives(self):

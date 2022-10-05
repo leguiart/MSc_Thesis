@@ -10,8 +10,8 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": ["--physics", "GPU", "-e", "NSLC", "-p", "30", "-g", "3000", "-r", "20", "--physics_cache", "--save_checkpoint", "--save_every", "10", "--save_networks"]
+            "justMyCode": false,
+            "args": ["--physics", "GPU", "-e", "MAP-ELITES", "-p", "10", "-g", "10", "-r", "20", "--physics_cache", "--save_checkpoint", "--save_every", "1", "--save_networks"]
         }
     ]
 }

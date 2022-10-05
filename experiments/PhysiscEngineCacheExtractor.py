@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
 
-from common.Constants import *
+from experiments.Constants import *
 from common.Utils import readFromPickle, writeToJson
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
 

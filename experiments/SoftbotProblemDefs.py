@@ -6,7 +6,7 @@ import subprocess
 import numpy as np
 from typing import List
 
-from common.Constants import *
+from experiments.Constants import *
 from evosoro.softbot import SoftBot
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive
 from evosoro_pymoo.Evaluators.GenotypeDistanceEvaluator import GenotypeDistanceEvaluator
@@ -179,8 +179,8 @@ class MESoftbotProblem(BaseSoftbotProblem):
             "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", backup_path, "unaligned_novelty", unaligned_vector, 
                                                     min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, 
                                                     k_neighbors=20, novelty_threshold=25.),
-            "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
-            "map_elites_archive_f" : MAP_ElitesArchive("f_elites", backup_path, min_max_gr, self.extract_morpho)
+            "genotype_diversity_evaluator" : genotypeDiversityEvaluator
+            # "map_elites_archive_f" : MAP_ElitesArchive("f_elites", backup_path, min_max_gr, self.extract_morpho)
         })
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:

@@ -10,11 +10,11 @@ from pymoo.core.population import Population
 
 # Appending repo's root dir in the python path to enable subsequent imports
 from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
-from common.Constants import *
+from experiments.Constants import *
 from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover 
 from evosoro_pymoo.Operators.Mutation import SoftbotMutation
 from common.Utils import setRandomSeed, readFromJson, writeToJson
-from common.Analytics import QD_Analytics
+from experiments.Analytics.Analytics import QD_Analytics
 sys.path.append(os.getcwd() + "/..")
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.softbot import Population as SoftbotPopulation, Genotype, Phenotype

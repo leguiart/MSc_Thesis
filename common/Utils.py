@@ -12,8 +12,6 @@ from functools import wraps
 from types import ModuleType, FunctionType
 from gc import get_referents
 
-from common.Constants import *
-
 
 # create logger
 module_logger = logging.getLogger(f"__main__.timeit")

@@ -124,6 +124,9 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
 
             self.filled_elites_archive[i] = 1
             saveToPickle(f"{self.archive_path}/elite_{i}.pickle", x)
+            return True
+        else:
+            return False
 
     def update_existing(self, individual_batch, novelty_evaluator):
 

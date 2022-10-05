@@ -4,8 +4,8 @@ import pandas as pd
 import json
 import os
 
-from common.Analytics import QD_Analytics
-from common.Constants import *
+from experiments.Analytics.Analytics import QD_Analytics
+from experiments.Constants import *
 # sys.path.append(os.getcwd() + "/..")
 
 def jsonToCSV(filename):
