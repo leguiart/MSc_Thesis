@@ -117,7 +117,10 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
                         self.novelty_archive += [individual]
 
         else:
-            os.mkdir(self.archive_path)
+            try:
+                os.mkdir(self.archive_path)
+            except:
+                pass
 
 
     def backup(self):
