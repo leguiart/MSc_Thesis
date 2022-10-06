@@ -167,6 +167,7 @@ def main(parser : argparse.ArgumentParser):
     save_checkpoint = argv.save_checkpoint
     save_every = argv.save_every
     save_networks = argv.save_networks
+    skip_existing = argv.skip_existing
 
 
     if experiment not in EXPERIMENT_TYPES or physics_sim not in PHYSICS_SIM_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
@@ -344,7 +345,11 @@ def main(parser : argparse.ArgumentParser):
         resume_run = False
         starting_gen = 1
 
+
+
         if os.path.exists(run_path) and os.path.isdir(run_path):
+            if skip_existing:
+                continue
             response = input("****************************************************\n"
                             "** WARNING ** A directory named " + run_path + " may exist already.\n"
                             "Would you like to resume possibly pending run? (y/n): ")
@@ -446,5 +451,6 @@ if __name__ == "__main__":
     parser.add_argument('--save_checkpoint', action='store_true', help = "Use to save checkpoints from which to continue in case the program is stopped")
     parser.add_argument('-se', '--save_every', type=int, default=1, help="Save checkpoints every given number of generations")
     parser.add_argument('--save_networks', action='store_true', help = "Use to save networks each generation")
+    parser.add_argument('--skip_existing', action='store_true', help = "Use to skip any run with stored data in existance")
 
     main(parser)
