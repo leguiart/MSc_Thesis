@@ -27,14 +27,14 @@ from pymoo.core.evaluator import Evaluator
 from pymoo.util.misc import termination_from_tuple
 from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival, TournamentSelection, binary_tournament
 from dotenv import load_dotenv
-from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive
-from evosoro_pymoo.Algorithms.ME_Selection import MESelection
-from evosoro_pymoo.Algorithms.ME_Survival import MESurvival
 
 load_dotenv()
 sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
 
 from experiments.Constants import *
+from evosoro_pymoo.Algorithms.ME_Survival import MESurvival
+from evosoro_pymoo.Algorithms.ME_Selection import MESelection
+from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive
 from evosoro_pymoo.Algorithms.OptimizerPyMOO import PopulationBasedOptimizerPyMOO
 from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAndVectorFieldDiversitySurvival
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
