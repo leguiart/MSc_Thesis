@@ -91,17 +91,6 @@ class GenotypeDistanceEvaluator(IEvaluator, dict):
         logger.debug("Starting vector field distance calculation...")
 
         dxdydz = self.dx*self.dy*self.dz
-        # with concurrent.futures.ProcessPoolExecutor() as executor:
-        #     future_to_indexes = {}
-        #     for i in range(len(X)):              
-        #         for j in range(i + 1, len(X)):
-        #             row_id, col_id = X[i][0], X[j][0]
-        #             if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
-        #                 future_to_indexes[executor.submit(vector_field_distance, X[i][1], X[j][1], self.output_tags, dxdydz)] = (row_id, col_id)
-
-        #     for future in concurrent.futures.as_completed(future_to_indexes):
-        #         row_id, col_id = future_to_indexes[future]
-        #         self[(row_id, col_id)] = future.result()
 
         for i in range(len(X)):              
             for j in range(i + 1, len(X)):
@@ -216,26 +205,6 @@ def main():
                 gen_lst = [int(str.lstrip(str(str.split(stored_bot, '_')[-1]), '0')) for stored_bot in stored_bots]
                 gen_lst.sort()
                 max_gens = min(3000, len(gen_lst))
-                try:
-                    res_set = readFromPickle(res_set_path)
-                except:
-                    res_set = None
-
-                if res_set:
-                    res_pop = res_set['res'].pop
-                    res_pop = [(ind.X.id, ind.X.genotype) for ind in res_pop]
-                    genotypeDiversityEvaluator.evaluate(res_pop)
-                    for id, _ in res_pop:
-                        diversity = genotypeDiversityEvaluator[id]
-                        df_dict["Id"] += [id]
-                        df_dict["control_div"] += [diversity[0]]
-                        df_dict["morpho_div"] += [diversity[1]]
-                        df_dict["gene_div"] += [diversity[2]]
-                        df_dict["Generation"] += [max_gens]
-                        df_dict["Run"] += [run_index + 1]
-                        df_dict["Method"] += [experiment_type]
-
-                pd.DataFrame(df_dict).to_csv(div_csv_path, mode='a', header=not os.path.exists(div_csv_path), index = False)
                 run_not_included = False
 
                 for gen in gen_lst[:max_gens]:
@@ -263,7 +232,29 @@ def main():
                         else:
                             run_not_included = True
                             break
-                
+                if run_not_included:
+                    continue
+            
+                try:
+                    res_set = readFromPickle(res_set_path)
+                except:
+                    res_set = None
+
+                if res_set:
+                    res_pop = res_set['res'].pop
+                    res_pop = [(ind.X.id, ind.X.genotype) for ind in res_pop]
+                    genotypeDiversityEvaluator.evaluate(res_pop)
+                    for id, _ in res_pop:
+                        diversity = genotypeDiversityEvaluator[id]
+                        df_dict["Id"] += [id]
+                        df_dict["control_div"] += [diversity[0]]
+                        df_dict["morpho_div"] += [diversity[1]]
+                        df_dict["gene_div"] += [diversity[2]]
+                        df_dict["Generation"] += [max_gens]
+                        df_dict["Run"] += [run_index + 1]
+                        df_dict["Method"] += [experiment_type]
+
+                pd.DataFrame(df_dict).to_csv(div_csv_path, mode='a', header=not os.path.exists(div_csv_path), index = False)
 
 
                 
