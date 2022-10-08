@@ -51,7 +51,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         self.problem.start(**kwargs)
         self.analytics.start(**kwargs) 
 
-    def backup(self):
+    def backup(self, *args, **kwargs):
         saveToPickle(f"{self.checkpoint_path}/algorithm_checkpoint.pickle", self.algorithm)
         self.problem.backup()
         self.analytics.backup()
@@ -85,6 +85,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         if self.algorithm.is_initialized:
             parent_pop = self.algorithm.pop 
             pop = Population.merge(parent_pop, children_pop)
+            logger.debug(f"Parent population size: {len(parent_pop)}. Child population size: {len(children_pop)}")
         else:
             pop = children_pop
             
@@ -106,7 +107,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         pop.set("F", F)
         pop.set("G", G)
         set_cv(pop)
-
+        
         # Save networks
         if self.save_networks:
             if self.algorithm.is_initialized:

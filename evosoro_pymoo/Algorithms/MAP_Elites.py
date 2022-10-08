@@ -55,7 +55,7 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
             delta_bin_i = (max - min) / granularity
             bins = list(np.linspace(min + delta_bin_i/2, max - delta_bin_i/2, granularity))
             if issubclass(bins_type, int):
-                bins = np.floor(bins)
+                bins = np.rint(bins)
             elif not issubclass(bins_type, float):
                 raise ValueError("bins_type parameter must be float or int")
                 
