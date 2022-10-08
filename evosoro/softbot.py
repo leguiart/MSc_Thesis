@@ -416,30 +416,6 @@ class Population(IStarter, object):
         for i in range(self.pop_size):
             self.append(self._get_random_individual(i))
         self.max_id = len(self)
-        # if backup_path is None or not os.path.exists(backup_path):
-        # if not resuming_run:
-            # with ProcessPoolExecutor() as executor:
-            #     futures = {executor.submit(self._get_random_individual, i) for i in range(self.pop_size)}
-            #     for future in as_completed(futures):
-            #         self.append(future.result())
-        #     for i in range(self.pop_size):
-        #         self.append(self._get_random_individual(i))
-        #     self.max_id = len(self)
-        # else:
-        #     for entry in os.listdir(backup_path):
-        #         if os.path.isfile(os.path.join(backup_path, entry)) and entry.endswith(".pickle"):
-        #             with open(os.path.join(backup_path, entry), 'rb') as handle:
-        #                 individual = pickle.load(handle)
-        #             self.append(individual)
-        #             if self.max_id < individual.id:
-        #                 self.max_id = individual.id
-        #     if len(self) < self.pop_size and len(self) > 0:
-        #         while len(self) < self.pop_size:
-        #             self.add_random_individual()
-                
-        #     elif len(self) == 0:
-        #         return False
-        # return True
         
 
     def __iter__(self):

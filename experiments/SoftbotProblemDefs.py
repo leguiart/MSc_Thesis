@@ -1,17 +1,13 @@
 
 
-from itertools import product
-import shutil
 import subprocess
 import numpy as np
 from typing import List
 
 from experiments.Constants import *
 from evosoro.softbot import SoftBot
-from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive
-from evosoro_pymoo.Evaluators.GenotypeDistanceEvaluator import GenotypeDistanceEvaluator
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
-from evosoro_pymoo.Evaluators.IEvaluator import EvaluatorInterface, IEvaluator
+from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import BaseSoftBotPhysicsEvaluator
 from evosoro_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator, NoveltyEvaluatorKD
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
@@ -79,7 +75,7 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
 
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
         super().__init__(physics_evaluator, n_var=1, n_obj=1)
-        genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
+        self.genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
         populationSaver = PopulationSaver(backup_path)
  
         # self.evaluators.update({"population_saver" : populationSaver,
@@ -90,7 +86,8 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
             "unaligned_novelty" : NoveltyEvaluatorKD("Unaligned novelty", backup_path, "unaligned_novelty", unaligned_vector,
                                                      min_novelty_archive_size=pop_size, max_novelty_archive_size=1000, 
                                                      k_neighbors=20, novelty_threshold=25.),
-            "genotype_diversity_evaluator" : genotypeDiversityEvaluator})
+            "genotype_diversity_evaluator" : self.genotypeDiversityEvaluator,
+            "genotype_diversity_extractor" : GenotypeDiversityExtractor(self.genotypeDiversityEvaluator)})
 
 
     def _extractObjectives(self, x: SoftBot) -> List[float]:
@@ -98,7 +95,6 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
     
     def start(self, **kwargs):
         super().start(**kwargs)
-        self.evaluators["genotype_diversity_extractor"] = GenotypeDiversityExtractor(self.evaluators["genotype_diversity_evaluator"])
 
     # def _extractConstraints(self, x: SoftBot) -> List[float]:
     #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
