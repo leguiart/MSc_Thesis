@@ -47,16 +47,27 @@ class MAP_Elites(GeneticAlgorithm):
 class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
     def __init__(self, name : str, base_path : str, 
                 min_max_gr_li : List[tuple], 
-                extract_descriptors_func : Callable[[object], List]) -> None:
+                extract_descriptors_func : Callable[[object], List],
+                bins_type = float) -> None:
 
-        feats = []
+        bins_per_feat = []
         for min, max, granularity in min_max_gr_li:
-            feats += [list(np.linspace(min, max, granularity))]
-        bc_space = []
-        for element in itertools.product(*feats):
-            bc_space += [list(element)]
-        self.bc_space = np.vstack(bc_space)
-        self.filled_elites_archive = [0 for _ in range(len(self.bc_space))]
+            delta_bin_i = (max - min) / granularity
+            bins = list(np.linspace(min + delta_bin_i/2, max - delta_bin_i/2, granularity))
+            if issubclass(bins_type, int):
+                bins = np.floor(bins)
+            elif not issubclass(bins_type, float):
+                raise ValueError("bins_type parameter must be float or int")
+                
+            bins_per_feat += [bins]
+            
+        bin_space = []
+        for element in itertools.product(*bins_per_feat):
+            bin_space += [list(element)]
+        
+
+        self.bin_space = np.vstack(bin_space)
+        self.filled_elites_archive = [0 for _ in range(len(self.bin_space))]
         self.extract_descriptors_func = extract_descriptors_func
         self.name = name
         self.base_path = base_path
@@ -95,12 +106,12 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
             self.filled_elites_archive[i] = 1
 
     def feature_descriptor(self, x):
-        return self.bc_space[self.feature_descriptor_idx(x)]
+        return self.bin_space[self.feature_descriptor_idx(x)]
 
     def feature_descriptor_idx(self, x):
         b_x = self.extract_descriptors_func(x)
-        X = np.tile(b_x, (self.bc_space.shape[0], 1))
-        dist_vec = np.sqrt(np.sum((X - self.bc_space)**2, axis = 1))
+        X = np.tile(b_x, (self.bin_space.shape[0], 1))
+        dist_vec = np.sqrt(np.sum((X - self.bin_space)**2, axis = 1))
         return np.argmin(dist_vec)
 
     def __getitem__(self, i):

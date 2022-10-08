@@ -8,16 +8,11 @@ License: MIT.
 """
 
 import os
-import pickle
-import shutil
-from typing import Callable, List
 import numpy as np
 import copy
 import logging
-import heapq as hq
-from requests import get
+from typing import Callable, List, TypeVar
 from sklearn.neighbors import KDTree
-from evosoro.softbot import SoftBot
 
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
@@ -32,8 +27,8 @@ logger = logging.getLogger(f"__main__.{__name__}")
 def std_is_valid(x):
     return True
 
-
-class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
+T = TypeVar("T")
+class NoveltyEvaluatorKD(IEvaluator[T], IResults, ICheckpoint, IStarter):
     """
     Novelty-search based phenotype evaluator.
     ...
@@ -58,7 +53,7 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
     evaluate(artifacts)
         Evaluates the novelty of each artifact in a list of artifacts
     """
-    def __init__(self, name : str, base_path : str, novelty_name : str, vector_extractor : Callable[[SoftBot], List], 
+    def __init__(self, name : str, base_path : str, novelty_name : str, vector_extractor : Callable[[T], List], 
                 novelty_threshold = 30., novelty_floor = .25, min_novelty_archive_size = 1, k_neighbors = 10, 
                 max_novelty_archive_size = None, max_iter = 100):
         """
@@ -157,7 +152,7 @@ class NoveltyEvaluatorKD(IEvaluator[SoftBot], IResults, ICheckpoint, IStarter):
         return self.novelty_archive
 
     @timeit
-    def evaluate(self, X, *args, **kwargs):
+    def evaluate(self, X : List[T], *args, **kwargs) -> List[T]:
         """Evaluates the novelty of each object in a list of objects according to the Novelty-Search algorithm
         X : list
             List of objects which contain a fitness metric definition
@@ -241,7 +236,7 @@ class NSLCEvaluator(NoveltyEvaluatorKD):
         self.nslc_quality_name = nslc_quality_name
         self.fitness_name = fitness_name
 
-    def evaluate(self, X, *args, **kwargs) -> list:
+    def evaluate(self, X : List[T], *args, **kwargs) -> List[T]:
         logger.debug("Starting novelty search with local competition evaluation")
 
         novelty_scores, kn_neighbors_ind = self._evaluate_novelty(X)

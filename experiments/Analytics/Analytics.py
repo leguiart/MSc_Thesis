@@ -32,11 +32,11 @@ class QD_Analytics(IAnalytics):
         self.init_indicator_mapping()
         
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
-        min_max_gr = [(0, self.total_voxels, self.total_voxels), (0, self.total_voxels, self.total_voxels)]
+        min_max_gr = [(0, self.total_voxels, self.total_voxels + 1), (0, self.total_voxels, self.total_voxels + 1)]
         #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, min_max_gr, self.extract_morpho)
+        self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, min_max_gr, self.extract_morpho, bins_type=int)
         #2.- Elites in terms of aligned novelty
-        self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho)
+        self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho, bins_type=int)
 
         self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
 

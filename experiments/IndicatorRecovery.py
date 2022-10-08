@@ -12,9 +12,11 @@ from dotenv import load_dotenv
 load_dotenv()
 sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
 
+from experiments.Constants import *
+from common.Utils import readFromPickle
+from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from experiments.Analytics.Analytics import QD_Analytics
 from experiments.SoftbotProblemDefs import QualitySoftbotProblem
-
 
 
 logger = logging.getLogger(__name__)
@@ -33,14 +35,6 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-
-
-load_dotenv()
-sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
-
-from experiments.Constants import *
-from common.Utils import readFromPickle
-from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 
 class DummySurvival:
     def __init__(self):
@@ -128,6 +122,7 @@ def main():
                 analytics.start(resuming_run = False, isNewExperiment = False)
                 physics_sim = DummyPhysicsEvaluator()
                 softbot_problem = QualitySoftbotProblem(physics_sim, 30, run_dir, orig_size_xyz=IND_SIZE)
+                softbot_problem.start(resuming_run = False)
                 algorithm = Algorithm(softbot_problem)
 
                 stored_bots = glob.glob(run_dir + "/Gen_*")
@@ -165,19 +160,19 @@ def main():
 
                 if run_not_included:
                     continue
-            
                 try:
                     res_set = readFromPickle(res_set_path)
                 except:
                     res_set = None
 
                 if res_set:
-                    
                     res_pop_mat = [[individual] for individual in res_set['res'].pop]
                     softbot_problem._evaluate(res_pop_mat, {"F":[], "G":[]})
                     res_pop = [vec[0] for vec in res_pop_mat]
                     analytics.notify(algorithm, pop = res_pop, child_pop = softbot_pop[len(softbot_pop)//2:])
-
+                
+                softbot_problem.backup()
+                analytics.save_archives()
 
 if __name__ == "__main__":
     main()

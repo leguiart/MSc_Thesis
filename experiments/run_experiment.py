@@ -336,9 +336,9 @@ def main(parser : argparse.ArgumentParser):
         
         if experiment == "MAP-ELITES":
             total_voxels = np.prod(IND_SIZE)
-            min_max_gr = [(0, total_voxels, total_voxels), (0, total_voxels, total_voxels)]       
+            min_max_gr = [(0, total_voxels, total_voxels + 1), (0, total_voxels, total_voxels + 1)]       
 
-            me_archive = MAP_ElitesArchive("f_elites", run_path, min_max_gr, extract_morpho)
+            me_archive = MAP_ElitesArchive("f_elites", run_path, min_max_gr, extract_morpho, bins_type=int)
             ga_survival = MESurvival(me_archive)
             ga_selection = MESelection(me_archive)
 

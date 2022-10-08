@@ -1,17 +1,13 @@
 
 
-from itertools import product
-import shutil
 import subprocess
 import numpy as np
 from typing import List
 
 from experiments.Constants import *
 from evosoro.softbot import SoftBot
-from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive
-from evosoro_pymoo.Evaluators.GenotypeDistanceEvaluator import GenotypeDistanceEvaluator
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
-from evosoro_pymoo.Evaluators.IEvaluator import EvaluatorInterface, IEvaluator
+from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import BaseSoftBotPhysicsEvaluator
 from evosoro_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator, NoveltyEvaluatorKD
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
