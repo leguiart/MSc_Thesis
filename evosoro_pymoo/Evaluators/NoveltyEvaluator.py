@@ -117,13 +117,19 @@ class NoveltyEvaluatorKD(IEvaluator[T], IResults, ICheckpoint, IStarter):
             except:
                 pass
 
+    def _picke_archive(self):
+        for ind in self.novelty_archive:
+            self.pickle_individual(ind)
 
-    def backup(self):
+    def backup(self, *args, **kwargs):
         self.obj_properties_backup["its"] = self.its
         self.obj_properties_backup["time_out"] = self.time_out
         self.obj_properties_backup["novelty_threshold"] = self.novelty_threshold
-        for ind in self.individuals_added:
-            self.pickle_individual(ind)
+        if 'pickle_nov_archive' in kwargs and kwargs['pickle_nov_archive']:
+            self._picke_archive()
+        else:
+            for ind in self.individuals_added:
+                self.pickle_individual(ind)
         writeToJson(self.obj_properties_json_path, self.obj_properties_backup)
 
 

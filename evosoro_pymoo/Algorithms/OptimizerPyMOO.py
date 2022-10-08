@@ -51,7 +51,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         self.problem.start(**kwargs)
         self.analytics.start(**kwargs) 
 
-    def backup(self):
+    def backup(self, *args, **kwargs):
         saveToPickle(f"{self.checkpoint_path}/algorithm_checkpoint.pickle", self.algorithm)
         self.problem.backup()
         self.analytics.backup()

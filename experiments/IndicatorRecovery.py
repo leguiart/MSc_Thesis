@@ -171,7 +171,7 @@ def main():
                     res_pop = [vec[0] for vec in res_pop_mat]
                     analytics.notify(algorithm, pop = res_pop, child_pop = softbot_pop[len(softbot_pop)//2:])
                 
-                softbot_problem.backup()
+                softbot_problem.backup(pickle_nov_archive = True)
                 analytics.save_archives()
 
 if __name__ == "__main__":
