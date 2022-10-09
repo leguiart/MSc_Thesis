@@ -181,6 +181,8 @@ def main():
                             
                             # softbot_problem.backup(pickle_nov_archive = True)
                             analytics.save_archives()  
+                        else:
+                            run_not_included = True
                         break
 
             if run_not_included:
