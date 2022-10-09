@@ -33,10 +33,13 @@ class QD_Analytics(IAnalytics):
         
         # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
         min_max_gr = [(0, self.total_voxels, self.total_voxels + 1), (0, self.total_voxels, self.total_voxels + 1)]
+        lower_bound = np.array([0,0])
+        upper_bound = np.array([self.total_voxels, self.total_voxels])
+        ppd = np.array([self.total_voxels + 1, self.total_voxels + 1])
         #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, min_max_gr, self.extract_morpho, bins_type=int)
+        self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, lower_bound, upper_bound, ppd, self.extract_morpho, bins_type=int)
         #2.- Elites in terms of aligned novelty
-        self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, min_max_gr, self.extract_morpho, bins_type=int)
+        self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, lower_bound, upper_bound, ppd, self.extract_morpho, bins_type=int)
 
         self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
 
@@ -351,6 +354,8 @@ class QD_Analytics(IAnalytics):
             if xf is not None:
                 archives["map_elites_archive_f"] += [[xf.fitness, xf.unaligned_novelty, xf.aligned_novelty]]
                 archives["map_elites_archive_an"] += [[xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
+                # saveToPickle(f"{self.map_elites_archive_f.archive_path}/elite_{i}.pickle", xf)
+                # saveToPickle(f"{self.map_elites_archive_an.archive_path}/elite_{i}.pickle", xan)
             else:
                 archives["map_elites_archive_f"] += [0]
                 archives["map_elites_archive_an"] += [0]

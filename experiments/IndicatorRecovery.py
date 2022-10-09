@@ -130,6 +130,7 @@ def main():
                 gen_lst.sort()
                 max_gens = min(3000, len(gen_lst))
                 run_not_included = False 
+                softbot_pop = None
 
                 for gen in gen_lst[:max_gens]:
                     gen_path = os.path.join(run_dir, f"Gen_{gen:04d}")
@@ -153,26 +154,30 @@ def main():
                             softbot_pop = [vec[0] for vec in softbot_pop_mat]
                             lst_pop = [ind.X for ind in softbot_pop]
                             softbot_problem.clean(lst_pop, pop_size = len(lst_pop)//2)
-                            analytics.notify(algorithm, pop = softbot_pop[:len(softbot_pop)//2], child_pop = softbot_pop[len(softbot_pop)//2:])                            
+                            analytics.notify(algorithm, pop = softbot_pop[:len(softbot_pop)//2], child_pop = softbot_pop[len(softbot_pop)//2:])                     
                         else:
                             run_not_included = True
+                            if gen == max_gens - 1:
+                                try:
+                                    res_set = readFromPickle(res_set_path)
+                                except:
+                                    res_set = None
+
+                                if res_set:
+                                    res_pop_mat = [[individual] for individual in res_set['res'].pop]
+                                    softbot_problem._evaluate(res_pop_mat, {"F":[], "G":[]})
+                                    res_pop = [vec[0] for vec in res_pop_mat]
+                                    analytics.notify(algorithm, pop = res_pop, child_pop = softbot_pop[len(softbot_pop)//2:])
+                                
+                                # softbot_problem.backup(pickle_nov_archive = True)
+                                analytics.save_archives()  
                             break
 
                 if run_not_included:
                     continue
-                try:
-                    res_set = readFromPickle(res_set_path)
-                except:
-                    res_set = None
-
-                if res_set:
-                    res_pop_mat = [[individual] for individual in res_set['res'].pop]
-                    softbot_problem._evaluate(res_pop_mat, {"F":[], "G":[]})
-                    res_pop = [vec[0] for vec in res_pop_mat]
-                    analytics.notify(algorithm, pop = res_pop, child_pop = softbot_pop[len(softbot_pop)//2:])
+ 
                 
-                softbot_problem.backup(pickle_nov_archive = True)
-                analytics.save_archives()
+
 
 if __name__ == "__main__":
     main()

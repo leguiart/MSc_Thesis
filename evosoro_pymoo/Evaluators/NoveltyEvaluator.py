@@ -117,7 +117,7 @@ class NoveltyEvaluatorKD(IEvaluator[T], IResults, ICheckpoint, IStarter):
             except:
                 pass
 
-    def _picke_archive(self):
+    def _pickle_archive(self):
         for ind in self.novelty_archive:
             self.pickle_individual(ind)
 
@@ -126,7 +126,7 @@ class NoveltyEvaluatorKD(IEvaluator[T], IResults, ICheckpoint, IStarter):
         self.obj_properties_backup["time_out"] = self.time_out
         self.obj_properties_backup["novelty_threshold"] = self.novelty_threshold
         if 'pickle_nov_archive' in kwargs and kwargs['pickle_nov_archive']:
-            self._picke_archive()
+            self._pickle_archive()
         else:
             for ind in self.individuals_added:
                 self.pickle_individual(ind)
