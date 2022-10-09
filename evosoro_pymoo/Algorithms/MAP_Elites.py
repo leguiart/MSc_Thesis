@@ -27,47 +27,78 @@ from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter
 
-class MAP_Elites(GeneticAlgorithm):
-    def __init__(self, 
-                batch_size=100, 
-                sampling=FloatRandomSampling(), 
-                selection=None, 
-                mutation=PolynomialMutation, 
-                survival=None, 
-                **kwargs):
-        super().__init__(batch_size, 
-                        sampling, 
-                        selection, 
-                        mutation, 
-                        survival, 
-                        advance_after_initial_infill = True, 
-                        **kwargs)
+
+# Given a bin number, compute it's index
+# ppd : points per dimension
+def bin2index(id, ppd):
+    dim = ppd.size
+    ind = np.zeros((dim), dtype=np.int32) #indice
+    for i in range(dim):
+        p = np.prod(ppd[0:dim - i - 1])
+        ind[dim - i - 1] = id // p
+        id = id % p
+    return ind
+
+# Given some index, compute it's bin number
+# ppd : points per dimension
+def index2bin(ind, ppd):
+    dim = ppd.size
+    bin_id = 0
+    for i in range(dim):
+        bin_id += ind[dim - i - 1]*np.prod(ppd[0:dim - i - 1]) #producto
+    return int(bin_id)
+
+def descriptor2index(x : np.ndarray, l: np.ndarray, h: np.ndarray):
+    res = (x - l) // h
+    return res.astype(int)
 
 
 class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
     def __init__(self, name : str, base_path : str, 
-                min_max_gr_li : List[tuple], 
+                lower_lim : np.ndarray,
+                upper_lim : np.ndarray,
+                ppd : np.ndarray,
                 extract_descriptors_func : Callable[[object], List],
                 bins_type = float) -> None:
 
-        bins_per_feat = []
-        for min, max, granularity in min_max_gr_li:
-            delta_bin_i = (max - min) / granularity
-            bins = list(np.linspace(min + delta_bin_i/2, max - delta_bin_i/2, granularity))
-            if issubclass(bins_type, int):
-                bins = np.rint(bins)
-            elif not issubclass(bins_type, float):
-                raise ValueError("bins_type parameter must be float or int")
-                
-            bins_per_feat += [bins]
-            
-        bin_space = []
-        for element in itertools.product(*bins_per_feat):
-            bin_space += [list(element)]
+        self.ppd = ppd
+        self.bpd = self.ppd - 1
+        self.dim = self.ppd.size
+        self.upper_lim = upper_lim
+        self.lower_lim = lower_lim
+        self.delta_bin = (self.upper_lim - self.lower_lim) / self.bpd
+        self.index2BinCache = {}
         
 
+        points_per_feature = []
+        indexes_per_feature = []
+
+        for i in range(self.dim):
+
+            # delta_bin_i = (max - min) / granularity
+            # bins = list(np.linspace(min + delta_bin_i/2, max - delta_bin_i/2, granularity))
+            points = list(np.linspace(self.lower_lim[i], self.upper_lim[i], self.ppd[i]))
+            indexes = list(range(len(points)))
+            # if issubclass(bins_type, int):
+            #     bins = np.rint(bins)
+            # elif not issubclass(bins_type, float):
+            #     raise ValueError("bins_type parameter must be float or int")
+                
+            points_per_feature += [points]
+            indexes_per_feature += [indexes]
+            
+        bin_space = []
+        for element in itertools.product(*points_per_feature):
+            li = list(element)
+            li.reverse()
+            bin_space += [li]
         self.bin_space = np.vstack(bin_space)
+
+        for j, indx in enumerate(itertools.product(*indexes_per_feature)):
+            self.index2BinCache[indx] = j
+
         self.filled_elites_archive = [0 for _ in range(len(self.bin_space))]
+        self.archive = [None for _ in range(len(self.bin_space))]
         self.extract_descriptors_func = extract_descriptors_func
         self.name = name
         self.base_path = base_path
@@ -110,13 +141,18 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
 
     def feature_descriptor_idx(self, x):
         b_x = self.extract_descriptors_func(x)
-        X = np.tile(b_x, (self.bin_space.shape[0], 1))
-        dist_vec = np.sqrt(np.sum((X - self.bin_space)**2, axis = 1))
-        return np.argmin(dist_vec)
+        index = descriptor2index(b_x, self.lower_lim, self.delta_bin)
+        return self.index2BinCache[tuple(index)]
+        # return index2bin(index, self.ppd)
+        # X = np.tile(b_x, (self.bin_space.shape[0], 1))
+        # dist_vec = np.sqrt(np.sum((X - self.bin_space)**2, axis = 1))
+        # return np.argmin(dist_vec)
+
 
     def __getitem__(self, i):
         if self.filled_elites_archive[i] != 0:
-            return readFromPickle(f"{self.archive_path}/elite_{i}.pickle")
+            # return readFromPickle(f"{self.archive_path}/elite_{i}.pickle")
+            return self.archive[i]
         else:
             return None
 
@@ -134,7 +170,8 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
                 self.qd_score += getattr(x, quality_metric) - getattr(xe, quality_metric)
 
             self.filled_elites_archive[i] = 1
-            saveToPickle(f"{self.archive_path}/elite_{i}.pickle", x)
+            self.archive[i] = x
+            # saveToPickle(f"{self.archive_path}/elite_{i}.pickle", x)
             return True
         else:
             return False
@@ -171,7 +208,8 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
 
                 self.qd_score += updated_elite_novelty
                 setattr(current_elite, novelty_metric, updated_elite_novelty)
-                saveToPickle(f"{self.archive_path}/elite_{indx}.pickle", current_elite)
+                # saveToPickle(f"{self.archive_path}/elite_{indx}.pickle", current_elite)
+                self.archive[indx] = current_elite
 
 
     
