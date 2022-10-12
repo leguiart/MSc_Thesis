@@ -1,6 +1,7 @@
 
 import glob
 import os
+import re
 import sys
 import concurrent.futures
 import logging
@@ -98,6 +99,8 @@ def df_to_population(df, ids_to_individuals):
 
 def main():
     base_experiments_path = "/media/leguiart/LuisExtra/ExperimentsData2"
+
+
     for experiment_type in ["SO", "QN", "ME", "NSLC", "MNSLC"]:
 
         if experiment_type != "SO":
@@ -107,74 +110,83 @@ def main():
 
         run_dir_prefix = os.path.join(base_experiments_path,f"{run_name}Data")
         run_dirs = glob.glob(run_dir_prefix+"*")
+        run_dirs = list(filter(lambda dir : os.path.isdir(dir), run_dirs))
+        
+        run_indices = {}
+        for dir in run_dirs:
+            indx = re.findall('[0-9]+', dir.split('/')[-1])
+            if indx:
+                run_indices[int(indx[0])] = dir
 
         original_indicators_csv_path = f"/media/leguiart/LuisExtra/ExperimentsData2/{run_name}.csv"
         indicators_csv = pd.read_csv(original_indicators_csv_path)
-        grouped_by_run = [indicators_csv[indicators_csv['run'] == i] for i in range(1, 21)]
+        grouped_by_run = [indicators_csv[indicators_csv['run'] == i] for i in run_indices.keys()]
 
-        for run_index, run_dir in enumerate(run_dirs):
+        for j, item in enumerate(run_indices.items()):
+            run_index, run_dir = item
+            run_df = grouped_by_run[j]
 
-            res_set_path = os.path.join(run_dir, "results_set.pickle")
-            if os.path.isdir(run_dir):
-                run_df = grouped_by_run[run_index]
+            analytics = QD_Analytics(run_index, experiment_type, f"{run_name}_recovered_", run_dir, base_experiments_path)
+            analytics.start(resuming_run = False, isNewExperiment = False)
+            physics_sim = DummyPhysicsEvaluator()
+            softbot_problem = QualitySoftbotProblem(physics_sim, 30, run_dir, orig_size_xyz=IND_SIZE)
+            softbot_problem.start(resuming_run = False)
+            algorithm = Algorithm(softbot_problem)
 
-                analytics = QD_Analytics(run_index + 1, experiment_type, f"{run_name}_recovered_", run_dir, base_experiments_path)
-                analytics.start(resuming_run = False, isNewExperiment = False)
-                physics_sim = DummyPhysicsEvaluator()
-                softbot_problem = QualitySoftbotProblem(physics_sim, 30, run_dir, orig_size_xyz=IND_SIZE)
-                softbot_problem.start(resuming_run = False)
-                algorithm = Algorithm(softbot_problem)
+            stored_bots = glob.glob(run_dir + "/Gen_*")
+            gen_lst = [int(str.lstrip(str(str.split(stored_bot, '_')[-1]), '0')) for stored_bot in stored_bots]
+            gen_lst.sort()
+            max_gens = len(gen_lst)
+            run_not_included = False 
+            softbot_pop = None
 
-                stored_bots = glob.glob(run_dir + "/Gen_*")
-                gen_lst = [int(str.lstrip(str(str.split(stored_bot, '_')[-1]), '0')) for stored_bot in stored_bots]
-                gen_lst.sort()
-                max_gens = min(3000, len(gen_lst))
-                run_not_included = False 
-                softbot_pop = None
+            for gen in gen_lst:
+                gen_path = os.path.join(run_dir, f"Gen_{gen:04d}")
+                if os.path.isdir(gen_path):
+                    nn_backup_path = os.path.join(gen_path, f"Gen_{gen:04d}_networks.pickle")
+                    
+                    try:
+                        generation_nns = readFromPickle(nn_backup_path)
+                    except:
+                        generation_nns = None
 
-                for gen in gen_lst[:max_gens]:
-                    gen_path = os.path.join(run_dir, f"Gen_{gen:04d}")
-                    if os.path.isdir(gen_path):
-                        nn_backup_path = os.path.join(gen_path, f"Gen_{gen:04d}_networks.pickle")
-                        
-                        try:
-                            generation_nns = readFromPickle(nn_backup_path)
-                        except:
-                            generation_nns = None
+                    if generation_nns:
+                        algorithm.n_gen = gen
+                        ids_to_individuals = {individual[0] : individual[1] for individual in generation_nns}
+                        d = {"id" : list(ids_to_individuals.keys())}
+                        df = pd.DataFrame(d)
+                        df_joined = df.join(run_df.set_index('id'), on='id', lsuffix='_caller', rsuffix='_other')
 
-                        if generation_nns:
-                            algorithm.n_gen = gen
-                            ids_to_individuals = {individual[0] : individual[1] for individual in generation_nns}
-                            d = {"id" : list(ids_to_individuals.keys())}
-                            df = pd.DataFrame(d)
-                            df_joined = df.join(run_df.set_index('id'), on='id', lsuffix='_caller', rsuffix='_other')
+                        softbot_pop_mat = df_to_population(df_joined, ids_to_individuals)
+                        softbot_problem._evaluate(softbot_pop_mat, {"F":[], "G":[]})
+                        softbot_pop = [vec[0] for vec in softbot_pop_mat]
+                        lst_pop = [ind.X for ind in softbot_pop]
+                        softbot_problem.clean(lst_pop, pop_size = len(lst_pop)//2)
+                        analytics.notify(algorithm, pop = softbot_pop[:len(softbot_pop)//2], child_pop = softbot_pop[len(softbot_pop)//2:])                     
+                    else:
+                        if gen == max_gens:
+                            res_set_path = os.path.join(run_dir, "results_set.pickle")
 
-                            softbot_pop_mat = df_to_population(df_joined, ids_to_individuals)
-                            softbot_problem._evaluate(softbot_pop_mat, {"F":[], "G":[]})
-                            softbot_pop = [vec[0] for vec in softbot_pop_mat]
-                            lst_pop = [ind.X for ind in softbot_pop]
-                            softbot_problem.clean(lst_pop, pop_size = len(lst_pop)//2)
-                            analytics.notify(algorithm, pop = softbot_pop[:len(softbot_pop)//2], child_pop = softbot_pop[len(softbot_pop)//2:])                     
+                            try:
+                                res_set = readFromPickle(res_set_path)
+                            except:
+                                res_set = None
+
+                            if res_set:
+                                algorithm.n_gen = gen
+                                res_pop_mat = [[individual] for individual in res_set['res'].pop]
+                                softbot_problem._evaluate(res_pop_mat, {"F":[], "G":[]})
+                                res_pop = [vec[0] for vec in res_pop_mat]
+                                analytics.notify(algorithm, pop = res_pop, child_pop = softbot_pop[len(softbot_pop)//2:])
+                            
+                            # softbot_problem.backup(pickle_nov_archive = True)
+                            analytics.save_archives()  
                         else:
                             run_not_included = True
-                            if gen == max_gens - 1:
-                                try:
-                                    res_set = readFromPickle(res_set_path)
-                                except:
-                                    res_set = None
+                        break
 
-                                if res_set:
-                                    res_pop_mat = [[individual] for individual in res_set['res'].pop]
-                                    softbot_problem._evaluate(res_pop_mat, {"F":[], "G":[]})
-                                    res_pop = [vec[0] for vec in res_pop_mat]
-                                    analytics.notify(algorithm, pop = res_pop, child_pop = softbot_pop[len(softbot_pop)//2:])
-                                
-                                # softbot_problem.backup(pickle_nov_archive = True)
-                                analytics.save_archives()  
-                            break
-
-                if run_not_included:
-                    continue
+            if run_not_included:
+                continue
  
                 
 
