@@ -22,7 +22,9 @@ from pymoo.operators.sampling.rnd import FloatRandomSampling
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 from common.Utils import readFromJson, readFromPickle, saveToPickle, writeToJson
+from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
+from evosoro_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter
@@ -98,14 +100,15 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
             self.index2BinCache[indx] = j
 
         self.filled_elites_archive = [0 for _ in range(len(self.bin_space))]
+        self.filled_indices = []
         self.archive = [None for _ in range(len(self.bin_space))]
         self.extract_descriptors_func = extract_descriptors_func
         self.name = name
         self.base_path = base_path
         self.archive_path = os.path.join(self.base_path, self.name)
 
-        self.coverage = 0 
-        self.qd_score = 0 
+        # self.coverage = 0 
+        # self.qd_score = 0 
 
         self.checkpoint_path = os.path.join(self.base_path, f"{name}_evaluator_checkpoint.pickle")
 
@@ -148,7 +151,6 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
         # dist_vec = np.sqrt(np.sum((X - self.bin_space)**2, axis = 1))
         # return np.argmin(dist_vec)
 
-
     def __getitem__(self, i):
         if self.filled_elites_archive[i] != 0:
             # return readFromPickle(f"{self.archive_path}/elite_{i}.pickle")
@@ -163,24 +165,36 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
         i = self.feature_descriptor_idx(x)
         xe = self[i]
         if xe is None or getattr(xe, quality_metric) < getattr(x, quality_metric):
-            if xe is None:
-                self.coverage += 1/len(self)
-                self.qd_score += getattr(x, quality_metric)
-            else:
-                self.qd_score += getattr(x, quality_metric) - getattr(xe, quality_metric)
-
+            # if xe is None:
+            #     # self.coverage += 1/len(self)
+            #     self.qd_score += getattr(x, quality_metric)
+            # else:
+            #     self.qd_score += getattr(x, quality_metric) - getattr(xe, quality_metric)
+            # saveToPickle(f"{self.archive_path}/elite_{i}.pickle", x)
+            self.filled_indices += [i]
             self.filled_elites_archive[i] = 1
             self.archive[i] = x
-            # saveToPickle(f"{self.archive_path}/elite_{i}.pickle", x)
             return True
         else:
             return False
+    
+    def coverage(self):
+        return len(self.filled_indices)/len(self)
 
-    def update_existing(self, individual_batch, novelty_evaluator):
+    def qd_scores(self, attributes = {'fitness':'qd-score_f'}):
+        scores = {}
+        for attr in attributes.keys():
+            scores[attributes[attr]] = 0
+
+        for i in self.filled_indices:
+            for attr in attributes.keys():
+                scores[attributes[attr]] += getattr(self.archive[i], attr)
+        return scores
+
+    def update_existing_batch(self, individual_batch : List[SoftBot], novelty_evaluator : NoveltyEvaluatorKD):
 
         union_hashtable = {}
         union_matrix = []
-        archive_matrix = []
 
         # Compute the Union of Novelty archive and the population
         for individual in individual_batch + novelty_evaluator.novelty_archive:
@@ -197,7 +211,7 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
             current_elite = self[indx]
             if not current_elite is None:
                 old_elite_novelty = getattr(current_elite, novelty_metric)
-                self.qd_score -= old_elite_novelty
+                # self.qd_score -= old_elite_novelty
 
                 if current_elite.md5 in union_hashtable:
                     updated_elite_novelty = getattr(union_hashtable[current_elite.md5], novelty_metric)
@@ -206,10 +220,47 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
                     updated_elite_novelty = np.mean(distances)
                     # updated_elite_novelty, _ = novelty_evaluator._average_knn_distance([novelty_evaluator.vector_extractor(current_elite)], kd_tree)
 
-                self.qd_score += updated_elite_novelty
+                # self.qd_score += updated_elite_novelty
                 setattr(current_elite, novelty_metric, updated_elite_novelty)
                 # saveToPickle(f"{self.archive_path}/elite_{indx}.pickle", current_elite)
                 self.archive[indx] = current_elite
+
+
+    def update_existing_archive(self, novelty_evaluator : NoveltyEvaluatorKD):
+
+        novelty_hashtable = {}
+        union_matrix = []
+
+        # Compute the Union of Novelty archive and the population
+        for individual in novelty_evaluator.novelty_archive:
+            if individual.md5 not in novelty_hashtable:
+                novelty_hashtable[individual.md5] = individual
+                union_matrix += [novelty_evaluator.vector_extractor(individual)]
+        
+        union_matrix = np.array(union_matrix)
+        kd_tree = KDTree(union_matrix)
+        novelty_metric = novelty_evaluator.novelty_name
+
+        for i in self.filled_indices:
+            individual = self.archive[i]
+            indx = self.feature_descriptor_idx(individual)
+            current_elite = self[indx]
+            # if not current_elite is None:
+            # old_elite_novelty = getattr(current_elite, novelty_metric)
+            # self.qd_score -= old_elite_novelty
+
+            if current_elite.md5 in novelty_hashtable:
+                updated_elite_novelty = getattr(novelty_hashtable[current_elite.md5], novelty_metric)
+            else:
+                distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], 
+                                                min(novelty_evaluator.k_neighbors, len(union_matrix)))
+                updated_elite_novelty = np.mean(distances)
+                # updated_elite_novelty, _ = novelty_evaluator._average_knn_distance([novelty_evaluator.vector_extractor(current_elite)], kd_tree)
+
+            # self.qd_score += updated_elite_novelty
+            setattr(current_elite, novelty_metric, updated_elite_novelty)
+            # saveToPickle(f"{self.archive_path}/elite_{indx}.pickle", current_elite)
+            self.archive[indx] = current_elite
 
 
     

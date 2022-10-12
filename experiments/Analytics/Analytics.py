@@ -78,8 +78,12 @@ class QD_Analytics(IAnalytics):
             "aligned_novelty_archive_fit",
             "unaligned_novelty_archive_novelty",
             "aligned_novelty_archive_novelty",
-            "qd-score_f",
-            "qd-score_an",
+            "qd-score_ff",
+            "qd-score_fun",
+            "qd-score_fan",
+            "qd-score_anf",
+            "qd-score_anun",
+            "qd-score_anan",
             "coverage",            
             "control_cppn_nodes",
             "control_cppn_edges",
@@ -160,9 +164,13 @@ class QD_Analytics(IAnalytics):
         # if self.indicator_mapping:
         #     del self.indicator_mapping
         self.indicator_mapping = {
-            "qd-score_f" : [0],
-            "qd-score_an" : [0],
-            "coverage" : [0], 
+            "qd-score_ff" : [],
+            "qd-score_fun" : [],
+            "qd-score_fan" : [],
+            "qd-score_anf" : [],
+            "qd-score_anun" : [],
+            "qd-score_anan" : [],
+            "coverage" : [], 
             "id" : [],
             "generation" : [],
             "run" : [],
@@ -233,7 +241,11 @@ class QD_Analytics(IAnalytics):
         
         self.init_indicator_mapping()
 
-        self.map_elites_archive_an.update_existing([ind.X for ind in child_pop], problem.evaluators["aligned_novelty"])
+        # self.map_elites_archive_an.update_existing_batch([ind.X for ind in child_pop], problem.evaluators["aligned_novelty"])
+        self.map_elites_archive_an.update_existing_archive(problem.evaluators["aligned_novelty"])
+        self.map_elites_archive_an.update_existing_archive(problem.evaluators["unaligned_novelty"])
+        self.map_elites_archive_f.update_existing_archive(problem.evaluators["aligned_novelty"])
+        self.map_elites_archive_f.update_existing_archive(problem.evaluators["unaligned_novelty"])
 
         add_to_me_archive = True
         if issubclass(type(algorithm.survival), MESurvival):
@@ -316,9 +328,6 @@ class QD_Analytics(IAnalytics):
                                                 self.indicator_mapping["morpho_cppn_nodes"][-1],
                                                 self.indicator_mapping["morpho_cppn_edges"][-1]]]
             
-        
-
-
 
         self.indicator_mapping["morpho_div"]= list(np.mean(distance_matrix(self.indicator_mapping["morphology"], self.indicator_mapping["morphology"]), axis=1))
         self.indicator_mapping["endpoint_div"] = list(np.mean(distance_matrix(self.indicator_mapping["endpoint"], self.indicator_mapping["endpoint"]), axis=1))
@@ -326,9 +335,15 @@ class QD_Analytics(IAnalytics):
         self.indicator_mapping["simplified_gene_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene"], self.indicator_mapping["simplified_gene"]), axis=1))
         self.indicator_mapping["simplified_gene_ne_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene_no_edges"], self.indicator_mapping["simplified_gene_no_edges"]), axis=1))
         self.indicator_mapping["simplified_gene_nws_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene_no_ws"], self.indicator_mapping["simplified_gene_no_ws"]), axis=1))
-        self.indicator_mapping["coverage"][0] = self.map_elites_archive_f.coverage
-        self.indicator_mapping["qd-score_f"][0] = self.map_elites_archive_f.qd_score
-        self.indicator_mapping["qd-score_an"][0] = self.map_elites_archive_an.qd_score
+        self.indicator_mapping["coverage"] += [self.map_elites_archive_f.coverage()]
+        f_qd_scores = self.map_elites_archive_f.qd_scores({'fitness':'qd-score_ff', 'unaligned_novelty':'qd-score_fun', 'aligned_novelty':'qd-score_fan'})
+        an_qd_scores = self.map_elites_archive_an.qd_scores({'fitness':'qd-score_anf', 'unaligned_novelty':'qd-score_anun', 'aligned_novelty':'qd-score_anan'})
+        
+        for score in f_qd_scores.keys():
+            self.indicator_mapping[score] += [f_qd_scores[score]]
+
+        for score in an_qd_scores.keys():
+            self.indicator_mapping[score] += [an_qd_scores[score]]
 
         indicator_df = self.indicator_df()
         indicator_df.to_csv(self.indicators_csv_path, mode='a', header=not os.path.exists(self.indicators_csv_path), index = False)
@@ -337,23 +352,25 @@ class QD_Analytics(IAnalytics):
         stats_df.to_csv(self.stats_csv_path, mode='a', header=not os.path.exists(self.stats_csv_path), index = False)
 
         
-
-    
-    def save_archives(self):
+    def save_archives(self, algorithm):
 
         archives = {
             "map_elites_archive_f" : [],
-            "map_elites_archive_an" : []
+            "map_elites_archive_an" : [],
+            "novelty_archive_f" : [],
+            "novelty_archive_an" : []
         }
-
+        if issubclass(type(algorithm.survival), MESurvival):
+            add_to_me_archive = False
+            self.map_elites_archive_f = algorithm.survival.me_archive
         # Coverage is the same for all archives
         for i in range(len(self.map_elites_archive_f)):
             xf = self.map_elites_archive_f[i]
             xan = self.map_elites_archive_an[i]
             # If one is None, all are None
             if xf is not None:
-                archives["map_elites_archive_f"] += [[xf.fitness, xf.unaligned_novelty, xf.aligned_novelty]]
-                archives["map_elites_archive_an"] += [[xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
+                archives["map_elites_archive_f"] += [[xf.md5, xf.id, xf.fitness, xf.unaligned_novelty, xf.aligned_novelty]]
+                archives["map_elites_archive_an"] += [[xan.md5, xan.id, xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
                 # saveToPickle(f"{self.map_elites_archive_f.archive_path}/elite_{i}.pickle", xf)
                 # saveToPickle(f"{self.map_elites_archive_an.archive_path}/elite_{i}.pickle", xan)
             else:
