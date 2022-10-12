@@ -217,8 +217,6 @@ class QD_Analytics(IAnalytics):
             "simplified_gene_nws_div":[]
         }
 
-
-
     def extract_morpho(self, x : object) -> List:
         return [x.active, x.passive]
 
@@ -231,7 +229,6 @@ class QD_Analytics(IAnalytics):
     def extract_trayectory(self, x):
         return [x.finalX - x.initialX, x.finalY -  x.initialY, x.finalZ - x.finalY]
 
-    
     @timeit
     def notify(self, algorithm, **kwargs):
         problem = algorithm.problem
@@ -272,7 +269,6 @@ class QD_Analytics(IAnalytics):
         for individual in problem.evaluators[unaligned_archive_key].novelty_archive:
             self.indicator_mapping["unaligned_novelty_archive_novelty"] += [individual.unaligned_novelty]
             self.indicator_mapping["unaligned_novelty_archive_fit"] += [individual.fitness]
-
 
 
         for ind in pop:
@@ -338,7 +334,7 @@ class QD_Analytics(IAnalytics):
         self.indicator_mapping["coverage"] += [self.map_elites_archive_f.coverage()]
         f_qd_scores = self.map_elites_archive_f.qd_scores({'fitness':'qd-score_ff', 'unaligned_novelty':'qd-score_fun', 'aligned_novelty':'qd-score_fan'})
         an_qd_scores = self.map_elites_archive_an.qd_scores({'fitness':'qd-score_anf', 'unaligned_novelty':'qd-score_anun', 'aligned_novelty':'qd-score_anan'})
-        
+
         for score in f_qd_scores.keys():
             self.indicator_mapping[score] += [f_qd_scores[score]]
 
