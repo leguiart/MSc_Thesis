@@ -238,11 +238,19 @@ class QD_Analytics(IAnalytics):
         
         self.init_indicator_mapping()
 
+        if "unaligned_novelty" in problem.evaluators:
+            unaligned_archive_key = "unaligned_novelty"
+        elif "unaligned_nslc" in problem.evaluators:
+            unaligned_archive_key = "unaligned_nslc"
+
         # self.map_elites_archive_an.update_existing_batch([ind.X for ind in child_pop], problem.evaluators["aligned_novelty"])
         self.map_elites_archive_an.update_existing_archive(problem.evaluators["aligned_novelty"])
-        self.map_elites_archive_an.update_existing_archive(problem.evaluators["unaligned_novelty"])
+        
+        self.map_elites_archive_an.update_existing_archive(problem.evaluators[unaligned_archive_key])
+
         self.map_elites_archive_f.update_existing_archive(problem.evaluators["aligned_novelty"])
-        self.map_elites_archive_f.update_existing_archive(problem.evaluators["unaligned_novelty"])
+
+        self.map_elites_archive_f.update_existing_archive(problem.evaluators[unaligned_archive_key])
 
         add_to_me_archive = True
         if issubclass(type(algorithm.survival), MESurvival):
@@ -261,10 +269,7 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["aligned_novelty_archive_novelty"] += [individual.aligned_novelty]
             self.indicator_mapping["aligned_novelty_archive_fit"] += [individual.fitness]
 
-        if "unaligned_novelty" in problem.evaluators:
-            unaligned_archive_key = "unaligned_novelty"
-        elif "unaligned_nslc" in problem.evaluators:
-            unaligned_archive_key = "unaligned_nslc"
+  
         
         for individual in problem.evaluators[unaligned_archive_key].novelty_archive:
             self.indicator_mapping["unaligned_novelty_archive_novelty"] += [individual.unaligned_novelty]
