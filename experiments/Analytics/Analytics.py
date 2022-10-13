@@ -244,6 +244,12 @@ class QD_Analytics(IAnalytics):
             unaligned_archive_key = "unaligned_nslc"
 
         # self.map_elites_archive_an.update_existing_batch([ind.X for ind in child_pop], problem.evaluators["aligned_novelty"])
+
+        add_to_me_archive = True
+        if issubclass(type(algorithm.survival), MESurvival):
+            add_to_me_archive = False
+            self.map_elites_archive_f = algorithm.survival.me_archive
+
         self.map_elites_archive_an.update_existing_archive(problem.evaluators["aligned_novelty"])
         
         self.map_elites_archive_an.update_existing_archive(problem.evaluators[unaligned_archive_key])
@@ -251,11 +257,6 @@ class QD_Analytics(IAnalytics):
         self.map_elites_archive_f.update_existing_archive(problem.evaluators["aligned_novelty"])
 
         self.map_elites_archive_f.update_existing_archive(problem.evaluators[unaligned_archive_key])
-
-        add_to_me_archive = True
-        if issubclass(type(algorithm.survival), MESurvival):
-            add_to_me_archive = False
-            self.map_elites_archive_f = algorithm.survival.me_archive
 
         for ind in child_pop:
             if add_to_me_archive: 
