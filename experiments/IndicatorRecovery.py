@@ -112,6 +112,9 @@ def main():
         run_dirs = glob.glob(run_dir_prefix+"*")
         run_dirs = list(filter(lambda dir : os.path.isdir(dir), run_dirs))
         
+        if len(run_dirs) == 0:
+            continue
+
         run_indices = {}
         for dir in run_dirs:
             indx = re.findall('[0-9]+', dir.split('/')[-1])
@@ -155,14 +158,18 @@ def main():
                         ids_to_individuals = {individual[0] : individual[1] for individual in generation_nns}
                         d = {"id" : list(ids_to_individuals.keys())}
                         df = pd.DataFrame(d)
-                        df_joined = df.join(run_df.set_index('id'), on='id', lsuffix='_caller', rsuffix='_other')
-
-                        softbot_pop_mat = df_to_population(df_joined, ids_to_individuals)
-                        softbot_problem._evaluate(softbot_pop_mat, {"F":[], "G":[]})
-                        softbot_pop = [vec[0] for vec in softbot_pop_mat]
-                        lst_pop = [ind.X for ind in softbot_pop]
-                        softbot_problem.clean(lst_pop, pop_size = len(lst_pop)//2)
-                        analytics.notify(algorithm, pop = softbot_pop[:len(softbot_pop)//2], child_pop = softbot_pop[len(softbot_pop)//2:])                     
+                        try:
+                            df_joined = df.join(run_df.set_index('id'), on='id', lsuffix='_caller', rsuffix='_other')
+                            softbot_pop_mat = df_to_population(df_joined, ids_to_individuals)
+                            softbot_problem._evaluate(softbot_pop_mat, {"F":[], "G":[]})
+                            softbot_pop = [vec[0] for vec in softbot_pop_mat]
+                            lst_pop = [ind.X for ind in softbot_pop]
+                            softbot_problem.clean(lst_pop, pop_size = len(lst_pop)//2)
+                            analytics.notify(algorithm, pop = softbot_pop[:len(softbot_pop)//2], child_pop = softbot_pop[len(softbot_pop)//2:])  
+                        except:
+                            logger.warning(f"Run {run_index} of {experiment_type} experiment, needs to be repeated")
+                            run_not_included = True
+                            break                   
                     else:
                         if gen == max_gens:
                             res_set_path = os.path.join(run_dir, "results_set.pickle")
@@ -180,9 +187,10 @@ def main():
                                 analytics.notify(algorithm, pop = res_pop, child_pop = softbot_pop[len(softbot_pop)//2:])
                             
                             # softbot_problem.backup(pickle_nov_archive = True)
-                            analytics.save_archives()  
+                            analytics.save_archives(algorithm)  
                         else:
                             run_not_included = True
+                            logger.warning(f"Run {run_index} of {experiment_type} experiment, needs to be repeated")
                         break
 
             if run_not_included:

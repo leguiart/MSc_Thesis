@@ -96,13 +96,14 @@ class NoveltyEvaluatorKD(IEvaluator[T], IResults, ICheckpoint, IStarter):
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
-        self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
-        if "novelty_threshold" in self.obj_properties_backup:
-            self.novelty_threshold = self.obj_properties_backup["novelty_threshold"]
-        if "time_out" in self.obj_properties_backup:
-            self.time_out = self.obj_properties_backup["time_out"]
-        if "its" in self.obj_properties_backup:
-            self.its = self.obj_properties_backup["its"]
+        if resuming_run:
+            self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
+            if "novelty_threshold" in self.obj_properties_backup:
+                self.novelty_threshold = self.obj_properties_backup["novelty_threshold"]
+            if "time_out" in self.obj_properties_backup:
+                self.time_out = self.obj_properties_backup["time_out"]
+            if "its" in self.obj_properties_backup:
+                self.its = self.obj_properties_backup["its"]
         if resuming_run and os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
             dir_contents = [file for file in os.listdir(self.archive_path) if os.path.isfile(os.path.join(self.archive_path, file))]
             if dir_contents:

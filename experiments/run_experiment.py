@@ -429,7 +429,7 @@ def main(parser : argparse.ArgumentParser):
             physics_evaluator_cache = physics_sim.already_evaluated
             writeToJson('experiments/physics_evaluator_cache.json', physics_evaluator_cache)
 
-            analytics.save_archives()
+            analytics.save_archives(algorithm)
         
     sys.exit()
 
