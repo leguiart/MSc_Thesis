@@ -173,7 +173,7 @@ class MAP_ElitesArchive(ICheckpoint, IEvaluator, IFileRecovery, object):
             # saveToPickle(f"{self.archive_path}/elite_{i}.pickle", x)
             self.filled_indices += [i]
             self.filled_elites_archive[i] = 1
-            self.archive[i] = x
+            self.archive[i] = copy.deepcopy(x)
             return True
         else:
             return False

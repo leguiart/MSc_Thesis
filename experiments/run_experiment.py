@@ -336,11 +336,10 @@ def main(parser : argparse.ArgumentParser):
         
         if experiment == "MAP-ELITES":
             total_voxels = np.prod(IND_SIZE)
-            min_max_gr = [(0, total_voxels, total_voxels + 1), (0, total_voxels, total_voxels + 1)]       
             lower_bound = np.array([0,0])
             upper_bound = np.array([total_voxels, total_voxels])
             ppd = np.array([total_voxels + 1, total_voxels + 1])
-            me_archive = MAP_ElitesArchive("f_elites", run_path, lower_bound, upper_bound, ppd, extract_morpho, bins_type=int)
+            me_archive = MAP_ElitesArchive("f_elites", run_path, lower_bound, upper_bound, ppd, extract_morpho)
             ga_survival = MESurvival(me_archive)
             ga_selection = MESelection(me_archive)
 
