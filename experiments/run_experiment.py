@@ -166,7 +166,7 @@ def main(parser : argparse.ArgumentParser):
     usePhysicsCache = argv.physics_cache
     save_checkpoint = argv.save_checkpoint
     save_every = argv.save_every
-    save_networks = argv.save_networks
+    save_networks = argv.save_population
     skip_existing = argv.skip_existing
 
 
