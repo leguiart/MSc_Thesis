@@ -415,8 +415,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             elif self.env[self.curr_env_idx].actuation_variance == 0 and ind.md5 in self.already_evaluated:
                 
                 for rank, goal in self.objective_dict.items():
-                    if goal["name"] == "fitness":
-                        logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
+                    #if goal["name"] == "fitness":
+                        #logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
                     setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
@@ -493,8 +493,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                 if tag is not None:
                     tag = tag.lstrip('<').rstrip('>')
                     tag_ocurrences = fitness_report.findall("./detail/" + self.run_name + "--id_%05i" % ind_id + "/" + tag)
-                    if details["name"] == "fitness":
-                        logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{tag_ocurrences[0].text}")
+                    #if details["name"] == "fitness":
+                        #logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{tag_ocurrences[0].text}")
                     # results[rank] = float(tag_ocurrences[0].text)
                     setattr(ind, details["name"], float(tag_ocurrences[0].text))
                 else:
