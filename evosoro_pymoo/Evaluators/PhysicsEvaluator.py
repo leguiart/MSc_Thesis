@@ -530,47 +530,6 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             for ind_id, ind in ids_softbot_map.items():
                 future = executor.submit(md5_func2, ind_id, ind)
                 future.result()
-        # for ind_id, ind in ids_softbot_map.items():
-            
-            # for _, details in self.objective_dict.items():
-            #     tag = details["tag"]
-            #     if tag is not None:
-            #         tag = tag.lstrip('<').rstrip('>')
-            #         tag_ocurrences = fitness_report.findall("./detail/" + self.run_name + "--id_%05i" % ind_id + "/" + tag)
-            #         setattr(ind, details["name"], float(tag_ocurrences[0].text))
-            #     else:
-            #         for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
-            #             if name == details["output_node_name"]:
-            #                 state = details_phenotype["state"]
-            #                 setattr(ind, details["name"], details["node_func"](state))
-
-
-            # self.already_evaluated[ind.md5] = [int64Convertion(getattr(ind, details["name"]))
-            #                                     for _, details in
-            #                                     self.objective_dict.items()]
-
-
-            # ind_filename_vxd = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind_id
-            # ind_filename_vxa = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind_id
-            # if os.path.exists(ind_filename_vxd):
-            #     sub.call("rm " + ind_filename_vxd, shell=True)
-
-            # # update the run statistics and file management
-            # if ind.fitness > self.best_fit_so_far:
-            #     self.best_fit_so_far = ind.fitness
-            #     file_destination = self.run_directory + "/bestSoFar/fitOnly/" + self.run_name + "--Gen_%04i--fit_%.08f--id_%05i--md5_%s.vxa" % (self.n_batch, ind.fitness, ind_id, ind.md5)
-
-            #     if os.path.exists(ind_filename_vxa):
-            #         sub.call("cp " + ind_filename_vxa + " " + file_destination, shell=True)
-
-
-            # if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
-            #     if os.path.exists(ind_filename_vxa):
-            #         file_destination = f"{self.run_directory}/Gen_{self.n_batch:04d}/{self.run_name}--Gen_{self.n_batch:04d}--fit_{ind.fitness:.08f}--id_{ind.id:05d}--md5_{ind.md5}.vxa"
-            #         sub.call("mv " + ind_filename_vxa + " " + file_destination, shell=True)
-            #         # sub.call("rm " + ind_filename_vxa, shell=True)
-            # else:
-            #     sub.call("rm " + ind_filename_vxa, shell=True)
 
         if not all_done:
             logger.warning("Couldn't get a fitness value in time for some individuals. "
