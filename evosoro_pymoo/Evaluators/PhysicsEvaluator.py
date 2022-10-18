@@ -221,7 +221,7 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                     if goal["tag"] is not None:
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
-                logger.debug("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
+                # logger.debug("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id +
@@ -415,8 +415,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             elif self.env[self.curr_env_idx].actuation_variance == 0 and ind.md5 in self.already_evaluated:
                 
                 for rank, goal in self.objective_dict.items():
-                    if goal["name"] == "fitness":
-                        logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
+                    # if goal["name"] == "fitness":
+                    #     logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
                     setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
@@ -493,8 +493,8 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                 if tag is not None:
                     tag = tag.lstrip('<').rstrip('>')
                     tag_ocurrences = fitness_report.findall("./detail/" + self.run_name + "--id_%05i" % ind_id + "/" + tag)
-                    if details["name"] == "fitness":
-                        logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{tag_ocurrences[0].text}")
+                    # if details["name"] == "fitness":
+                    #     logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{tag_ocurrences[0].text}")
                     # results[rank] = float(tag_ocurrences[0].text)
                     setattr(ind, details["name"], float(tag_ocurrences[0].text))
                 else:
@@ -503,26 +503,12 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                             state = details_phenotype["state"]
                             setattr(ind, details["name"], details["node_func"](state))
 
-            # for rank, details in self.objective_dict.items():
-            #     if results[rank] is not None:
-            #         if details["name"] == "fitness":
-            #             logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{results[rank]}")
-            #         setattr(ind, details["name"], results[rank])
-            #     else:
-            #         for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
-            #             if name == details["output_node_name"]:
-            #                 state = details_phenotype["state"]
-            #                 setattr(ind, details["name"], details["node_func"](state))
-
-
 
             self.already_evaluated[ind.md5] = [int64Convertion(getattr(ind, details["name"]))
                                                 for _, details in
                                                 self.objective_dict.items()]
 
 
-        # for ind in pop[start_indx:]:
-        #     ind_id = ind.id
             ind_filename_vxd = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind_id
             ind_filename_vxa = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind_id
             if os.path.exists(ind_filename_vxd):
