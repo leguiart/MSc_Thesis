@@ -3,7 +3,6 @@ import glob
 import os
 import re
 import sys
-import concurrent.futures
 import logging
 import numpy as np
 import pandas as pd

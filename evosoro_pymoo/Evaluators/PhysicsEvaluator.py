@@ -1,22 +1,26 @@
-import json
+
 import os
-import sys
 import time
 import logging
 import numpy as np
 import subprocess as sub
 from lxml import etree
+from concurrent.futures import ThreadPoolExecutor
 
-#sys.path.append(os.getcwd() + "/../..")
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit, writeToJson
+from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter
+from evosoro.softbot import Population as SoftBot
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
+def int64Convertion(num):
+    if isinstance(num, np.integer):
+        return int(num)
+    return num
 
 def folder_heirarchy_creation_helper(run_directory, save_networks, save_all_individual_data, save_lineages, resuming_run = False):
     # clear directory
@@ -402,11 +406,11 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
         create_gen_directories(self.n_batch, self.run_directory, self.save_vxa_every, self.save_nets)
         logger.info("Starting voxcraft physics evaluation")
 
-            
-        for ind in pop[start_indx:]:
+        def md5_func(ind : SoftBot):
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
             ind.md5, root = get_vxd(self.sim, self.env[self.curr_env_idx], ind)
             write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
+
             # don't evaluate if invalid
             if not ind.phenotype.is_valid():
                 logger.info("Skipping invalid individual")
@@ -415,8 +419,6 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             elif self.env[self.curr_env_idx].actuation_variance == 0 and ind.md5 in self.already_evaluated:
                 
                 for rank, goal in self.objective_dict.items():
-                    # if goal["name"] == "fitness":
-                    #     logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
                     setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
@@ -426,21 +428,24 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                         sub.call("mv " + source_file +
                                 " " + dest_file, shell=True)
                         
-
             # otherwise evaluate with voxcraft
             else:
 
                 if ind.id not in ids_softbot_map:
-                    num_evaluated_this_gen += 1
                     ids_softbot_map[ind.id] = ind
                     with open(self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind.id, "w", encoding='utf-8') as vxd:
                         root_str = etree.tostring(root)
                         vxd.write(root_str.decode('utf-8'))
 
+
+        with ThreadPoolExecutor() as executor:
+            for individual in pop[start_indx:]:
+                future = executor.submit(md5_func, individual)
+                future.result()
+
+        num_evaluated_this_gen = len(ids_softbot_map) 
         all_done = len(ids_softbot_map) == 0
         fitness_eval_start_time = time.time()
-
-
 
         while not all_done:
             time_waiting_for_fitness = time.time() - fitness_eval_start_time
@@ -480,22 +485,12 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                 logger.exception(re)
                 logger.error(f"Re-simulating this batch again...")
 
-        def int64Convertion(num):
-            if isinstance(num, np.integer):
-                return int(num)
-            return num
-
-        for ind_id, ind in ids_softbot_map.items():
-            
-            # results = {rank: None for rank in range(len(self.objective_dict))}
+        def md5_func2(ind_id : int, ind : SoftBot):
             for _, details in self.objective_dict.items():
                 tag = details["tag"]
                 if tag is not None:
                     tag = tag.lstrip('<').rstrip('>')
                     tag_ocurrences = fitness_report.findall("./detail/" + self.run_name + "--id_%05i" % ind_id + "/" + tag)
-                    # if details["name"] == "fitness":
-                    #     logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{tag_ocurrences[0].text}")
-                    # results[rank] = float(tag_ocurrences[0].text)
                     setattr(ind, details["name"], float(tag_ocurrences[0].text))
                 else:
                     for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
@@ -531,6 +526,52 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)
 
+        with ThreadPoolExecutor() as executor:
+            for ind_id, ind in ids_softbot_map.items():
+                future = executor.submit(md5_func2, ind_id, ind)
+                future.result()
+        # for ind_id, ind in ids_softbot_map.items():
+            
+            # for _, details in self.objective_dict.items():
+            #     tag = details["tag"]
+            #     if tag is not None:
+            #         tag = tag.lstrip('<').rstrip('>')
+            #         tag_ocurrences = fitness_report.findall("./detail/" + self.run_name + "--id_%05i" % ind_id + "/" + tag)
+            #         setattr(ind, details["name"], float(tag_ocurrences[0].text))
+            #     else:
+            #         for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
+            #             if name == details["output_node_name"]:
+            #                 state = details_phenotype["state"]
+            #                 setattr(ind, details["name"], details["node_func"](state))
+
+
+            # self.already_evaluated[ind.md5] = [int64Convertion(getattr(ind, details["name"]))
+            #                                     for _, details in
+            #                                     self.objective_dict.items()]
+
+
+            # ind_filename_vxd = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind_id
+            # ind_filename_vxa = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind_id
+            # if os.path.exists(ind_filename_vxd):
+            #     sub.call("rm " + ind_filename_vxd, shell=True)
+
+            # # update the run statistics and file management
+            # if ind.fitness > self.best_fit_so_far:
+            #     self.best_fit_so_far = ind.fitness
+            #     file_destination = self.run_directory + "/bestSoFar/fitOnly/" + self.run_name + "--Gen_%04i--fit_%.08f--id_%05i--md5_%s.vxa" % (self.n_batch, ind.fitness, ind_id, ind.md5)
+
+            #     if os.path.exists(ind_filename_vxa):
+            #         sub.call("cp " + ind_filename_vxa + " " + file_destination, shell=True)
+
+
+            # if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
+            #     if os.path.exists(ind_filename_vxa):
+            #         file_destination = f"{self.run_directory}/Gen_{self.n_batch:04d}/{self.run_name}--Gen_{self.n_batch:04d}--fit_{ind.fitness:.08f}--id_{ind.id:05d}--md5_{ind.md5}.vxa"
+            #         sub.call("mv " + ind_filename_vxa + " " + file_destination, shell=True)
+            #         # sub.call("rm " + ind_filename_vxa, shell=True)
+            # else:
+            #     sub.call("rm " + ind_filename_vxa, shell=True)
+
         if not all_done:
             logger.warning("Couldn't get a fitness value in time for some individuals. "
                             "The min fitness was assigned for these individuals")
@@ -541,3 +582,5 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
         logger.info("Finished voxcraft physics evaluation")
 
         return super().evaluate(pop)
+        
+
