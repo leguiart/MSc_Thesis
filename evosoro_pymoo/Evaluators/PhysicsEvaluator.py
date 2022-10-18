@@ -438,10 +438,13 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                         vxd.write(root_str.decode('utf-8'))
 
 
-        with ThreadPoolExecutor() as executor:
-            for individual in pop[start_indx:]:
-                future = executor.submit(md5_func, individual)
-                future.result()
+        # with ThreadPoolExecutor() as executor:
+            # for individual in pop[start_indx:]:
+            #     future = executor.submit(md5_func, individual)
+            #     future.result()
+
+        for individual in pop[start_indx:]:
+            md5_func(individual)
 
         num_evaluated_this_gen = len(ids_softbot_map) 
         all_done = len(ids_softbot_map) == 0
@@ -526,10 +529,13 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)
 
-        with ThreadPoolExecutor() as executor:
-            for ind_id, ind in ids_softbot_map.items():
-                future = executor.submit(md5_func2, ind_id, ind)
-                future.result()
+        # with ThreadPoolExecutor() as executor:
+            # for ind_id, ind in ids_softbot_map.items():
+            #     future = executor.submit(md5_func2, ind_id, ind)
+            #     future.result()
+        
+        for ind_id, ind in ids_softbot_map.items():
+            md5_func2(ind_id, ind)
 
         if not all_done:
             logger.warning("Couldn't get a fitness value in time for some individuals. "
