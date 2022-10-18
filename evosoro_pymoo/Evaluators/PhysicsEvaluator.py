@@ -17,10 +17,7 @@ from evosoro.softbot import Population as SoftBot
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
-def int64Convertion(num):
-    if isinstance(num, np.integer):
-        return int(num)
-    return num
+
 
 def folder_heirarchy_creation_helper(run_directory, save_networks, save_all_individual_data, save_lineages, resuming_run = False):
     # clear directory
@@ -487,6 +484,11 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                 logger.error(f"There was resource usage error:")
                 logger.exception(re)
                 logger.error(f"Re-simulating this batch again...")
+
+        def int64Convertion(num):
+            if isinstance(num, np.integer):
+                return int(num)
+            return num
 
         def md5_func2(ind_id : int, ind : SoftBot):
             for _, details in self.objective_dict.items():
