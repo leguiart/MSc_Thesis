@@ -20,7 +20,7 @@ class MESurvival(Survival):
         self.me_archive = me_archive
 
     def _do(self, problem, pop, *args, n_survive=None, **kwargs):
-        obj_pop = [x_i.X for x_i in pop]
+        obj_pop = [x_i.X for x_i in pop] if n_survive == len(pop) else [x_i.X for x_i in pop[n_survive:]]
         indexes = []
         for i, ind in enumerate(obj_pop):
             if self.me_archive.try_add(ind):
