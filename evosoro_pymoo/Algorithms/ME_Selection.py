@@ -37,7 +37,7 @@ class MESelection(Selection):
                 
 
         # Uniformly select filled bins
-        selected_bins += random.sample(filled_bins_indxs, min(n_select*n_parents, len(filled_bins_indxs)))
+        selected_bins += random.choices(filled_bins_indxs, min(n_select*n_parents, len(filled_bins_indxs)))
         for i, bin in enumerate(selected_bins):
             pop[i].X = copy.deepcopy(self.me_archive[bin])
 
