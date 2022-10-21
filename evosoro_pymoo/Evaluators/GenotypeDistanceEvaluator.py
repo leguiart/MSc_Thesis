@@ -1,5 +1,4 @@
 
-import concurrent.futures
 import logging
 from typing import Dict, List, Set, Tuple
 from matplotlib.pyplot import axis
@@ -61,14 +60,6 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
                         self.output_tags[-1].add(name)
             self.io_tags_cached = True
 
-        logger.debug("Starting vector field distance calculation...")
-
-        dxdydz = self.dx*self.dy*self.dz
-        for i in range(len(X)):              
-            for j in range(i + 1, len(X)):
-                row_id, col_id = X[i].id, X[j].id
-                if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
-                    self[(row_id, col_id)] = vector_field_distance(X[i], X[j], self.output_tags, dxdydz)
         # with concurrent.futures.ProcessPoolExecutor() as executor:
         #     future_to_indexes = {}
         #     for i in range(len(X)):              
@@ -80,6 +71,15 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
         #     for future in concurrent.futures.as_completed(future_to_indexes):
         #         row_id, col_id = future_to_indexes[future]
         #         self[(row_id, col_id)] = future.result()
+
+        logger.debug("Starting vector field distance calculation...")
+
+        dxdydz = self.dx*self.dy*self.dz
+        for i in range(len(X)):              
+            for j in range(i + 1, len(X)):
+                row_id, col_id = X[i].id, X[j].id
+                if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
+                    self[(row_id, col_id)] = vector_field_distance(X[i], X[j], self.output_tags, dxdydz)
 
         logger.debug("Finished vector field distance calculation...")
 

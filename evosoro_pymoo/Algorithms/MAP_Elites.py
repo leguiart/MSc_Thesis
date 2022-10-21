@@ -16,12 +16,8 @@ import pickle
 import shutil
 from typing import List, Callable
 from sklearn.neighbors import KDTree
-from pymoo.algorithms.base.genetic import GeneticAlgorithm
-from pymoo.operators.mutation.pm import PolynomialMutation
-from pymoo.operators.sampling.rnd import FloatRandomSampling
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
-from common.Utils import readFromJson, readFromPickle, saveToPickle, writeToJson
+from common.Utils import readFromPickle, saveToPickle
 from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD

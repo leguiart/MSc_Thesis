@@ -355,16 +355,23 @@ class QD_Analytics(IAnalytics):
 
         
     def save_archives(self, algorithm):
-
+        problem = algorithm.problem
         archives = {
             "map_elites_archive_f" : [],
             "map_elites_archive_an" : [],
-            "novelty_archive_f" : [],
+            "novelty_archive_un" : [],
             "novelty_archive_an" : []
         }
         if issubclass(type(algorithm.survival), MESurvival):
-            add_to_me_archive = False
             self.map_elites_archive_f = algorithm.survival.me_archive
+        if "unaligned_novelty" in problem.evaluators:
+            unaligned_archive_key = "unaligned_novelty"
+        elif "unaligned_nslc" in problem.evaluators:
+            unaligned_archive_key = "unaligned_nslc"
+
+        an_novelty_archive = problem.evaluators["aligned_novelty"]
+        un_novelty_archive = problem.evaluators[unaligned_archive_key]
+
         # Coverage is the same for all archives
         for i in range(len(self.map_elites_archive_f)):
             xf = self.map_elites_archive_f[i]
@@ -378,6 +385,14 @@ class QD_Analytics(IAnalytics):
             else:
                 archives["map_elites_archive_f"] += [0]
                 archives["map_elites_archive_an"] += [0]
+
+        for xan in an_novelty_archive.novelty_archive:
+            archives["novelty_archive_an"] += [[xan.md5, xan.id, xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
+        
+        for xun in un_novelty_archive.novelty_archive:
+            archives["novelty_archive_un"] += [[xun.md5, xun.id, xun.fitness, xun.unaligned_novelty, xun.aligned_novelty]]
+
+        
         save_json(self.archives_json_path, archives)
 
 

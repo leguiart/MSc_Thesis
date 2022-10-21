@@ -96,13 +96,14 @@ class NoveltyEvaluatorKD(IEvaluator[T], IResults, ICheckpoint, IStarter):
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
-        self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
-        if "novelty_threshold" in self.obj_properties_backup:
-            self.novelty_threshold = self.obj_properties_backup["novelty_threshold"]
-        if "time_out" in self.obj_properties_backup:
-            self.time_out = self.obj_properties_backup["time_out"]
-        if "its" in self.obj_properties_backup:
-            self.its = self.obj_properties_backup["its"]
+        if resuming_run:
+            self.obj_properties_backup = readFromJson(self.obj_properties_json_path)
+            if "novelty_threshold" in self.obj_properties_backup:
+                self.novelty_threshold = self.obj_properties_backup["novelty_threshold"]
+            if "time_out" in self.obj_properties_backup:
+                self.time_out = self.obj_properties_backup["time_out"]
+            if "its" in self.obj_properties_backup:
+                self.its = self.obj_properties_backup["its"]
         if resuming_run and os.path.exists(self.archive_path) and os.path.isdir(self.archive_path):
             dir_contents = [file for file in os.listdir(self.archive_path) if os.path.isfile(os.path.join(self.archive_path, file))]
             if dir_contents:
@@ -165,6 +166,12 @@ class NoveltyEvaluatorKD(IEvaluator[T], IResults, ICheckpoint, IStarter):
         """
 
         logger.debug("Starting novelty evaluation")
+
+        pop_size = kwargs['pop_size']
+        if len(X) == pop_size:
+            start_indx = 0
+        elif len(X) > pop_size:
+            start_indx = len(X) - pop_size
         
         self.individuals_added = []
         novelty_scores, _ = self._evaluate_novelty(X)
@@ -176,7 +183,7 @@ class NoveltyEvaluatorKD(IEvaluator[T], IResults, ICheckpoint, IStarter):
             if i < len(X):
                 # Set novelty
                 setattr(X[i], self.novelty_name, novelty)   
-                if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
+                if(i >= start_indx and getattr(X[i], self.novelty_name) > self.novelty_threshold) or len(self.novelty_archive) < self.min_novelty_archive_size:
                     self.items_added_in_generation+=1
                     ind_copy = copy.deepcopy(X[i])
                     self.novelty_archive += [ind_copy]
@@ -245,6 +252,12 @@ class NSLCEvaluator(NoveltyEvaluatorKD):
     def evaluate(self, X : List[T], *args, **kwargs) -> List[T]:
         logger.debug("Starting novelty search with local competition evaluation")
 
+        pop_size = kwargs['pop_size']
+        if len(X) == pop_size:
+            start_indx = 0
+        elif len(X) > pop_size:
+            start_indx = len(X) - pop_size
+
         novelty_scores, kn_neighbors_ind = self._evaluate_novelty(X)
 
         fitness_scores = np.array([getattr(X[i], self.fitness_name) 
@@ -261,7 +274,7 @@ class NSLCEvaluator(NoveltyEvaluatorKD):
                 setattr(X[i], self.novelty_name, novelty)
                 setattr(X[i], self.nslc_quality_name, self.k_neighbors - sum([1 if getattr(X[i], self.fitness_name) < f else 0 for f in kn_neighborsf]))
 
-                if(getattr(X[i], self.novelty_name) > self.novelty_threshold or len(self.novelty_archive) < self.min_novelty_archive_size):
+                if(i >= start_indx and getattr(X[i], self.novelty_name) > self.novelty_threshold) or len(self.novelty_archive) < self.min_novelty_archive_size:
                     self.items_added_in_generation+=1
                     ind_copy = copy.deepcopy(X[i])
                     self.novelty_archive += [ind_copy]

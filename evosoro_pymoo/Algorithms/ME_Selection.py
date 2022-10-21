@@ -1,6 +1,7 @@
 
 import random
 import numpy as np
+import copy
 
 from pymoo.core.selection import Selection
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive
@@ -36,8 +37,8 @@ class MESelection(Selection):
                 
 
         # Uniformly select filled bins
-        selected_bins += random.sample(filled_bins_indxs, min(n_select*n_parents, len(filled_bins_indxs)))
+        selected_bins += random.choices(filled_bins_indxs, k = min(n_select*n_parents, len(filled_bins_indxs)))
         for i, bin in enumerate(selected_bins):
-            pop[i].X = self.me_archive[bin]
+            pop[i].X = copy.deepcopy(self.me_archive[bin])
 
         return np.arange(0,n_select*n_parents).reshape((n_select, n_parents))

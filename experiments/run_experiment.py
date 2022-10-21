@@ -166,7 +166,7 @@ def main(parser : argparse.ArgumentParser):
     usePhysicsCache = argv.physics_cache
     save_checkpoint = argv.save_checkpoint
     save_every = argv.save_every
-    save_networks = argv.save_networks
+    save_networks = argv.save_population
     skip_existing = argv.skip_existing
 
 
@@ -429,7 +429,7 @@ def main(parser : argparse.ArgumentParser):
             physics_evaluator_cache = physics_sim.already_evaluated
             writeToJson('experiments/physics_evaluator_cache.json', physics_evaluator_cache)
 
-            analytics.save_archives()
+            analytics.save_archives(algorithm)
         
     sys.exit()
 
@@ -451,7 +451,7 @@ if __name__ == "__main__":
     parser.add_argument('--physics_cache', action='store_true', help = "Use existing physics cache")
     parser.add_argument('--save_checkpoint', action='store_true', help = "Use to save checkpoints from which to continue in case the program is stopped")
     parser.add_argument('-se', '--save_every', type=int, default=1, help="Save checkpoints every given number of generations")
-    parser.add_argument('--save_networks', action='store_true', help = "Use to save networks each generation")
+    parser.add_argument('--save_population', action='store_true', help = "Use to save population each generation")
     parser.add_argument('--skip_existing', action='store_true', help = "Use to skip any run with stored data in existance")
 
     main(parser)
