@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 import logging
 
-from pymoo.core.evaluator import set_cv
+# from pymoo.core.evaluator import set_cv
 from pymoo.core.algorithm import Algorithm
 from pymoo.core.population import Population
 
@@ -106,7 +106,7 @@ class PopulationBasedOptimizerPyMOO(Optimizer, ICheckpoint, IStarter):
         F, G, _ = self.algorithm.evaluator.eval(self.problem, mat_pop, pop_size = len(children_pop), n_gen = self.algorithm.n_gen)
         pop.set("F", F)
         pop.set("G", G)
-        set_cv(pop)
+        # set_cv(pop)
         
         # Save networks
         if self.save_networks:

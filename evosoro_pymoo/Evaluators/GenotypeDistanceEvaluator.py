@@ -44,7 +44,7 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
     @timeit
     def evaluate(self, X : List[SoftBot], *args, **kwargs) -> List[SoftBot]:
         if not self.io_tags_cached:            
-            for net in X[0].genotype:
+            for net in X[0][0].genotype:
                 self.input_tags += [set()]
                 self.output_tags += [set()]
                 for name in net.graph.nodes:
@@ -77,9 +77,9 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
         dxdydz = self.dx*self.dy*self.dz
         for i in range(len(X)):              
             for j in range(i + 1, len(X)):
-                row_id, col_id = X[i].id, X[j].id
+                row_id, col_id = X[i][0].id, X[j][0].id
                 if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
-                    self[(row_id, col_id)] = vector_field_distance(X[i], X[j], self.output_tags, dxdydz)
+                    self[(row_id, col_id)] = vector_field_distance(X[i][0], X[j][0], self.output_tags, dxdydz)
 
         logger.debug("Finished vector field distance calculation...")
 

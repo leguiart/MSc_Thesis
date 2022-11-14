@@ -24,34 +24,34 @@ SAVE_POPULATION_EVERY = 1  # How often (every x generations) we save a snapshot 
 LATTICE_DIM = 0.05
 
 #Simple GA experiment
-RUN_DIR_SO = "experiments/BodyBrainData"  # Subdirectory where results are going to be generated
+RUN_DIR_SO = "BodyBrainData"  # Subdirectory where results are going to be generated
 RUN_NAME_SO = "BodyBrain"
 SEEDS_JSON_SO = RUN_DIR_SO + "_seeds.json"
 ANALYTICS_JSON_SO = RUN_DIR_SO + "_analytics.json"
 # ANALYTICS_FILENAME_SO = RUN_DIR_SO + "_analytics"
 
 #QN-MOEA experiment
-RUN_DIR_QN = "experiments/BodyBrainQNData"  # Subdirectory where results are going to be generated
+RUN_DIR_QN = "BodyBrainQNData"  # Subdirectory where results are going to be generated
 RUN_NAME_QN = "BodyBrainQN"
 SEEDS_JSON_QN = RUN_DIR_QN + "_seeds.json"
 ANALYTICS_JSON_QN = RUN_DIR_QN + "_analytics.json"
 # ANALYTICS_FILENAME_MNSLC = RUN_DIR_QN + "_analytics"
 
 #NSLC experiment
-RUN_DIR_NSLC = "experiments/BodyBrainNSLCData"  # Subdirectory where results are going to be generated
+RUN_DIR_NSLC = "BodyBrainNSLCData"  # Subdirectory where results are going to be generated
 RUN_NAME_NSLC = "BodyBrainNSLC"
 SEEDS_JSON_NSLC = RUN_DIR_NSLC + "_seeds.json"
 ANALYTICS_JSON_NSLC = RUN_DIR_NSLC + "_analytics.json"
 
 
 #MAP-ELITES experiment
-RUN_DIR_ME = "experiments/BodyBrainMEData"  # Subdirectory where results are going to be generated
+RUN_DIR_ME = "BodyBrainMEData"  # Subdirectory where results are going to be generated
 RUN_NAME_ME = "BodyBrainME"
 SEEDS_JSON_ME = RUN_DIR_ME + "_seeds.json"
 ANALYTICS_JSON_ME = RUN_DIR_ME + "_analytics.json"
 
 #M-NSLC experiment
-RUN_DIR_MNSLC = "experiments/BodyBrainMNSLCData"  # Subdirectory where results are going to be generated
+RUN_DIR_MNSLC = "BodyBrainMNSLCData"  # Subdirectory where results are going to be generated
 RUN_NAME_MNSLC = "BodyBrainMNSLC"
 SEEDS_JSON_MNSLC = RUN_DIR_MNSLC + "_seeds.json"
 ANALYTICS_JSON_MNSLC = RUN_DIR_MNSLC + "_analytics.json"

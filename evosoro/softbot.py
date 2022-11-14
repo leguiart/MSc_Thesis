@@ -1,9 +1,8 @@
 
-import operator
-import logging
 import math
-import os
 import pickle
+import logging
+import operator
 import numpy as np
 from copy import deepcopy
 

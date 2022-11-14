@@ -1,14 +1,12 @@
 
-from inspect import isclass
+import os
 import numpy as np
 import pandas as pd
-import os
 from scipy.spatial import distance_matrix
-from pymoo.core.callback import Callback
 from typing import List
 from evosoro_pymoo.Algorithms.ME_Survival import MESurvival
 
-from experiments.Constants import *
+from Constants import *
 from evosoro_pymoo.common.IAnalytics import IAnalytics
 from common.Utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
 from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
@@ -129,7 +127,6 @@ class QD_Analytics(IAnalytics):
             "simplified_gene_ne_div",
             "simplified_gene_nws_div"]
 
-
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
         isNewExperiment = kwargs["isNewExperiment"]
@@ -242,8 +239,6 @@ class QD_Analytics(IAnalytics):
             unaligned_archive_key = "unaligned_novelty"
         elif "unaligned_nslc" in problem.evaluators:
             unaligned_archive_key = "unaligned_nslc"
-
-        # self.map_elites_archive_an.update_existing_batch([ind.X for ind in child_pop], problem.evaluators["aligned_novelty"])
 
         add_to_me_archive = True
         if issubclass(type(algorithm.survival), MESurvival):
