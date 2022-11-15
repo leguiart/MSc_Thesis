@@ -18,6 +18,7 @@ from typing import List, Callable, TypeVar
 from sklearn.neighbors import KDTree
 
 from qd_pymoo.Evaluators.IEvaluator import IEvaluationFunction
+from qd_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD
 
 T = TypeVar("T")
 
@@ -126,8 +127,35 @@ class MAP_ElitesArchive(IEvaluationFunction, object):
 
         for i in self.filled_indices:
             for attr in attributes.keys():
-                scores[attributes[attr]] += getattr(self.archive[i], attr)
+                scores[attributes[attr]] += getattr(self.archive[i][0], attr)
         return scores
+        
+    def update_existing_archive(self, novelty_evaluator : NoveltyEvaluatorKD, novelty_attribute : str, elite_feature : str):
 
+        novelty_hashtable = {}
+        union_matrix = []
+
+        # Compute the Union of Novelty archive and the population
+        for individual in novelty_evaluator.novelty_archive:
+            if individual.md5 not in novelty_hashtable:
+                novelty_hashtable[individual.md5] = individual
+                union_matrix += [novelty_evaluator.vector_extractor(individual)]
+        
+        union_matrix = np.array(union_matrix)
+        kd_tree = KDTree(union_matrix)
+
+        for indx in self.filled_indices:
+            current_elite = self[indx][0]
+
+            if current_elite.md5 in novelty_hashtable:
+                updated_elite_novelty = getattr(novelty_hashtable[current_elite.md5], novelty_attribute)
+            else:
+                distances, _ = kd_tree.query([novelty_evaluator.vector_extractor(current_elite)], 
+                                                min(novelty_evaluator.k_neighbors, len(union_matrix)))
+                updated_elite_novelty = np.mean(distances)
+
+            setattr(current_elite, novelty_attribute, updated_elite_novelty)
+            self.filled_indices[indx] = -getattr(current_elite, elite_feature)
+            self.archive[indx] = (current_elite, -getattr(current_elite, elite_feature))
 
       

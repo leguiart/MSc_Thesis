@@ -9,16 +9,20 @@ from pymoo.core.algorithm import Algorithm
 from pymoo.core.population import Population
 from pymoo.core.problem import Problem
 
+from evosoro_pymoo.common.IAnalytics import IAnalytics
+
 
 logger = logging.getLogger(f"__main__.{__name__}")
 
 class PopulationBasedOptimizer:
     def __init__(self,
                 algorithm : Algorithm, 
-                problem : Problem):
+                problem : Problem,
+                analytics : IAnalytics = None):
 
         self.algorithm = algorithm
         self.problem = problem
+        self.analytics = analytics
 
     def run(self):
 
@@ -49,6 +53,12 @@ class PopulationBasedOptimizer:
         logger.info("Starting individuals evaluation")
         self.algorithm.evaluator.eval(self.problem, pop, pop_size = len(children_pop), n_gen = self.algorithm.n_gen, skip_already_evaluated=False)
         logger.info("Individuals evaluation finished")
+
+        # Extract analytics
+        if self.analytics is not None:
+            logger.debug("Collecting analytics data")
+            self.analytics.notify(self.algorithm, pop = pop, pop_size = len(children_pop))
+            logger.debug("Finished collecting analytics data")
 
         # returned the evaluated individuals which have been evaluated or even modified
         # here we produce the next generation parent population by applying a survival technique

@@ -96,7 +96,7 @@ def preconfig_objects(experiment : str, physics_sim : BaseSoftBotPhysicsEvaluato
         ga_survival = MESurvival()
         softbot_problem = SoftBotProblemME(physics_evaluator=physics_sim, me_archive=me_evaluator)
 
-    return softbot_problem, ga_survival, ga_selection
+    return softbot_problem, ga_survival, ga_selection, unaligned_novelty_evaluator
 
 
 class PopulationSampler(Sampling):
@@ -279,10 +279,8 @@ def main(parser : argparse.ArgumentParser):
                                     k_neighbors=300, novelty_floor=1., max_novelty_archive_size=1500, 
                                     vector_extractor=aligned_vector)
             genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz=IND_SIZE)
-            me_evaluator = MAP_ElitesArchive("me_softbot", np.array([0.,0.]), np.array([125., 125.]), np.array([25, 25]), extract_descriptors_func=extract_morpho)
-
-            # Setting up analytics
-            analytics = QD_Analytics(run + 1, experiment, run_name, run_path, 'experiments')
+            me_evaluator = MAP_ElitesArchive("f_elites", np.array([0.,0.]), np.array([125., 125.]), np.array([25, 25]), extract_descriptors_func=extract_morpho)
+            an_me_evaluator = MAP_ElitesArchive("an_elites", np.array([0.,0.]), np.array([125., 125.]), np.array([25, 25]), extract_descriptors_func=extract_morpho)
 
             # Setting up physics simulation
             physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_path, run_name, objective_dict, 
@@ -290,7 +288,7 @@ def main(parser : argparse.ArgumentParser):
                                             save_lineages = SAVE_LINEAGES)
             physics_sim.start(usePhysicsCache = usePhysicsCache, resuming_run = resume_run)
             # Setting up Softbot optimization problem
-            softbot_problem, ga_survival, ga_selection = preconfig_objects(experiment, physics_sim, unaligned_novelty_evaluator, me_evaluator, genotypeDiversityEvaluator)
+            softbot_problem, ga_survival, ga_selection, unaligned_novelty_evaluator = preconfig_objects(experiment, physics_sim, unaligned_novelty_evaluator, me_evaluator, genotypeDiversityEvaluator)
 
             # Setting up optimization algorithm
             softbot_mutation = SoftbotMutation(pop_size, objective_dict)
@@ -311,7 +309,10 @@ def main(parser : argparse.ArgumentParser):
                                 eliminate_duplicates=False,
                                 sampling=PopulationSampler(objective_dict, genotype_cls, phenotype_cls, pop_size))
             algorithm.setup(softbot_problem, termination=('n_gen', max_gens + 1), seed=random_seed)
-            my_optimization = PopulationBasedOptimizer(algorithm, softbot_problem)
+
+            # Setting up analytics
+            analytics = QD_Analytics(run + 1, experiment, run_name, run_path, '', unaligned_novelty_evaluator, aligned_novelty_evaluator, me_evaluator, an_me_evaluator, genotypeDiversityEvaluator)
+            my_optimization = PopulationBasedOptimizer(algorithm, softbot_problem, analytics)
 
             # Start optimization
             results = my_optimization.run()

@@ -214,7 +214,7 @@ class SoftBotProblemFitness(BaseSingleObjectiveProblem):
 
     def _evaluate(self, x, out, *args, **kwargs):
         softBotPop = [vec[0] for vec in x]
-        return super()._evaluate(softBotPop, out, *args, **kwargs)
+        super()._evaluate(softBotPop, out, *args, **kwargs)
 
 class SoftBotProblemFitnessNovelty(BaseFitnessNoveltyProblem):
     def __init__(self, physics_evaluator: BaseSoftBotPhysicsEvaluator, novelty_archive: NoveltyEvaluatorKD):
@@ -222,7 +222,9 @@ class SoftBotProblemFitnessNovelty(BaseFitnessNoveltyProblem):
 
     def _evaluate(self, x, out, *args, **kwargs):
         softBotPop = [vec[0] for vec in x]
-        return super()._evaluate(softBotPop, out, *args, **kwargs)
+        super()._evaluate(softBotPop, out, *args, **kwargs)
+        for i, bot in enumerate(softBotPop):
+            bot.unaligned_novelty = -out["F"][i,1]
 
 class SoftBotProblemNSLC(BaseNSLCProblem):
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, nslc_archive : NSLCEval):
@@ -230,7 +232,9 @@ class SoftBotProblemNSLC(BaseNSLCProblem):
 
     def _evaluate(self, x, out, *args, **kwargs):
         softBotPop = [vec[0] for vec in x]
-        return super()._evaluate(softBotPop, out, *args, **kwargs)
+        super()._evaluate(softBotPop, out, *args, **kwargs)
+        for i, bot in enumerate(softBotPop):
+            bot.unaligned_novelty = -out["F"][i,1]
 
 class SoftBotProblemME(BaseMEProblem):
     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, me_archive: MAP_ElitesArchive):
@@ -238,4 +242,4 @@ class SoftBotProblemME(BaseMEProblem):
 
     def _evaluate(self, x, out, *args, **kwargs):
         softBotPop = [vec[0] for vec in x]
-        return super()._evaluate(softBotPop, out, *args, **kwargs)
+        super()._evaluate(softBotPop, out, *args, **kwargs)
