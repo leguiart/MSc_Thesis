@@ -137,3 +137,5 @@ dmypy.json
 /workspace
 /*_elites
 /experiments/*_elites
+
+database.ini

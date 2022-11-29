@@ -6,7 +6,7 @@ import os
 import sys
 import math
 from pymoo.core.problem import Problem
-from Constants import *
+from constants import *
 # sys.path.append(os.getcwd() + "/../..")
 from evosoro.networks import CPPN
 from evosoro.softbot import Genotype, Phenotype

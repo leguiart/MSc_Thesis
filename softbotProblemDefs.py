@@ -4,7 +4,7 @@ import subprocess
 import numpy as np
 from typing import List
 
-from Constants import *
+from constants import *
 from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator

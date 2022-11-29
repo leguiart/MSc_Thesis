@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["--physics", "GPU", "-e", "MAP-ELITES", "-p", "10", "-g", "10", "-r", "20", "--physics_cache"]
+            "args": ["-a", "NSLC", "-e", "NSLC_test", "-r", "20", "--physics_cache"]
         }
     ]
 }

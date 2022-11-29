@@ -17,7 +17,6 @@ import glob
 import uuid
 import logging
 import argparse
-import subprocess
 import numpy as np
 from functools import partial
 from pymoo.core.sampling import Sampling
@@ -25,30 +24,29 @@ from pymoo.operators.selection.tournament import TournamentSelection
 from pymoo.algorithms.moo.nsga2 import NSGA2, RankAndCrowdingSurvival, binary_tournament
 from pymoo.algorithms.soo.nonconvex.ga import GA, FitnessSurvival, comp_by_cv_and_fitness
 
-# from dotenv import load_dotenv
-# load_dotenv()
-# sys.path.append(os.getenv('PYTHONPATH'))# Appending repo's root dir in the python path to enable subsequent imports
+from data.dal import Dal
 
-from Constants import *
-from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
-from qd_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator, NoveltyEvaluatorKD
-from qd_pymoo.Algorithm.Optimizer import PopulationBasedOptimizer
-from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
-from qd_pymoo.Algorithm.ME_Selection import MESelection
+from constants import *
+from analytics.analytics import QD_Analytics
+from common.Utils import readFromJson,  saveToPickle, writeToJson
+from genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
+from softbotProblemDefs import SoftBotProblemFitness, SoftBotProblemFitnessNovelty, SoftBotProblemME, SoftBotProblemNSLC
+
 from qd_pymoo.Algorithm.ME_Survival import MESurvival
+from qd_pymoo.Algorithm.ME_Selection import MESelection
+from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
+from qd_pymoo.Algorithm.Optimizer import PopulationBasedOptimizer
+from qd_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator, NoveltyEvaluatorKD
 
+from evosoro_pymoo.Operators.Mutation import SoftbotMutation
+from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
+from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
 from evosoro_pymoo.Algorithms.RankAndVectorFieldDiversitySurvival import RankAndVectorFieldDiversitySurvival
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import BaseSoftBotPhysicsEvaluator, VoxcraftPhysicsEvaluator, VoxelyzePhysicsEvaluator
-from evosoro_pymoo.Operators.Crossover import DummySoftbotCrossover
-from evosoro_pymoo.Operators.Mutation import ME_SoftbotMutation, SoftbotMutation
-from common.Utils import readFromJson,  saveToPickle, writeToJson
-from analytics.Analytics import QD_Analytics
 
 from evosoro.base import Sim, Env, ObjectiveDict
 from evosoro.tools.utils import count_occurrences
 from evosoro.softbot import Population as SoftbotPopulation, SoftBot
-from SoftbotProblemDefs import SoftBotProblemFitness, SoftBotProblemFitnessNovelty, SoftBotProblemME, SoftBotProblemNSLC
-from Genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
 
 
 # create logger with __name__
@@ -74,24 +72,24 @@ def extract_morpho(x : SoftBot):
 def aligned_vector(a : SoftBot):
     return np.array([a.finalX - a.initialX, a.finalY - a.initialY, a.finalZ - a.initialZ])
 
-def preconfig_objects(experiment : str, physics_sim : BaseSoftBotPhysicsEvaluator, unaligned_novelty_evaluator : NoveltyEvaluatorKD, 
+def preconfig_objects(algorithm : str, physics_sim : BaseSoftBotPhysicsEvaluator, unaligned_novelty_evaluator : NoveltyEvaluatorKD, 
                       me_evaluator : MAP_ElitesArchive, genotypeDiversityEvaluator : GenotypeDiversityEvaluator):
     ga_survival = RankAndCrowdingSurvival()
     ga_selection = TournamentSelection(func_comp=binary_tournament)
-    if experiment == "SO":
+    if algorithm == "SO":
         ga_survival = FitnessSurvival()
         ga_selection = TournamentSelection(func_comp=comp_by_cv_and_fitness)
         softbot_problem = SoftBotProblemFitness(physics_evaluator=physics_sim)
-    elif experiment == "QN-MOEA":
+    elif algorithm == "QN-MOEA":
         softbot_problem = SoftBotProblemFitnessNovelty(physics_evaluator=physics_sim, novelty_archive=unaligned_novelty_evaluator)
-    elif experiment == "NSLC":
+    elif algorithm == "NSLC":
         unaligned_novelty_evaluator = NSLCEvaluator("unaligned_nslc_softbot", novelty_threshold=12., k_neighbors=300, 
                                           novelty_floor=1., max_novelty_archive_size=1500, 
                                           vector_extractor=extract_morpho)
         ga_survival = RankAndVectorFieldDiversitySurvival(genotypeDiversityEvaluator=genotypeDiversityEvaluator)
         softbot_problem = SoftBotProblemNSLC(physics_evaluator=physics_sim, nslc_archive=unaligned_novelty_evaluator)
 
-    elif experiment == "MAP-ELITES":
+    elif algorithm == "MAP-ELITES":
         ga_selection = MESelection(me_archive=me_evaluator)
         ga_survival = MESurvival()
         softbot_problem = SoftBotProblemME(physics_evaluator=physics_sim, me_archive=me_evaluator)
@@ -112,23 +110,60 @@ class PopulationSampler(Sampling):
         
 
 def main(parser : argparse.ArgumentParser):
+    dal = Dal()
     argv = parser.parse_args()
+    algo = argv.algorithm
     experiment = argv.experiment
     starting_run = argv.starting_run
     runs = argv.runs
-    pop_size = argv.population_size
-    max_gens = argv.generations
-    physics_sim = argv.physics
+    # pop_size = argv.population_size
+    # max_gens = argv.generations
+    # physics_sim = argv.physics
     usePhysicsCache = argv.physics_cache
-    save_checkpoint = argv.save_checkpoint
-    save_every = argv.save_every
-    save_networks = argv.save_population
+    # save_checkpoint = argv.save_checkpoint
+    # save_every = argv.save_every
+    # save_networks = argv.save_population
     skip_existing = argv.skip_existing
+    
+    algo_obj = dal.get_algorithm(algo)
+    if not algo_obj:
+        print("An error ocurred while fetching algorithm data from database")
+        sys.exit()
+    
+    experiment_obj = dal.get_experiment(experiment)
+    if not experiment_obj:
+        print("Experiment doesn't exist in database...")
+        print("Proceeding with experiment creation in database...")
+        experiment_params = readFromJson('experiment_config.json')
+        if not experiment_params:
+            print('No valid experiment_config.json file found, please specify one')
+        experiment_obj = dal.insert_experiment(uuid.uuid4(), experiment, algo_obj["algorithm_id"], experiment_params)
+    else:
+        if algo_obj["algorithm_id"] != experiment_obj["algorithm_id"]:
+            print("the specified named experiment doesn't match the specified algorithm, please specify the correct algorithm")
+            sys.exit()
 
-    if experiment not in EXPERIMENT_TYPES or physics_sim not in PHYSICS_SIM_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
+    if not experiment_obj:
+        print('Somehting went wrong while inserting or reading the experiment from database')
+        sys.exit()
+    experiment_params = experiment_obj["parameters"]
+    pop_size = experiment_params["population_size"]
+    max_gens = experiment_params["generations"]
+    physics_sim = experiment_params["physics"]
+    IND_SIZE = experiment_params["IND_SIZE"]
+    SIM_TIME = experiment_params["SIM_TIME"]
+    INIT_TIME = experiment_params["INIT_TIME"]
+    DT_FRAC = experiment_params["DT_FRAC"]
+    LATTICE_DIM = experiment_params["LATTICE_DIM"]
+    aligned_novelty_evaluator_params = experiment_params["aligned_novelty_evaluator"]
+    unaligned_novelty_evaluator_params = experiment_params["unaligned_novelty_evaluator"]
+    me_evaluator_params = experiment_params["me_evaluator"]
+    an_me_evaluator_params = experiment_params["an_me_evaluator"]
+
+    if algo not in ALGORITHM_TYPES or physics_sim not in PHYSICS_SIM_TYPES or starting_run <= 0 or starting_run > runs or pop_size <= 0 or runs <= 0 or pop_size <= 0 or max_gens <= 0:
         parser.print_help()
         sys.exit(2)
-    
+
     genotype_cls = BodyBrainGenotypeIndirect
     phenotype_cls = SimplePhenotypeIndirect
     physics_sim_cls = None
@@ -201,27 +236,30 @@ def main(parser : argparse.ArgumentParser):
 
         physics_sim_cls = VoxcraftPhysicsEvaluator
 
-    if experiment == "SO":
-        seeds_json = SEEDS_JSON_SO
-        run_dir = RUN_DIR_SO
-        run_name = RUN_NAME_SO
+    # if algorithm == "SO":
+    #     seeds_json = SEEDS_JSON_SO
+    #     run_dir = RUN_DIR_SO
+    #     run_name = RUN_NAME_SO
     
-    elif experiment == "QN-MOEA":
-        seeds_json = SEEDS_JSON_QN
-        run_dir = RUN_DIR_QN
-        run_name = RUN_NAME_QN
+    # elif algorithm == "QN-MOEA":
+    #     seeds_json = SEEDS_JSON_QN
+    #     run_dir = RUN_DIR_QN
+    #     run_name = RUN_NAME_QN
 
-    elif experiment == "NSLC":
-        seeds_json = SEEDS_JSON_NSLC
-        run_dir = RUN_DIR_NSLC
-        run_name = RUN_NAME_NSLC
+    # elif algorithm == "NSLC":
+    #     seeds_json = SEEDS_JSON_NSLC
+    #     run_dir = RUN_DIR_NSLC
+    #     run_name = RUN_NAME_NSLC
 
-    elif experiment == "MAP-ELITES":
-        seeds_json = SEEDS_JSON_ME
-        run_dir = RUN_DIR_ME
-        run_name = RUN_NAME_ME
+    # elif algorithm == "MAP-ELITES":
+    #     seeds_json = SEEDS_JSON_ME
+    #     run_dir = RUN_DIR_ME
+    #     run_name = RUN_NAME_ME
 
-
+    run_name = experiment_obj['experiment_name']
+    run_dir = experiment_obj['experiment_name'] + 'Data'
+    seeds_json = run_dir + '_seeds.json'
+    
     runToSeedMapping = readFromJson(seeds_json)
     firstRun = starting_run
     
@@ -232,14 +270,19 @@ def main(parser : argparse.ArgumentParser):
         if not str(run + 1) in runToSeedMapping.keys():
             runToSeedMapping[str(run + 1)] = uuid.uuid4().int & (1<<32)-1
             writeToJson(seeds_json, runToSeedMapping)
+        
+        experiment_run_obj = dal.get_experiment_run(experiment_obj["experiment_id"], run + 1)
 
-        random_seed = runToSeedMapping[str(run + 1)]
+        if not experiment_run_obj:
+            experiment_run_obj = dal.insert_experiment_run(uuid.uuid4(), run + 1, runToSeedMapping[str(run + 1)], experiment_obj["experiment_id"])
 
+        random_seed = experiment_run_obj["seed"]
+        
         # Setting up the simulation object
         sim = Sim(dt_frac=DT_FRAC, simulation_time=SIM_TIME, fitness_eval_init_time=INIT_TIME)
 
         # Setting up the environment object
-        env = [Env(sticky_floor=0, time_between_traces=0, lattice_dimension=0.015)]
+        env = [Env(sticky_floor=0, time_between_traces=0, lattice_dimension=LATTICE_DIM)]
 
         run_path = run_dir + str(run + 1)
 
@@ -272,27 +315,30 @@ def main(parser : argparse.ArgumentParser):
                     "****************************************************\n")
         
         if starting_gen <= max_gens:
-            unaligned_novelty_evaluator = NoveltyEvaluatorKD("unaligned_novelty_softbot", novelty_threshold=12., 
-                                    k_neighbors=300, novelty_floor=1., max_novelty_archive_size=1500, 
-                                    vector_extractor=extract_morpho)
-            aligned_novelty_evaluator = NoveltyEvaluatorKD("aligned_novelty_softbot", novelty_threshold=12., 
-                                    k_neighbors=300, novelty_floor=1., max_novelty_archive_size=1500, 
-                                    vector_extractor=aligned_vector)
+            unaligned_novelty_evaluator = NoveltyEvaluatorKD("unaligned_novelty_softbot", novelty_threshold=unaligned_novelty_evaluator_params["novelty_threshold"], 
+                                    k_neighbors=unaligned_novelty_evaluator_params["k_neighbors"], novelty_floor=unaligned_novelty_evaluator_params["novelty_floor"], 
+                                    max_novelty_archive_size=unaligned_novelty_evaluator_params["max_novelty_archive_size"], vector_extractor=extract_morpho)
+            aligned_novelty_evaluator = NoveltyEvaluatorKD("aligned_novelty_softbot", novelty_threshold=aligned_novelty_evaluator_params["novelty_threshold"], 
+                                    k_neighbors=aligned_novelty_evaluator_params["k_neighbors"], novelty_floor=aligned_novelty_evaluator_params["novelty_floor"], 
+                                    max_novelty_archive_size=aligned_novelty_evaluator_params["max_novelty_archive_size"], vector_extractor=aligned_vector)
             genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz=IND_SIZE)
-            me_evaluator = MAP_ElitesArchive("f_elites", np.array([0.,0.]), np.array([125., 125.]), np.array([25, 25]), extract_descriptors_func=extract_morpho)
-            an_me_evaluator = MAP_ElitesArchive("an_elites", np.array([0.,0.]), np.array([125., 125.]), np.array([25, 25]), extract_descriptors_func=extract_morpho)
+            total_voxels = IND_SIZE[0] * IND_SIZE[1] * IND_SIZE[2]
+            me_evaluator = MAP_ElitesArchive("f_elites", np.array([0.,0.]), np.array([total_voxels, total_voxels]), np.array(me_evaluator_params["bpd"]), extract_descriptors_func=extract_morpho)
+            an_me_evaluator = MAP_ElitesArchive("an_elites", np.array([0.,0.]), np.array([total_voxels, total_voxels]), np.array(an_me_evaluator_params["bpd"]), extract_descriptors_func=extract_morpho)
 
             # Setting up physics simulation
-            physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_path, run_name, objective_dict, 
-                                            max_gens, 0, max_eval_time= MAX_EVAL_TIME, time_to_try_again= TIME_TO_TRY_AGAIN, 
-                                            save_lineages = SAVE_LINEAGES)
+            physics_sim = physics_sim_cls(sim, env, SAVE_POPULATION_EVERY, run_path, 
+                                            run_name, objective_dict, max_gens, 0, 
+                                            max_eval_time= MAX_EVAL_TIME, 
+                                            time_to_try_again= TIME_TO_TRY_AGAIN, 
+                                            save_lineages= SAVE_LINEAGES)
             physics_sim.start(usePhysicsCache = usePhysicsCache, resuming_run = resume_run)
             # Setting up Softbot optimization problem
-            softbot_problem, ga_survival, ga_selection, unaligned_novelty_evaluator = preconfig_objects(experiment, physics_sim, unaligned_novelty_evaluator, me_evaluator, genotypeDiversityEvaluator)
+            softbot_problem, ga_survival, ga_selection, unaligned_novelty_evaluator = preconfig_objects(algo, physics_sim, unaligned_novelty_evaluator, me_evaluator, genotypeDiversityEvaluator)
 
             # Setting up optimization algorithm
             softbot_mutation = SoftbotMutation(pop_size, objective_dict)
-            if experiment in ["SO", "MAP-ELITES"]:
+            if algo in ["SO", "MAP-ELITES"]:
                 algorithm = GA(pop_size=pop_size,
                                 mutation=softbot_mutation, 
                                 crossover=DummySoftbotCrossover(), 
@@ -311,7 +357,9 @@ def main(parser : argparse.ArgumentParser):
             algorithm.setup(softbot_problem, termination=('n_gen', max_gens + 1), seed=random_seed)
 
             # Setting up analytics
-            analytics = QD_Analytics(run + 1, experiment, run_name, run_path, '', unaligned_novelty_evaluator, aligned_novelty_evaluator, me_evaluator, an_me_evaluator, genotypeDiversityEvaluator)
+            analytics = QD_Analytics(experiment_run_obj["run_id"], algorithm, run_name, run_path, '', 
+                                    unaligned_novelty_evaluator, aligned_novelty_evaluator, me_evaluator, 
+                                    an_me_evaluator, genotypeDiversityEvaluator, dal)
             my_optimization = PopulationBasedOptimizer(algorithm, softbot_problem, analytics)
 
             # Start optimization
@@ -336,16 +384,17 @@ if __name__ == "__main__":
             self.print_help()
             sys.exit(2)
     parser = CustomParser()
-    parser.add_argument('-e', '--experiment', type=str, default='SO', help="Experiment to run: SO(default), QN-MOEA, MNSLC")
+    parser.add_argument('-a', '--algorithm', type=str, default='SO', help="Algorithm to run: SO(default), QN-MOEA, MNSLC")
+    parser.add_argument('-e', '--experiment', type=str, default='SO', help="Experiment to run")
     parser.add_argument('--starting_run', type=int, default=1, help="Run number to start from (use if existing data for experiment)")
     parser.add_argument('-r', '--runs', type=int, default=1, help="Number of runs of the experiment")
-    parser.add_argument('-p', '--population_size', type=int, default=5, help="Size of the population")
-    parser.add_argument('-g','--generations', type=int, default=20, help="Number of iterations the optimization algorithm will execute")
-    parser.add_argument('--physics', type=str, default='CPU', help = "Type of physics engine to use: CPU (default), GPU")
+    # parser.add_argument('-p', '--population_size', type=int, default=5, help="Size of the population")
+    # parser.add_argument('-g','--generations', type=int, default=20, help="Number of iterations the optimization algorithm will execute")
+    # parser.add_argument('--physics', type=str, default='CPU', help = "Type of physics engine to use: CPU (default), GPU")
     parser.add_argument('--physics_cache', action='store_true', help = "Use existing physics cache")
-    parser.add_argument('--save_checkpoint', action='store_true', help = "Use to save checkpoints from which to continue in case the program is stopped")
-    parser.add_argument('-se', '--save_every', type=int, default=1, help="Save checkpoints every given number of generations")
-    parser.add_argument('--save_population', action='store_true', help = "Use to save population each generation")
+    # parser.add_argument('--save_checkpoint', action='store_true', help = "Use to save checkpoints from which to continue in case the program is stopped")
+    # parser.add_argument('-se', '--save_every', type=int, default=1, help="Save checkpoints every given number of generations")
+    # parser.add_argument('--save_population', action='store_true', help = "Use to save population each generation")
     parser.add_argument('--skip_existing', action='store_true', help = "Use to skip any run with stored data in existance")
 
     main(parser)

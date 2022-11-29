@@ -2,27 +2,29 @@
 import os
 import numpy as np
 import pandas as pd
-from scipy.spatial import distance_matrix
 from typing import List
+from scipy.spatial import distance_matrix
 
-from Constants import *
-from evosoro_pymoo.common.IAnalytics import IAnalytics
-from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
-from qd_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD
-from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
+from constants import *
+from data.dal import Dal
 from qd_pymoo.Algorithm.ME_Survival import MESurvival
-from common.Utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
+from evosoro_pymoo.common.IAnalytics import IAnalytics
 from qd_pymoo.Problems.ME_Problem import BaseMEProblem
+from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
+from qd_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD
 from qd_pymoo.Problems.SingleObjectiveProblem import BaseSingleObjectiveProblem
+from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
+from common.Utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
 
 
 class QD_Analytics(IAnalytics):
-    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path,
+    def __init__(self, run_id, method, experiment_name, json_base_path, csv_base_path,
                 un_archive : NoveltyEvaluatorKD, an_archive : NoveltyEvaluatorKD, 
                 f_me_archive : MAP_ElitesArchive, an_me_archive : MAP_ElitesArchive, 
-                genotypeDivEvaluator : GenotypeDiversityEvaluator):
+                genotypeDivEvaluator : GenotypeDiversityEvaluator,
+                dal : Dal):
         super().__init__()
-        self.run = run
+        self.run_id = run_id
         self.method = method
         self.init_paths(experiment_name, json_base_path, csv_base_path)
         self.un_archive = un_archive
@@ -30,7 +32,8 @@ class QD_Analytics(IAnalytics):
         self.f_me_archive = f_me_archive
         self.an_me_archive = an_me_archive
         self.genotypeDivEvaluator = genotypeDivEvaluator
-        self.actual_generation = 1
+        self.dal = dal
+        # self.actual_generation = 1
 
         self.indicator_stats_set = [
             "fitness",
@@ -75,9 +78,10 @@ class QD_Analytics(IAnalytics):
             "simplified_gene_ne_div",
             "simplified_gene_nws_div"]
         self.indicator_set = [
-            "id",
+            "individual_id",
             "generation",
-            "run",
+            # "run",
+            "run_id",
             "md5",
             "fitness",
             "unaligned_novelty",
@@ -122,16 +126,6 @@ class QD_Analytics(IAnalytics):
         self.stats_csv_path = os.path.join(self.csv_base_path, self.stats_csv_name)
         self.total_voxels = IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2]
         self.init_indicator_mapping()
-        
-        # # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
-        # min_max_gr = [(0, self.total_voxels, self.total_voxels + 1), (0, self.total_voxels, self.total_voxels + 1)]
-        # lower_bound = np.array([0,0])
-        # upper_bound = np.array([self.total_voxels, self.total_voxels])
-        # ppd = np.array([self.total_voxels + 1, self.total_voxels + 1])
-        # #1.- Elites in terms of fitness
-        # self.f_me_archive = MAP_ElitesArchive("f_elites", self.json_base_path, lower_bound, upper_bound, ppd, self.extract_morpho, bins_type=int)
-        # #2.- Elites in terms of aligned novelty
-        # self.an_me_archive = MAP_ElitesArchive("an_elites", self.json_base_path, lower_bound, upper_bound, ppd, self.extract_morpho, bins_type=int)
 
         self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
 
@@ -174,9 +168,10 @@ class QD_Analytics(IAnalytics):
             "qd-score_anun" : [],
             "qd-score_anan" : [],
             "coverage" : [], 
-            "id" : [],
+            "individual_id" : [],
             "generation" : [],
-            "run" : [],
+            # "run" : [],
+            "run_id" : [],
             "md5" : [],
             "fitness" : [],
             "morphology" : [],
@@ -235,7 +230,7 @@ class QD_Analytics(IAnalytics):
     @timeit
     def notify(self, algorithm, **kwargs):
         problem = algorithm.problem
-        self.actual_generation = algorithm.n_gen
+        actual_generation = algorithm.n_gen
         pop = [ind.X[0] for ind in kwargs['pop']]
         # child_pop = kwargs['child_pop']
         
@@ -286,9 +281,10 @@ class QD_Analytics(IAnalytics):
             inipoint = self.extract_initpoint(ind)
             trayectory = self.extract_trayectory(ind)
             morphology = self.extract_morpho(ind)
-            self.indicator_mapping["id"] += [ind.id]
-            self.indicator_mapping["generation"] += [self.actual_generation]
-            self.indicator_mapping["run"] += [self.run]
+            self.indicator_mapping["individual_id"] += [ind.id]
+            self.indicator_mapping["generation"] += [int(actual_generation)]
+            # self.indicator_mapping["run"] += [self.run]
+            self.indicator_mapping["run_id"] += [self.run_id]
             self.indicator_mapping["md5"] += [ind.md5]
             self.indicator_mapping["endpoint"] += [endpoint]
             self.indicator_mapping["inipoint"] += [inipoint]
@@ -303,8 +299,8 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["trayectory_x"] += [trayectory[0]]
             self.indicator_mapping["trayectory_y"] += [trayectory[1]]
             self.indicator_mapping["trayectory_z"] += [trayectory[2]]
-            self.indicator_mapping["morphology_active"] += [morphology[0]]
-            self.indicator_mapping["morphology_passive"] += [morphology[1]]
+            self.indicator_mapping["morphology_active"] += [int(morphology[0])]
+            self.indicator_mapping["morphology_passive"] += [int(morphology[1])]
             self.indicator_mapping["fitness"] += [ind.fitness]
             self.indicator_mapping["unaligned_novelty"] += [ind.unaligned_novelty]
             self.indicator_mapping["aligned_novelty"] += [ind.aligned_novelty]
@@ -351,11 +347,14 @@ class QD_Analytics(IAnalytics):
         for score in an_qd_scores.keys():
             self.indicator_mapping[score] += [an_qd_scores[score]]
 
-        indicator_df = self.indicator_df()
-        indicator_df.to_csv(self.indicators_csv_path, mode='a', header=not os.path.exists(self.indicators_csv_path), index = False)
+        self.dal.insert_indicators(self.indicator_mapping, self.indicator_set)
+        self.dal.insert_indicator_stats(self.indicator_stats(actual_generation))
 
-        stats_df = self.indicator_stats_df()
-        stats_df.to_csv(self.stats_csv_path, mode='a', header=not os.path.exists(self.stats_csv_path), index = False)
+        # indicator_df = self.indicator_df()
+        # indicator_df.to_csv(self.indicators_csv_path, mode='a', header=not os.path.exists(self.indicators_csv_path), index = False)
+
+        # stats_df = self.indicator_stats_df()
+        # stats_df.to_csv(self.stats_csv_path, mode='a', header=not os.path.exists(self.stats_csv_path), index = False)
 
         
     def save_archives(self, algorithm):
@@ -403,24 +402,23 @@ class QD_Analytics(IAnalytics):
     def indicator_df(self):
         return pd.DataFrame({k : self.indicator_mapping[k] for k in self.indicator_set})
             
-
-    def indicator_stats_df(self):
-        d = {"Indicator":[], "Best":[], "Worst":[], "Average":[], "STD":[], "Median":[], "Generation":[], "Run":[], "Method":[]}
+    def indicator_stats(self, generation):
+        d = {"indicator":[], "best":[], "worst":[], "average":[], "std":[], "median":[], "generation":[], "run_id":[]}
 
         for key in self.indicator_stats_set:
-            # Population fitness
-            # d["Indicator"] += [key.replace("_", " ")]
-            d["Indicator"] += [key]
+            d["indicator"] += [key]
             arr = np.array(self.indicator_mapping[key])
-            d["Best"] += [np.nanmax(arr)]
-            d["Worst"] += [np.nanmin(arr)]
-            d["Average"] += [np.nanmean(arr)]
-            d["STD"] += [np.nanstd(arr)]
-            d["Median"] += [np.nanmedian(arr)]
-            d["Generation"] += [self.actual_generation]
-            d["Run"] += [self.run]
-            d["Method"] += [self.method]
+            d["best"] += [float(np.nanmax(arr))]
+            d["worst"] += [float(np.nanmin(arr))]
+            d["average"] += [float(np.nanmean(arr))]
+            d["std"] += [float(np.nanstd(arr))]
+            d["median"] += [float(np.nanmedian(arr))]
+            d["generation"] += [int(generation)]
+            d["run_id"] += [self.run_id]
+        
+        return d
 
-        return pd.DataFrame(d)
+    def indicator_stats_df(self, generation):
+        return pd.DataFrame(self.indicator_stats(generation))
         
 
