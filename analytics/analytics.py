@@ -82,6 +82,7 @@ class QD_Analytics(IAnalytics):
             "generation",
             # "run",
             "run_id",
+            "population_type",
             "md5",
             "fitness",
             "unaligned_novelty",
@@ -170,6 +171,7 @@ class QD_Analytics(IAnalytics):
             "coverage" : [], 
             "individual_id" : [],
             "generation" : [],
+            "population_type" : [],
             # "run" : [],
             "run_id" : [],
             "md5" : [],
@@ -276,13 +278,16 @@ class QD_Analytics(IAnalytics):
         if not algorithm.is_initialized:
             return
 
-        for ind in pop:
+        self.genotypeDivEvaluator.evaluate(pop)
+
+        for i, ind in enumerate(pop):
             endpoint = self.extract_endpoint(ind)
             inipoint = self.extract_initpoint(ind)
             trayectory = self.extract_trayectory(ind)
             morphology = self.extract_morpho(ind)
             self.indicator_mapping["individual_id"] += [ind.id]
             self.indicator_mapping["generation"] += [int(actual_generation)]
+            self.indicator_mapping["population_type"] += ["child" if i >= len(pop) // 2 else "parent"]
             # self.indicator_mapping["run"] += [self.run]
             self.indicator_mapping["run_id"] += [self.run_id]
             self.indicator_mapping["md5"] += [ind.md5]
@@ -350,6 +355,11 @@ class QD_Analytics(IAnalytics):
         self.dal.insert_indicators(self.indicator_mapping, self.indicator_set)
         self.dal.insert_indicator_stats(self.indicator_stats(actual_generation))
 
+        self.genotypeDivEvaluator.genotypeDistanceEvaluator.distance_cache = {}
+
+        if algorithm.n_gen % 100 == 0:
+            self.save_archives(algorithm.n_gen)
+
         # indicator_df = self.indicator_df()
         # indicator_df.to_csv(self.indicators_csv_path, mode='a', header=not os.path.exists(self.indicators_csv_path), index = False)
 
@@ -357,46 +367,9 @@ class QD_Analytics(IAnalytics):
         # stats_df.to_csv(self.stats_csv_path, mode='a', header=not os.path.exists(self.stats_csv_path), index = False)
 
         
-    def save_archives(self, algorithm):
-        problem = algorithm.problem
-        archives = {
-            "f_me_archive" : [],
-            "an_me_archive" : [],
-            "novelty_archive_un" : [],
-            "novelty_archive_an" : []
-        }
-        if issubclass(type(algorithm.survival), MESurvival):
-            self.f_me_archive = algorithm.survival.me_archive
-        if "unaligned_novelty" in problem.evaluators:
-            unaligned_archive_key = "unaligned_novelty"
-        elif "unaligned_nslc" in problem.evaluators:
-            unaligned_archive_key = "unaligned_nslc"
-
-        an_novelty_archive = problem.evaluators["aligned_novelty"]
-        un_novelty_archive = problem.evaluators[unaligned_archive_key]
-
-        # Coverage is the same for all archives
-        for i in range(len(self.f_me_archive)):
-            xf = self.f_me_archive[i]
-            xan = self.an_me_archive[i]
-            # If one is None, all are None
-            if xf is not None:
-                archives["f_me_archive"] += [[xf.md5, xf.id, xf.fitness, xf.unaligned_novelty, xf.aligned_novelty]]
-                archives["an_me_archive"] += [[xan.md5, xan.id, xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
-                # saveToPickle(f"{self.f_me_archive.archive_path}/elite_{i}.pickle", xf)
-                # saveToPickle(f"{self.an_me_archive.archive_path}/elite_{i}.pickle", xan)
-            else:
-                archives["f_me_archive"] += [0]
-                archives["an_me_archive"] += [0]
-
-        for xan in an_novelty_archive.novelty_archive:
-            archives["novelty_archive_an"] += [[xan.md5, xan.id, xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
-        
-        for xun in un_novelty_archive.novelty_archive:
-            archives["novelty_archive_un"] += [[xun.md5, xun.id, xun.fitness, xun.unaligned_novelty, xun.aligned_novelty]]
-
-        
-        save_json(self.archives_json_path, archives)
+    def save_archives(self, generation):
+        self.dal.insert_experiment_archives(self.run_id, generation, self.f_me_archive, self.an_me_archive, self.un_archive, self.an_archive)
+        # save_json(self.archives_json_path, archives)
 
 
     def indicator_df(self):

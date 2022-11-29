@@ -30,11 +30,20 @@ CREATE TABLE IF NOT EXISTS dbo.experimentRuns(
 		REFERENCES dbo.experiments (experiment_id)
 );
 
+CREATE TABLE IF NOT EXISTS dbo.experimentArchives(
+	run_id UUID UNIQUE NOT NULL PRIMARY KEY,
+	generation INT,
+	archives BYTEA NOT NULL,
+	archives_json JSON NULL,
+	FOREIGN KEY (run_id)
+		REFERENCES dbo.experimentRuns(run_id)
+);
 
 CREATE TABLE IF NOT EXISTS dbo.experimentIndicators(
 	individual_id INT NOT NULL,
 	md5 VARCHAR(32) NOT NULL,
 	generation INT NOT NULL,
+	population_type VARCHAR(20) NULL,
 	run_id UUID NOT NULL,
 	fitness NUMERIC,
 	unaligned_novelty NUMERIC,

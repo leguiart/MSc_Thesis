@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import json
+import pickle
 import numpy as np
 import psycopg2
 import psycopg2.extras
@@ -102,6 +103,98 @@ class Dal:
     def insert_experiment_run(self, run_id, run_number, seed, experiment_id):
         row = insert(self.params, "dbo.experimentruns", run_id = run_id, run_number = run_number, seed = seed, experiment_id = experiment_id)
         return {"run_id" : row[0], "run_number" : row[1], "seed" : row[2], "experiment_id" : row[3]} 
+
+    def insert_experiment_archives(self, run_id, generation, f_me_archive, an_me_archive, un_archive, an_archive):
+        archives_pickle = {
+            "f_me_archive" : f_me_archive,
+            "an_me_archive" : an_me_archive,
+            "novelty_archive_un" : un_archive,
+            "novelty_archive_an" : an_archive
+        }
+        archives = {
+            "f_me_archive" : [],
+            "an_me_archive" : [],
+            "novelty_archive_un" : [],
+            "novelty_archive_an" : []
+        }
+        # Coverage is the same for all archives
+        for i in range(len(f_me_archive)):
+            xf = f_me_archive[i]
+            # If one is None, all are None
+            if xf is not None:
+                xf = f_me_archive[i][0]
+                xan = an_me_archive[i][0]
+                archives["f_me_archive"] += [[xf.md5, xf.id, xf.fitness, xf.unaligned_novelty, xf.aligned_novelty]]
+                archives["an_me_archive"] += [[xan.md5, xan.id, xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
+                # saveToPickle(f"{self.f_me_archive.archive_path}/elite_{i}.pickle", xf)
+                # saveToPickle(f"{self.an_me_archive.archive_path}/elite_{i}.pickle", xan)
+            else:
+                archives["f_me_archive"] += [0]
+                archives["an_me_archive"] += [0]
+
+        for xan in an_archive.novelty_archive:
+            archives["novelty_archive_an"] += [[xan.md5, xan.id, xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
+        
+        for xun in un_archive.novelty_archive:
+            archives["novelty_archive_un"] += [[xun.md5, xun.id, xun.fitness, xun.unaligned_novelty, xun.aligned_novelty]]
+
+        archives_row = self.get_archives(run_id)
+
+        if archives_row:
+            self.update_archives(run_id, generation, pickle.dumps(archives_pickle), archives)
+        else:
+            insert(self.params, "dbo.experimentarchives", run_id = run_id, generation = generation, archives = pickle.dumps(archives_pickle), archives_json = archives)
+
+    def update_archives(self, run_id, generation, archives, archives_json):
+        """ update vendor name based on the vendor id """
+        sql = """ UPDATE dbo.experimentarchives
+                    SET generation = %s,
+                    archives = %s,
+                    archives_json = %s
+                    WHERE run_id = %s"""
+        conn = None
+        updated_rows = 0
+        try:
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**self.params)
+            # create a new cursor
+            cur = conn.cursor()
+            # execute the UPDATE  statement
+            cur.execute(sql, (generation, archives, archives_json, run_id))
+            # get the number of updated rows
+            updated_rows = cur.rowcount
+            # Commit the changes to the database
+            conn.commit()
+            # Close communication with the PostgreSQL database
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+
+        return updated_rows
+
+    def get_archives(self, run_id):
+        """ query archives row from the dbo.experimentarchives table """
+        sql = "SELECT run_id, generation, archives, archives_json FROM dbo.experimentarchives WHERE run_id = %s"
+        conn = None
+        archives = None
+        try:
+            conn = psycopg2.connect(**self.params)
+            cur = conn.cursor()
+            cur.execute(sql, (run_id,))
+            row = cur.fetchone()
+            if cur.rowcount > 0:
+                archives = {"run_id" : row[0], "generation" : row[1], "archives" : pickle.loads(row[2]),  "archives_json" : row[3]} 
+
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if conn is not None:
+                conn.close()
+        return archives
 
     def get_algorithm(self, name):
         """ query algorithm row from the dbo.algorithms table """

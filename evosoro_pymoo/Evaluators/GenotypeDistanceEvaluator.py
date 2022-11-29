@@ -42,7 +42,7 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
         return (__o[0], __o[1]) not in self.distance_cache and (__o[1], __o[0]) not in self.distance_cache
 
     @timeit
-    def evaluate(self, X : List[SoftBot], *args, **kwargs) -> List[SoftBot]:
+    def evaluate(self, X : List[SoftBot], *args, **kwargs):
         if not self.io_tags_cached:            
             for net in X[0][0].genotype:
                 self.input_tags += [set()]
@@ -77,13 +77,23 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
         dxdydz = self.dx*self.dy*self.dz
         for i in range(len(X)):              
             for j in range(i + 1, len(X)):
-                row_id, col_id = X[i][0].id, X[j][0].id
+                if type(X[i]) is np.ndarray:
+                    row_id, col_id = X[i][0].id, X[j][0].id
+                elif type(X[i]) is SoftBot:
+                    row_id, col_id = X[i].id, X[j].id
+                else:
+                    raise TypeError()
                 if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
-                    self[(row_id, col_id)] = vector_field_distance(X[i][0], X[j][0], self.output_tags, dxdydz)
+                    if type(X[i]) is np.ndarray:
+                        dist = vector_field_distance(X[i][0], X[j][0], self.output_tags, dxdydz)
+                    elif type(X[i]) is SoftBot:
+                        dist = vector_field_distance(X[i], X[j], self.output_tags, dxdydz)
+                    else:
+                        raise TypeError()
+                    self[(row_id, col_id)] = dist
 
         logger.debug("Finished vector field distance calculation...")
 
-        return X
 
     def clean(self, X : List[SoftBot], pop_size : int):
         new_dist_dict = {}
