@@ -1,56 +1,39 @@
 
-from inspect import isclass
+import os
 import numpy as np
 import pandas as pd
-import os
-from scipy.spatial import distance_matrix
-from pymoo.core.callback import Callback
 from typing import List
-from evosoro_pymoo.Algorithms.ME_Survival import MESurvival
+from scipy.spatial import distance_matrix
 
-from experiments.Constants import *
+from constants import *
+from data.dal import Dal
+from qd_pymoo.Algorithm.ME_Survival import MESurvival
 from evosoro_pymoo.common.IAnalytics import IAnalytics
+from qd_pymoo.Problems.ME_Problem import BaseMEProblem
+from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
+from qd_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD
+from qd_pymoo.Problems.SingleObjectiveProblem import BaseSingleObjectiveProblem
+from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
 from common.Utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
-from evosoro_pymoo.Algorithms.MAP_Elites import MAP_ElitesArchive, MOMAP_ElitesArchive
-
 
 
 class QD_Analytics(IAnalytics):
-
-    def init_paths(self, experiment_name, json_base_path, csv_base_path):
-        self.json_base_path = json_base_path
-        self.csv_base_path = csv_base_path
-
-        self.experiment_name = experiment_name
-        self.archives_json_name = self.experiment_name + "_archives.json"
-        self.archives_json_path = os.path.join(self.json_base_path, self.archives_json_name)
-        self.indicator_csv_name = self.experiment_name + ".csv"
-        self.indicators_csv_path = os.path.join(self.csv_base_path, self.indicator_csv_name)
-        self.stats_csv_name = self.experiment_name + "_stats.csv"
-        self.stats_csv_path = os.path.join(self.csv_base_path, self.stats_csv_name)
-        self.total_voxels = IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2]
-        self.init_indicator_mapping()
-        
-        # We are going to have three MAP-Elites archives, for all we are going to store a 2-vector (Fitness, Unaligned Novelty) in each bin, for analysis purposes
-        min_max_gr = [(0, self.total_voxels, self.total_voxels + 1), (0, self.total_voxels, self.total_voxels + 1)]
-        lower_bound = np.array([0,0])
-        upper_bound = np.array([self.total_voxels, self.total_voxels])
-        ppd = np.array([self.total_voxels + 1, self.total_voxels + 1])
-        #1.- Elites in terms of fitness
-        self.map_elites_archive_f = MAP_ElitesArchive("f_elites", self.json_base_path, lower_bound, upper_bound, ppd, self.extract_morpho, bins_type=int)
-        #2.- Elites in terms of aligned novelty
-        self.map_elites_archive_an = MAP_ElitesArchive("an_elites", self.json_base_path, lower_bound, upper_bound, ppd, self.extract_morpho, bins_type=int)
-
-        self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
-
-    def __init__(self, run, method, experiment_name, json_base_path, csv_base_path):
+    def __init__(self, run_id, method, experiment_name, json_base_path, csv_base_path,
+                un_archive : NoveltyEvaluatorKD, an_archive : NoveltyEvaluatorKD, 
+                f_me_archive : MAP_ElitesArchive, an_me_archive : MAP_ElitesArchive, 
+                genotypeDivEvaluator : GenotypeDiversityEvaluator,
+                dal : Dal):
         super().__init__()
-
-        self.init_paths(experiment_name, json_base_path, csv_base_path)
-        self.actual_generation = 1
-        self.run = run
+        self.run_id = run_id
         self.method = method
- 
+        self.init_paths(experiment_name, json_base_path, csv_base_path)
+        self.un_archive = un_archive
+        self.an_archive = an_archive
+        self.f_me_archive = f_me_archive
+        self.an_me_archive = an_me_archive
+        self.genotypeDivEvaluator = genotypeDivEvaluator
+        self.dal = dal
+        # self.actual_generation = 1
 
         self.indicator_stats_set = [
             "fitness",
@@ -94,10 +77,12 @@ class QD_Analytics(IAnalytics):
             "simplified_gene_div",
             "simplified_gene_ne_div",
             "simplified_gene_nws_div"]
-
-        self.indicator_set = ["id",
+        self.indicator_set = [
+            "individual_id",
             "generation",
-            "run",
+            # "run",
+            "run_id",
+            "population_type",
             "md5",
             "fitness",
             "unaligned_novelty",
@@ -129,13 +114,28 @@ class QD_Analytics(IAnalytics):
             "simplified_gene_ne_div",
             "simplified_gene_nws_div"]
 
+    def init_paths(self, experiment_name, json_base_path, csv_base_path):
+        self.json_base_path = json_base_path
+        self.csv_base_path = csv_base_path
+
+        self.experiment_name = experiment_name
+        self.archives_json_name = self.experiment_name + "_archives.json"
+        self.archives_json_path = os.path.join(self.json_base_path, self.archives_json_name)
+        self.indicator_csv_name = self.experiment_name + ".csv"
+        self.indicators_csv_path = os.path.join(self.csv_base_path, self.indicator_csv_name)
+        self.stats_csv_name = self.experiment_name + "_stats.csv"
+        self.stats_csv_path = os.path.join(self.csv_base_path, self.stats_csv_name)
+        self.total_voxels = IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2]
+        self.init_indicator_mapping()
+
+        self.checkpoint_path = os.path.join(self.json_base_path, f"analytics_checkpoint.pickle")
 
     def start(self, **kwargs):
         resuming_run = kwargs["resuming_run"]
         isNewExperiment = kwargs["isNewExperiment"]
 
-        self.map_elites_archive_f.start(resuming_run = resuming_run)
-        self.map_elites_archive_an.start(resuming_run = resuming_run)
+        # self.f_me_archive.start(resuming_run = resuming_run)
+        # self.an_me_archive.start(resuming_run = resuming_run)
 
         if isNewExperiment:
             if os.path.exists(self.indicators_csv_path):
@@ -161,8 +161,6 @@ class QD_Analytics(IAnalytics):
         return analytics_from_bkp
 
     def init_indicator_mapping(self):
-        # if self.indicator_mapping:
-        #     del self.indicator_mapping
         self.indicator_mapping = {
             "qd-score_ff" : [],
             "qd-score_fun" : [],
@@ -171,9 +169,11 @@ class QD_Analytics(IAnalytics):
             "qd-score_anun" : [],
             "qd-score_anan" : [],
             "coverage" : [], 
-            "id" : [],
+            "individual_id" : [],
             "generation" : [],
-            "run" : [],
+            "population_type" : [],
+            # "run" : [],
+            "run_id" : [],
             "md5" : [],
             "fitness" : [],
             "morphology" : [],
@@ -232,60 +232,65 @@ class QD_Analytics(IAnalytics):
     @timeit
     def notify(self, algorithm, **kwargs):
         problem = algorithm.problem
-        self.actual_generation = algorithm.n_gen
-        pop = kwargs['pop']
-        child_pop = kwargs['child_pop']
+        actual_generation = algorithm.n_gen
+        pop = [ind.X[0] for ind in kwargs['pop']]
+        # child_pop = kwargs['child_pop']
         
         self.init_indicator_mapping()
 
-        if "unaligned_novelty" in problem.evaluators:
-            unaligned_archive_key = "unaligned_novelty"
-        elif "unaligned_nslc" in problem.evaluators:
-            unaligned_archive_key = "unaligned_nslc"
+        # Compute aligned novelty scores
+        an_scores = self.an_archive.evaluation_fn(pop, **kwargs)
+        # Assign aligned novelty scores
+        for i, individual in enumerate(pop):
+            individual.aligned_novelty = -an_scores[i]
+        if issubclass(type(problem), BaseSingleObjectiveProblem) or issubclass(type(problem), BaseMEProblem):
+            # Compute unaligned novelty scores
+            un_scores = self.un_archive.evaluation_fn(pop, **kwargs)
+            # Assign unaligned novelty scores
+            for i, individual in enumerate(pop):
+                individual.unaligned_novelty = -un_scores[i]
 
-        # self.map_elites_archive_an.update_existing_batch([ind.X for ind in child_pop], problem.evaluators["aligned_novelty"])
+        # Assign novelty scores to archive objects
+        # unaligned novelty archive
+        for i, individual in enumerate(self.un_archive.novelty_archive):
+            individual.unaligned_novelty = self.un_archive.novelty_scores[i]
+            self.indicator_mapping["unaligned_novelty_archive_novelty"] += [individual.unaligned_novelty]
+            self.indicator_mapping["unaligned_novelty_archive_fit"] += [individual.fitness]
+        # aligned novelty archive
+        for i, individual in enumerate(self.an_archive.novelty_archive):
+            individual.aligned_novelty = self.an_archive.novelty_scores[i]
+            self.indicator_mapping["aligned_novelty_archive_novelty"] += [individual.aligned_novelty]
+            self.indicator_mapping["aligned_novelty_archive_fit"] += [individual.fitness]
 
-        add_to_me_archive = True
-        if issubclass(type(algorithm.survival), MESurvival):
-            add_to_me_archive = False
-            self.map_elites_archive_f = algorithm.survival.me_archive
-
-        self.map_elites_archive_an.update_existing_archive(problem.evaluators["aligned_novelty"])
+        self.an_me_archive.update_existing_archive(self.an_archive, "aligned_novelty", "aligned_novelty")
         
-        self.map_elites_archive_an.update_existing_archive(problem.evaluators[unaligned_archive_key])
+        self.an_me_archive.update_existing_archive(self.un_archive, "unaligned_novelty", "aligned_novelty")
 
-        self.map_elites_archive_f.update_existing_archive(problem.evaluators["aligned_novelty"])
+        self.f_me_archive.update_existing_archive(self.an_archive, "aligned_novelty", "fitness")
 
-        self.map_elites_archive_f.update_existing_archive(problem.evaluators[unaligned_archive_key])
+        self.f_me_archive.update_existing_archive(self.un_archive, "unaligned_novelty", "fitness")
 
-        for ind in child_pop:
-            if add_to_me_archive: 
-                self.map_elites_archive_f.try_add(ind.X)
-            self.map_elites_archive_an.try_add(ind.X, quality_metric="aligned_novelty")
+        for ind in pop:
+            if not issubclass(type(algorithm.survival), MESurvival): 
+                self.f_me_archive.try_add(ind, -ind.fitness)
+            self.an_me_archive.try_add(ind, -ind.aligned_novelty)
 
         if not algorithm.is_initialized:
             return
 
-        for individual in problem.evaluators["aligned_novelty"].novelty_archive:
-            self.indicator_mapping["aligned_novelty_archive_novelty"] += [individual.aligned_novelty]
-            self.indicator_mapping["aligned_novelty_archive_fit"] += [individual.fitness]
+        self.genotypeDivEvaluator.evaluate(pop)
 
-  
-        
-        for individual in problem.evaluators[unaligned_archive_key].novelty_archive:
-            self.indicator_mapping["unaligned_novelty_archive_novelty"] += [individual.unaligned_novelty]
-            self.indicator_mapping["unaligned_novelty_archive_fit"] += [individual.fitness]
-
-
-        for ind in pop:
-            endpoint = self.extract_endpoint(ind.X)
-            inipoint = self.extract_initpoint(ind.X)
-            trayectory = self.extract_trayectory(ind.X)
-            morphology = self.extract_morpho(ind.X)
-            self.indicator_mapping["id"] += [ind.X.id]
-            self.indicator_mapping["generation"] += [self.actual_generation]
-            self.indicator_mapping["run"] += [self.run]
-            self.indicator_mapping["md5"] += [ind.X.md5]
+        for i, ind in enumerate(pop):
+            endpoint = self.extract_endpoint(ind)
+            inipoint = self.extract_initpoint(ind)
+            trayectory = self.extract_trayectory(ind)
+            morphology = self.extract_morpho(ind)
+            self.indicator_mapping["individual_id"] += [ind.id]
+            self.indicator_mapping["generation"] += [int(actual_generation)]
+            self.indicator_mapping["population_type"] += ["child" if i >= len(pop) // 2 else "parent"]
+            # self.indicator_mapping["run"] += [self.run]
+            self.indicator_mapping["run_id"] += [self.run_id]
+            self.indicator_mapping["md5"] += [ind.md5]
             self.indicator_mapping["endpoint"] += [endpoint]
             self.indicator_mapping["inipoint"] += [inipoint]
             self.indicator_mapping["trayectory"] += [trayectory]
@@ -299,16 +304,16 @@ class QD_Analytics(IAnalytics):
             self.indicator_mapping["trayectory_x"] += [trayectory[0]]
             self.indicator_mapping["trayectory_y"] += [trayectory[1]]
             self.indicator_mapping["trayectory_z"] += [trayectory[2]]
-            self.indicator_mapping["morphology_active"] += [morphology[0]]
-            self.indicator_mapping["morphology_passive"] += [morphology[1]]
-            self.indicator_mapping["fitness"] += [ind.X.fitness]
-            self.indicator_mapping["unaligned_novelty"] += [ind.X.unaligned_novelty]
-            self.indicator_mapping["aligned_novelty"] += [ind.X.aligned_novelty]
-            self.indicator_mapping["gene_diversity"] += [ind.X.gene_diversity]
-            self.indicator_mapping["control_gene_div"] += [ind.X.control_gene_div]
-            self.indicator_mapping["morpho_gene_div"] += [ind.X.morpho_gene_div]
-            control_cppn = ind.X.genotype.networks[0].graph
-            morpho_cppn = ind.X.genotype.networks[1].graph
+            self.indicator_mapping["morphology_active"] += [int(morphology[0])]
+            self.indicator_mapping["morphology_passive"] += [int(morphology[1])]
+            self.indicator_mapping["fitness"] += [ind.fitness]
+            self.indicator_mapping["unaligned_novelty"] += [ind.unaligned_novelty]
+            self.indicator_mapping["aligned_novelty"] += [ind.aligned_novelty]
+            self.indicator_mapping["gene_diversity"] += [ind.gene_diversity]
+            self.indicator_mapping["control_gene_div"] += [ind.control_gene_div]
+            self.indicator_mapping["morpho_gene_div"] += [ind.morpho_gene_div]
+            control_cppn = ind.genotype.networks[0].graph
+            morpho_cppn = ind.genotype.networks[1].graph
             self.indicator_mapping["control_cppn_nodes"] += [control_cppn.number_of_nodes()]
             self.indicator_mapping["control_cppn_edges"] += [control_cppn.number_of_edges()]
             self.indicator_mapping["control_cppn_ws"] += [sum([tup[2] for tup in list(control_cppn.edges.data('weight'))])]
@@ -337,9 +342,9 @@ class QD_Analytics(IAnalytics):
         self.indicator_mapping["simplified_gene_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene"], self.indicator_mapping["simplified_gene"]), axis=1))
         self.indicator_mapping["simplified_gene_ne_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene_no_edges"], self.indicator_mapping["simplified_gene_no_edges"]), axis=1))
         self.indicator_mapping["simplified_gene_nws_div"] = list(np.mean(distance_matrix(self.indicator_mapping["simplified_gene_no_ws"], self.indicator_mapping["simplified_gene_no_ws"]), axis=1))
-        self.indicator_mapping["coverage"] += [self.map_elites_archive_f.coverage()]
-        f_qd_scores = self.map_elites_archive_f.qd_scores({'fitness':'qd-score_ff', 'unaligned_novelty':'qd-score_fun', 'aligned_novelty':'qd-score_fan'})
-        an_qd_scores = self.map_elites_archive_an.qd_scores({'fitness':'qd-score_anf', 'unaligned_novelty':'qd-score_anun', 'aligned_novelty':'qd-score_anan'})
+        self.indicator_mapping["coverage"] += [self.f_me_archive.coverage()]
+        f_qd_scores = self.f_me_archive.qd_scores({'fitness':'qd-score_ff', 'unaligned_novelty':'qd-score_fun', 'aligned_novelty':'qd-score_fan'})
+        an_qd_scores = self.an_me_archive.qd_scores({'fitness':'qd-score_anf', 'unaligned_novelty':'qd-score_anun', 'aligned_novelty':'qd-score_anan'})
 
         for score in f_qd_scores.keys():
             self.indicator_mapping[score] += [f_qd_scores[score]]
@@ -347,76 +352,46 @@ class QD_Analytics(IAnalytics):
         for score in an_qd_scores.keys():
             self.indicator_mapping[score] += [an_qd_scores[score]]
 
-        indicator_df = self.indicator_df()
-        indicator_df.to_csv(self.indicators_csv_path, mode='a', header=not os.path.exists(self.indicators_csv_path), index = False)
+        self.dal.insert_indicators(self.indicator_mapping, self.indicator_set)
+        self.dal.insert_indicator_stats(self.indicator_stats(actual_generation))
 
-        stats_df = self.indicator_stats_df()
-        stats_df.to_csv(self.stats_csv_path, mode='a', header=not os.path.exists(self.stats_csv_path), index = False)
+        self.genotypeDivEvaluator.genotypeDistanceEvaluator.distance_cache = {}
 
-        
-    def save_archives(self, algorithm):
-        problem = algorithm.problem
-        archives = {
-            "map_elites_archive_f" : [],
-            "map_elites_archive_an" : [],
-            "novelty_archive_un" : [],
-            "novelty_archive_an" : []
-        }
-        if issubclass(type(algorithm.survival), MESurvival):
-            self.map_elites_archive_f = algorithm.survival.me_archive
-        if "unaligned_novelty" in problem.evaluators:
-            unaligned_archive_key = "unaligned_novelty"
-        elif "unaligned_nslc" in problem.evaluators:
-            unaligned_archive_key = "unaligned_nslc"
+        if algorithm.n_gen % 100 == 0:
+            self.save_archives(algorithm.n_gen)
 
-        an_novelty_archive = problem.evaluators["aligned_novelty"]
-        un_novelty_archive = problem.evaluators[unaligned_archive_key]
+        # indicator_df = self.indicator_df()
+        # indicator_df.to_csv(self.indicators_csv_path, mode='a', header=not os.path.exists(self.indicators_csv_path), index = False)
 
-        # Coverage is the same for all archives
-        for i in range(len(self.map_elites_archive_f)):
-            xf = self.map_elites_archive_f[i]
-            xan = self.map_elites_archive_an[i]
-            # If one is None, all are None
-            if xf is not None:
-                archives["map_elites_archive_f"] += [[xf.md5, xf.id, xf.fitness, xf.unaligned_novelty, xf.aligned_novelty]]
-                archives["map_elites_archive_an"] += [[xan.md5, xan.id, xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
-                # saveToPickle(f"{self.map_elites_archive_f.archive_path}/elite_{i}.pickle", xf)
-                # saveToPickle(f"{self.map_elites_archive_an.archive_path}/elite_{i}.pickle", xan)
-            else:
-                archives["map_elites_archive_f"] += [0]
-                archives["map_elites_archive_an"] += [0]
-
-        for xan in an_novelty_archive.novelty_archive:
-            archives["novelty_archive_an"] += [[xan.md5, xan.id, xan.fitness, xan.unaligned_novelty, xan.aligned_novelty]]
-        
-        for xun in un_novelty_archive.novelty_archive:
-            archives["novelty_archive_un"] += [[xun.md5, xun.id, xun.fitness, xun.unaligned_novelty, xun.aligned_novelty]]
+        # stats_df = self.indicator_stats_df()
+        # stats_df.to_csv(self.stats_csv_path, mode='a', header=not os.path.exists(self.stats_csv_path), index = False)
 
         
-        save_json(self.archives_json_path, archives)
+    def save_archives(self, generation):
+        self.dal.insert_experiment_archives(self.run_id, generation, self.f_me_archive, self.an_me_archive, self.un_archive, self.an_archive)
+        # save_json(self.archives_json_path, archives)
 
 
     def indicator_df(self):
         return pd.DataFrame({k : self.indicator_mapping[k] for k in self.indicator_set})
             
-
-    def indicator_stats_df(self):
-        d = {"Indicator":[], "Best":[], "Worst":[], "Average":[], "STD":[], "Median":[], "Generation":[], "Run":[], "Method":[]}
+    def indicator_stats(self, generation):
+        d = {"indicator":[], "best":[], "worst":[], "average":[], "std":[], "median":[], "generation":[], "run_id":[]}
 
         for key in self.indicator_stats_set:
-            # Population fitness
-            # d["Indicator"] += [key.replace("_", " ")]
-            d["Indicator"] += [key]
+            d["indicator"] += [key]
             arr = np.array(self.indicator_mapping[key])
-            d["Best"] += [np.nanmax(arr)]
-            d["Worst"] += [np.nanmin(arr)]
-            d["Average"] += [np.nanmean(arr)]
-            d["STD"] += [np.nanstd(arr)]
-            d["Median"] += [np.nanmedian(arr)]
-            d["Generation"] += [self.actual_generation]
-            d["Run"] += [self.run]
-            d["Method"] += [self.method]
+            d["best"] += [float(np.nanmax(arr))]
+            d["worst"] += [float(np.nanmin(arr))]
+            d["average"] += [float(np.nanmean(arr))]
+            d["std"] += [float(np.nanstd(arr))]
+            d["median"] += [float(np.nanmedian(arr))]
+            d["generation"] += [int(generation)]
+            d["run_id"] += [self.run_id]
+        
+        return d
 
-        return pd.DataFrame(d)
+    def indicator_stats_df(self, generation):
+        return pd.DataFrame(self.indicator_stats(generation))
         
 

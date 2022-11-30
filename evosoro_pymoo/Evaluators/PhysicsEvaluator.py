@@ -1,12 +1,15 @@
 
+from abc import abstractmethod
 import os
 import time
 import logging
+from typing import List
 import numpy as np
 import subprocess as sub
 from lxml import etree
 from concurrent.futures import ThreadPoolExecutor
 
+from qd_pymoo.Evaluators.IEvaluator import IEvaluationFunction
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit
@@ -45,7 +48,6 @@ def folder_heirarchy_creation_helper(run_directory, save_networks, save_all_indi
         if save_lineages:
             sub.call("mkdir " + run_directory + "/ancestors 2> /dev/null", shell=True)
 
-
 def initialize_folder_heirarchy(run_directory, save_networks, save_all_individual_data=True,
                        save_lineages=True, resuming_run = False):
 
@@ -58,8 +60,6 @@ def initialize_folder_heirarchy(run_directory, save_networks, save_all_individua
         sub.call("mkdir " + run_directory + "/" + " 2>/dev/null", shell=True)
         folder_heirarchy_creation_helper(run_directory, save_networks, 
                                 save_all_individual_data, save_lineages)
-
-
 
 def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
 
@@ -76,7 +76,7 @@ def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
         sub.call("mkdir " + run_directory + "/network_gml/Gen_%04i" % gen, shell=True)
 
 
-class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecovery):
+class BaseSoftBotPhysicsEvaluator(IEvaluationFunction, IEvaluator, ICheckpoint, IStarter, IFileRecovery):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
                 objective_dict, max_gens, num_env_cycles = 0, max_eval_time=60, 
                 time_to_try_again=10, save_lineages = True, save_nets = False):
@@ -148,7 +148,7 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecove
         usePhysicsCache = kwargs["usePhysicsCache"]
         if not resuming_run:
             if usePhysicsCache:
-                self.already_evaluated = readFromJson('experiments/physics_evaluator_cache.json')
+                self.already_evaluated = readFromJson('physics_evaluator_cache.json')
         initialize_folder_heirarchy(self.run_directory, self.save_nets, save_lineages=self.save_lineages, resuming_run=resuming_run)
 
     def backup(self, *args, **kwargs):
@@ -171,6 +171,10 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecove
     def evaluate(self, pop, *args, **kwargs):
         self.update_env()        
         return pop
+
+    @abstractmethod
+    def evaluation_fn(self, X: List[SoftBot], *args, **kwargs) -> List[SoftBot]:
+        pass
 
 
 
@@ -385,16 +389,13 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
         sub.call(f"cp {self.sim_path}/build/vx3_node_worker .", shell=True)
         sub.call(f"cp {self.sim_path}/demos/voxelyze/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
 
-    @timeit
-    def evaluate(self, pop, *args, **kwargs):
-        pop_size = kwargs['pop_size']
-        self.n_batch = kwargs['n_gen']
+    def _evaluate(self, pop, pop_size, n_gen):
+        self.n_batch = n_gen
 
         if len(pop) == pop_size:
             start_indx = 0
         elif len(pop) > pop_size:
             start_indx = len(pop) - pop_size
-
         start_time = time.time()
         num_evaluated_this_gen = 0
         # ids_to_analyze = []
@@ -439,9 +440,6 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             for individual in pop[start_indx:]:
                 future = executor.submit(md5_func, individual)
                 future.result()
-
-        # for individual in pop[start_indx:]:
-        #     md5_func(individual)
 
         num_evaluated_this_gen = len(ids_softbot_map) 
         all_done = len(ids_softbot_map) == 0
@@ -535,9 +533,7 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             for ind_id, ind in ids_softbot_map.items():
                 future = executor.submit(md5_func2, ind_id, ind)
                 future.result()
-        
-        # for ind_id, ind in ids_softbot_map.items():
-        #     md5_func2(ind_id, ind)
+    
 
         if not all_done:
             logger.warning("Couldn't get a fitness value in time for some individuals. "
@@ -548,6 +544,14 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
         logger.info("Finished voxcraft physics evaluation")
 
+    @timeit
+    def evaluation_fn(self, X: List[SoftBot], *args, **kwargs) -> List[float]:
+        self._evaluate(X, kwargs['pop_size'], kwargs['n_gen'])
+        return -np.array([ind.fitness for ind in X])
+
+    @timeit
+    def evaluate(self, pop, *args, **kwargs):
+        self._evaluate(pop, kwargs['pop_size'], kwargs['n_gen'])
         return super().evaluate(pop)
         
 

@@ -14,17 +14,19 @@ logger = logging.getLogger(f"__main__.{__name__}")
 
 
 class SoftbotMutation(Mutation):
-    def __init__(self, max_id):
+    def __init__(self, max_id, objective_dict):
         self.max_id = max_id
+        self.objective_dict = objective_dict
         super().__init__()
 
     def _do(self, problem, X, **kwargs):
         self.max_id = len(X) if self.max_id == 0 else self.max_id
-        return self.create_new_children_through_mutation(X, problem.evaluators["physics"].objective_dict)
+        softBotPop = [vec[0] for vec in X]
+        new_children_vec = np.array(self.create_new_children_through_mutation(softBotPop))
+        return new_children_vec.reshape((new_children_vec.shape[0], 1))
 
 
-    def create_new_children_through_mutation(self, pop, objective_dict, new_children=None, 
-                                            mutate_network_probs=None, max_mutation_attempts=1500):
+    def create_new_children_through_mutation(self, pop, new_children=None, mutate_network_probs=None, max_mutation_attempts=1500):
         """Create copies, with modification, of existing individuals in the population.
 
         Parameters
@@ -57,23 +59,27 @@ class SoftbotMutation(Mutation):
 
         while len(new_children) < len(pop):
             for ind in pop:
-                new_individual = mutate_individual(ind, mutate_network_probs, objective_dict, max_mutation_attempts)
+                new_individual = mutate_individual(ind, mutate_network_probs, self.objective_dict, max_mutation_attempts)
                 new_individual.id = self.max_id
                 self.max_id += 1
                 new_children.append(new_individual)
+                if len(new_children) >= len(pop):
+                    break
 
         return new_children
 
-class ME_SoftbotMutation(Mutation):
-    def __init__(self, max_id, offspring_n):
-        self.max_id = max_id
-        self.offspring_n = offspring_n
-        super().__init__()
+class ME_SoftbotMutation(SoftbotMutation):
 
+    def __init__(self, max_id, objective_dict):
+        super().__init__(max_id, objective_dict)
 
     def _do(self, problem, X, **kwargs):
         self.max_id = len(X) if self.max_id == 0 else self.max_id
-        return self.mutate_from_archive(problem.evaluators["map_elites_archive_f"], problem.evaluators["physics"].objective_dict)
+        # return self.create_new_children_through_mutation(X)
+        new_children_vec = np.array(self.create_new_children_through_mutation(X))
+        return new_children_vec.reshape((new_children_vec.shape[0], 1))
+        # self.max_id = len(X) if self.max_id == 0 else self.max_id
+        # return self.mutate_from_archive(problem.evaluators["map_elites_archive_f"], problem.evaluators["physics"].objective_dict)
 
 
     def mutate_from_archive(self, archive, objective_dict, new_children=None, 

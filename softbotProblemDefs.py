@@ -4,13 +4,20 @@ import subprocess
 import numpy as np
 from typing import List
 
-from experiments.Constants import *
+from constants import *
 from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro_pymoo.Evaluators.PhysicsEvaluator import BaseSoftBotPhysicsEvaluator
 from evosoro_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator, NoveltyEvaluatorKD
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
+
+from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
+from qd_pymoo.Problems.FitnessNoveltyProblem import BaseFitnessNoveltyProblem
+from qd_pymoo.Problems.NSLC_Problem import BaseNSLCProblem
+from qd_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator as NSLCEval
+from qd_pymoo.Problems.SingleObjectiveProblem import BaseSingleObjectiveProblem
+from qd_pymoo.Problems.ME_Problem import BaseMEProblem
 
 MAX_NS_ARCHIVE_SIZE = (IND_SIZE[0]*IND_SIZE[1]*IND_SIZE[2])**2//2
 
@@ -25,14 +32,6 @@ def unaligned_vector(a):
 def aligned_distance_metric(a, b):
     a_vec = np.array([a.fitnessX, a.fitnessY])
     b_vec = np.array([b.fitnessX, b.fitnessY])
-    return np.sqrt(np.sum((a_vec - b_vec)**2))
-
-# def aligned_vector(a):
-#     return np.array([a.fitnessX, a.fitnessY])
-
-def aligned_distance_metric_gpu(a, b):
-    a_vec = np.array([a.finalX - a.initialX, a.finalY - a.initialY])
-    b_vec = np.array([b.finalX - b.initialX, b.finalY - b.initialY])
     return np.sqrt(np.sum((a_vec - b_vec)**2))
 
 def aligned_vector(a):
@@ -96,9 +95,6 @@ class QualitySoftbotProblem(BaseSoftbotProblem):
     def start(self, **kwargs):
         super().start(**kwargs)
 
-    # def _extractConstraints(self, x: SoftBot) -> List[float]:
-    #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
-
 
 class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
 
@@ -126,8 +122,6 @@ class QualityNoveltySoftbotProblem(BaseSoftbotProblem):
         super().start(**kwargs)
         self.evaluators["genotype_diversity_extractor"] = GenotypeDiversityExtractor(self.evaluators["genotype_diversity_evaluator"])
 
-    # def _extractConstraints(self, x: SoftBot) -> List[float]:
-    #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
 
 class NSLCSoftbotProblem(BaseSoftbotProblem):
 
@@ -154,8 +148,6 @@ class NSLCSoftbotProblem(BaseSoftbotProblem):
         super().start(**kwargs)
         self.evaluators["genotype_diversity_extractor"] = GenotypeDiversityExtractor(self.evaluators["genotype_diversity_evaluator"])
 
-    # def _extractConstraints(self, x: SoftBot) -> List[float]:
-    #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
 
 class MESoftbotProblem(BaseSoftbotProblem):
 
@@ -189,8 +181,6 @@ class MESoftbotProblem(BaseSoftbotProblem):
         super().start(**kwargs)
         self.evaluators["genotype_diversity_extractor"] = GenotypeDiversityExtractor(self.evaluators["genotype_diversity_evaluator"])
 
-    # def _extractConstraints(self, x: SoftBot) -> List[float]:
-    #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
 
 class MNSLCSoftbotProblem(BaseSoftbotProblem):
 
@@ -217,30 +207,39 @@ class MNSLCSoftbotProblem(BaseSoftbotProblem):
         super().start(**kwargs)
         self.evaluators["genotype_diversity_extractor"] = GenotypeDiversityExtractor(self.evaluators["genotype_diversity_evaluator"])
 
-    # def _extractConstraints(self, x: SoftBot) -> List[float]:
-    #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.8*x.num_voxels]
 
-# class MNSLCSoftbotProblemGPU(BaseSoftbotProblem):
+class SoftBotProblemFitness(BaseSingleObjectiveProblem):
+    def __init__(self, physics_evaluator: BaseSoftBotPhysicsEvaluator):
+        super().__init__(n_var=1, fitness_evaluator = physics_evaluator)
 
-#     def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, pop_size : int, backup_path : str, orig_size_xyz = (6,6,6)):
-#         super().__init__(physics_evaluator, n_var=1, n_obj=3)
- 
-#         genotypeDiversityEvaluator = GenotypeDiversityEvaluator(orig_size_xyz)
-#         populationSaver = PopulationSaver(backup_path)
-#         self.evaluators.update({"population_saver" : populationSaver,
-#             "physics" : self.evaluators["physics"],
-#             "aligned_novelty" : NoveltyEvaluatorKD("Aligned Novelty", backup_path, "aligned_novelty", aligned_vector, 
-#                                                     min_novelty_archive_size=pop_size//2, max_novelty_archive_size=500, 
-#                                                     k_neighbors=20, novelty_threshold=.5), 
-#             "unaligned_nslc" : NSLCEvaluator("Unaligned NSLC", backup_path, "unaligned_novelty", unaligned_vector, 
-#                                             "nslc_quality", "fitness", min_novelty_archive_size=pop_size//2, max_novelty_archive_size=1000, 
-#                                             k_neighbors=20, novelty_threshold=25.),
-#             "genotype_diversity_evaluator" : genotypeDiversityEvaluator,
-#             "genotype_diversity_extractor" : GenotypeDiversityExtractor(genotypeDiversityEvaluator)})
-        
+    def _evaluate(self, x, out, *args, **kwargs):
+        softBotPop = [vec[0] for vec in x]
+        super()._evaluate(softBotPop, out, *args, **kwargs)
 
-#     def _extractObjectives(self, x: SoftBot) -> List[float]:
-#         return [-x.nslc_quality, -x.aligned_novelty, -x.unaligned_novelty]
+class SoftBotProblemFitnessNovelty(BaseFitnessNoveltyProblem):
+    def __init__(self, physics_evaluator: BaseSoftBotPhysicsEvaluator, novelty_archive: NoveltyEvaluatorKD):
+        super().__init__(n_var=1, fitness_evaluator = physics_evaluator, novelty_archive=novelty_archive)
 
-    # def _extractConstraints(self, x: SoftBot) -> List[float]:
-    #     return [-x.num_voxels + 0.1*x.genotype.ds_size, x.num_voxels - 0.9*x.genotype.ds_size, -x.active + 0.1*x.num_voxels, x.active - 0.9*x.num_voxels]
+    def _evaluate(self, x, out, *args, **kwargs):
+        softBotPop = [vec[0] for vec in x]
+        super()._evaluate(softBotPop, out, *args, **kwargs)
+        for i, bot in enumerate(softBotPop):
+            bot.unaligned_novelty = -out["F"][i,1]
+
+class SoftBotProblemNSLC(BaseNSLCProblem):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, nslc_archive : NSLCEval):
+        super().__init__(n_var=1, fitness_evaluator=physics_evaluator, nslc_archive=nslc_archive)
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        softBotPop = [vec[0] for vec in x]
+        super()._evaluate(softBotPop, out, *args, **kwargs)
+        for i, bot in enumerate(softBotPop):
+            bot.unaligned_novelty = -out["F"][i,1]
+
+class SoftBotProblemME(BaseMEProblem):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, me_archive: MAP_ElitesArchive):
+        super().__init__(n_var=1, fitness_evaluator = physics_evaluator, me_archive = me_archive)
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        softBotPop = [vec[0] for vec in x]
+        super()._evaluate(softBotPop, out, *args, **kwargs)
