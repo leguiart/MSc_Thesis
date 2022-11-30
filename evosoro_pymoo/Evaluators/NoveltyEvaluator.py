@@ -16,7 +16,7 @@ from sklearn.neighbors import KDTree
 
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit, writeToJson
+from utils.utils import readFromJson, readFromPickle, saveToPickle, timeit, writeToJson
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IResults import IResults
 from evosoro_pymoo.common.IStart import IStarter

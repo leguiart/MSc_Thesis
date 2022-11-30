@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from qd_pymoo.Evaluators.IEvaluator import IEvaluationFunction
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit
+from utils.utils import readFromJson, readFromPickle, saveToPickle, timeit
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter

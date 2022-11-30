@@ -28,7 +28,7 @@ from data.dal import Dal
 
 from constants import *
 from analytics.analytics import QD_Analytics
-from common.Utils import readFromJson,  saveToPickle, writeToJson
+from utils.utils import readFromJson,  saveToPickle, writeToJson
 from genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
 from softbotProblemDefs import SoftBotProblemFitness, SoftBotProblemFitnessNovelty, SoftBotProblemME, SoftBotProblemNSLC
 

@@ -6,7 +6,7 @@ import numpy as np
 
 from evosoro_pymoo.Evaluators.GenotypeDistanceEvaluator import GenotypeDistanceEvaluator
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit
+from utils.utils import readFromJson, readFromPickle, saveToPickle, timeit
 from evosoro_pymoo.common.IStateCleaner import IStateCleaning
 
 logger = logging.getLogger(f"__main__.{__name__}")

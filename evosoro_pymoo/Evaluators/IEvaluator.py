@@ -1,6 +1,6 @@
 import abc
 from typing import Generic, List, TypeVar
-from common.Utils import timeit
+from utils.utils import timeit
 
 class EvaluatorInterface(metaclass=abc.ABCMeta):
     @classmethod

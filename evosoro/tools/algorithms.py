@@ -5,7 +5,7 @@ import numpy as np
 import subprocess as sub
 from functools import partial
 
-from common.Utils import timeit
+from utils.utils import timeit
 
 from .evaluation import evaluate_all
 from .selection import pareto_selection, pareto_tournament_selection
