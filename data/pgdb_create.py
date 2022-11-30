@@ -23,7 +23,7 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS dbo.experiments (
             experiment_id UUID UNIQUE NOT NULL PRIMARY KEY,
             experiment_name VARCHAR(50) UNIQUE NOT NULL,
-            algorithm_id UUID UNIQUE NOT NULL,
+            algorithm_id UUID NOT NULL,
             parameters JSON NOT NULL,
             description TEXT NULL,
             FOREIGN KEY (algorithm_id)
