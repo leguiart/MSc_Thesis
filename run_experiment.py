@@ -236,26 +236,6 @@ def main(parser : argparse.ArgumentParser):
 
         physics_sim_cls = VoxcraftPhysicsEvaluator
 
-    # if algorithm == "SO":
-    #     seeds_json = SEEDS_JSON_SO
-    #     run_dir = RUN_DIR_SO
-    #     run_name = RUN_NAME_SO
-    
-    # elif algorithm == "QN-MOEA":
-    #     seeds_json = SEEDS_JSON_QN
-    #     run_dir = RUN_DIR_QN
-    #     run_name = RUN_NAME_QN
-
-    # elif algorithm == "NSLC":
-    #     seeds_json = SEEDS_JSON_NSLC
-    #     run_dir = RUN_DIR_NSLC
-    #     run_name = RUN_NAME_NSLC
-
-    # elif algorithm == "MAP-ELITES":
-    #     seeds_json = SEEDS_JSON_ME
-    #     run_dir = RUN_DIR_ME
-    #     run_name = RUN_NAME_ME
-
     run_name = experiment_obj['experiment_name']
     run_dir = experiment_obj['experiment_name'] + 'Data'
     seeds_json = run_dir + '_seeds.json'
