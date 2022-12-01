@@ -1,9 +1,0 @@
-[submodule "src/Cu-Collision-Detection"]
-	path = src/Cu-Collision-Detection
-	url = https://github.com/davidmatthews1uvm/Cu-Collision-Detection
-[submodule "3rdparty/thrust"]
-	path = 3rdparty/thrust
-	url = https://github.com/thrust/thrust.git
-[submodule "3rdparty/halloc"]
-	path = 3rdparty/halloc
-	url = https://github.com/liusida/halloc.git
