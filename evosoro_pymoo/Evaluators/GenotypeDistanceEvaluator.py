@@ -3,7 +3,7 @@ import logging
 from typing import Dict, List, Set, Tuple
 from matplotlib.pyplot import axis
 import numpy as np
-from common.Utils import timeit
+from utils.utils import timeit
 from evosoro.softbot import SoftBot
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator

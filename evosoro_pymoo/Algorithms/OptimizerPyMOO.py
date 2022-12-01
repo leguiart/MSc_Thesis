@@ -13,7 +13,7 @@ from evosoro.base import Env, Sim
 from evosoro.tools.algorithms import Optimizer
 from evosoro_pymoo.Problems.SoftbotProblem import BaseSoftbotProblem
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
-from common.Utils import readFromDill, saveToDill, saveToPickle, timeit
+from utils.utils import readFromDill, saveToDill, saveToPickle, timeit
 from evosoro_pymoo.common.IAnalytics import IAnalytics
 from evosoro_pymoo.common.IStart import IStarter
 from evosoro_pymoo.common.IStateCleaner import IStateCleaning

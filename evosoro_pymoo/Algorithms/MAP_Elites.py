@@ -17,7 +17,7 @@ import shutil
 from typing import List, Callable
 from sklearn.neighbors import KDTree
 
-from common.Utils import readFromPickle, saveToPickle
+from utils.utils import readFromPickle, saveToPickle
 from evosoro.softbot import SoftBot
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
 from evosoro_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD

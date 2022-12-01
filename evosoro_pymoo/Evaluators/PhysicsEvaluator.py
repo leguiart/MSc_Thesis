@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from qd_pymoo.Evaluators.IEvaluator import IEvaluationFunction
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit
+from utils.utils import readFromJson, readFromPickle, saveToPickle, timeit
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter
@@ -193,7 +193,7 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
     def start(self, **kwargs):
         super().start(**kwargs)
-        sub.call(f"cp {self.sim_path}/voxelyzeMain/voxelyze {self.experiments_path}", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+        sub.call(f"cp {self.sim_path}/voxelyze {self.experiments_path}", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
     @timeit
     def evaluate(self, pop, *args, **kwargs):

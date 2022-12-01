@@ -14,7 +14,7 @@ from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
 from qd_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD
 from qd_pymoo.Problems.SingleObjectiveProblem import BaseSingleObjectiveProblem
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
-from common.Utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
+from utils.utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
 
 
 class QD_Analytics(IAnalytics):
