@@ -193,7 +193,7 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
     def start(self, **kwargs):
         super().start(**kwargs)
-        sub.call(f"cp {self.sim_path}/voxelyzeMain/voxelyze {self.experiments_path}", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+        sub.call(f"cp {self.sim_path}/voxelyze {self.experiments_path}", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
     @timeit
     def evaluate(self, pop, *args, **kwargs):
