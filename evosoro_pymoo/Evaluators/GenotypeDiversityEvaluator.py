@@ -34,10 +34,10 @@ class GenotypeDiversityEvaluator(IEvaluator, IStateCleaning, object):
                 if i != j:
                     ind1_id = X[i].id
                     ind2_id = X[j].id
-
-                    gene_diversity += [self.genotypeDistanceEvaluator[ind1_id, ind2_id][2]]
-                    morpho_diversity += [self.genotypeDistanceEvaluator[ind1_id, ind2_id][1]]
-                    control_diversity += [self.genotypeDistanceEvaluator[ind1_id, ind2_id][0]]
+                    if ind1_id != ind2_id:
+                        gene_diversity += [self.genotypeDistanceEvaluator[ind1_id, ind2_id][2]]
+                        morpho_diversity += [self.genotypeDistanceEvaluator[ind1_id, ind2_id][1]]
+                        control_diversity += [self.genotypeDistanceEvaluator[ind1_id, ind2_id][0]]
                     
             gene_diversity = np.array(gene_diversity)
             morpho_diversity = np.array(morpho_diversity)
