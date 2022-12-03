@@ -30,7 +30,7 @@ from constants import *
 from analytics.analytics import QD_Analytics
 from utils.utils import readFromJson,  saveToPickle, writeToJson
 from genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
-from softbotProblemDefs import SoftBotProblemFitness, SoftBotProblemFitnessNovelty, SoftBotProblemME, SoftBotProblemNSLC
+from softbot_problem_defs import SoftBotProblemFitness, SoftBotProblemFitnessNovelty, SoftBotProblemME, SoftBotProblemNSLC
 
 from qd_pymoo.Algorithm.ME_Survival import MESurvival
 from qd_pymoo.Algorithm.ME_Selection import MESelection

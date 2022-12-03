@@ -148,6 +148,7 @@ class BaseSoftBotPhysicsEvaluator(IEvaluationFunction, IEvaluator, ICheckpoint, 
         usePhysicsCache = kwargs["usePhysicsCache"]
         if not resuming_run:
             if usePhysicsCache:
+                print("Using existing physics cache from json file")
                 self.already_evaluated = readFromJson('physics_evaluator_cache.json')
         initialize_folder_heirarchy(self.run_directory, self.save_nets, save_lineages=self.save_lineages, resuming_run=resuming_run)
 

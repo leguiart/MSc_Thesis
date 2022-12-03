@@ -80,7 +80,6 @@ class QD_Analytics(IAnalytics):
         self.indicator_set = [
             "individual_id",
             "generation",
-            # "run",
             "run_id",
             "population_type",
             "md5",
@@ -172,7 +171,6 @@ class QD_Analytics(IAnalytics):
             "individual_id" : [],
             "generation" : [],
             "population_type" : [],
-            # "run" : [],
             "run_id" : [],
             "md5" : [],
             "fitness" : [],
@@ -377,21 +375,46 @@ class QD_Analytics(IAnalytics):
             
     def indicator_stats(self, generation):
         d = {"indicator":[], "best":[], "worst":[], "average":[], "std":[], "median":[], "generation":[], "run_id":[]}
+        pointwise_indicators = ["endpoint_x", "endpoint_y", "endpoint_z", "inipoint_x", "inipoint_y", "inipoint_z", "trayectory_x", "trayectory_y", "trayectory_z"]
+
 
         for key in self.indicator_stats_set:
-            d["indicator"] += [key]
-            arr = np.array(self.indicator_mapping[key])
-            d["best"] += [float(np.nanmax(arr))]
-            d["worst"] += [float(np.nanmin(arr))]
-            d["average"] += [float(np.nanmean(arr))]
-            d["std"] += [float(np.nanstd(arr))]
-            d["median"] += [float(np.nanmedian(arr))]
-            d["generation"] += [int(generation)]
-            d["run_id"] += [self.run_id]
-        
+            # d["indicator"] += [key]
+            indicatorStatsHelper(d, self.indicator_mapping, pointwise_indicators, key, 0, len(self.indicator_mapping[key]), generation, self.run_id)
+            if key not in ["qd-score_ff","qd-score_fun","qd-score_fan","qd-score_anf","qd-score_anun","qd-score_anan","coverage"]:
+                indicatorStatsHelper(d, self.indicator_mapping, pointwise_indicators, key, len(self.indicator_mapping[key])//2, len(self.indicator_mapping[key]), generation, self.run_id, prefix="child_")
+                indicatorStatsHelper(d, self.indicator_mapping, pointwise_indicators, key, 0, len(self.indicator_mapping[key])//2, generation, self.run_id, prefix="parent_")
         return d
 
     def indicator_stats_df(self, generation):
         return pd.DataFrame(self.indicator_stats(generation))
         
+def charToIndexHelper(c):
+    if c == 'x':
+        return 0
+    elif c == 'y':
+        return 1
+    elif c == 'z':
+        return 2
+    else:
+        raise ValueError("Invalid character passed")
 
+def indicatorStatsHelper(d, indicator_mapping, pointwise_indicators, key, first, last, generation, run_id, prefix = ""):
+    d["indicator"] += [prefix + key]
+    arr = np.array(indicator_mapping[key][first:last])
+    if key in pointwise_indicators:
+        [indicator, coordinate_char] = key.split('_')
+        coord_index = charToIndexHelper(coordinate_char)
+        point_mat = np.array(indicator_mapping[indicator][first:last])
+        dists = np.linalg.norm(point_mat, axis=1)
+
+        d["best"] += [point_mat[np.argmax(dists)][coord_index]]
+        d["worst"] += [point_mat[np.argmin(dists)][coord_index]]
+    else:
+        d["best"] += [float(np.nanmax(arr))]
+        d["worst"] += [float(np.nanmin(arr))]
+    d["average"] += [float(np.nanmean(arr))]
+    d["std"] += [float(np.nanstd(arr))]
+    d["median"] += [float(np.nanmedian(arr))]
+    d["generation"] += [int(generation)]
+    d["run_id"] += [run_id]
