@@ -43,8 +43,14 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
 
     @timeit
     def evaluate(self, X : List[SoftBot], *args, **kwargs):
-        if not self.io_tags_cached:            
-            for net in X[0][0].genotype:
+        if not self.io_tags_cached:
+            if type(X[0]) is np.ndarray:
+                softbot = X[0][0]
+            elif type(X[0]) is SoftBot:
+                softbot = X[0]
+            else:
+                raise TypeError()
+            for net in softbot.genotype:
                 self.input_tags += [set()]
                 self.output_tags += [set()]
                 for name in net.graph.nodes:

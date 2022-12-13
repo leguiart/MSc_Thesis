@@ -142,4 +142,4 @@ database.ini
 *_seeds.json
 *_cache.json
 
-/*Data[0-9]
+/*Data[0-9]*
