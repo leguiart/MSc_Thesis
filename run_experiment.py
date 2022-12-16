@@ -239,7 +239,10 @@ def main(parser : argparse.ArgumentParser):
     run_name = experiment_obj['experiment_name']
     run_dir = experiment_obj['experiment_name'] + 'Data'
     seeds_json = run_dir + '_seeds.json'
-    
+
+    stored_cppns = dal.get_experiment_cppns([experiment_obj["experiment_id"]])
+    stored_cppns_set = set(stored_cppns['md5'])
+
     runToSeedMapping = readFromJson(seeds_json)
     firstRun = starting_run
     
@@ -337,9 +340,9 @@ def main(parser : argparse.ArgumentParser):
             algorithm.setup(softbot_problem, termination=('n_gen', max_gens + 1), seed=random_seed)
 
             # Setting up analytics
-            analytics = QD_Analytics(experiment_run_obj["run_id"], algorithm, run_name, run_path, '', 
-                                    unaligned_novelty_evaluator, aligned_novelty_evaluator, me_evaluator, 
-                                    an_me_evaluator, genotypeDiversityEvaluator, dal)
+            analytics = QD_Analytics(experiment_run_obj["run_id"], algorithm, run_name, experiment_obj["experiment_id"], 
+                                    run_path, '', unaligned_novelty_evaluator, aligned_novelty_evaluator, me_evaluator, 
+                                    an_me_evaluator, genotypeDiversityEvaluator, dal, stored_cppns_set)
             my_optimization = PopulationBasedOptimizer(algorithm, softbot_problem, analytics)
 
             # Start optimization
