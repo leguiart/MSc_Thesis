@@ -91,6 +91,18 @@ CREATE TABLE IF NOT EXISTS dbo.experimentIndicatorStats(
 		REFERENCES dbo.experimentRuns(run_id)
 );
 
+CREATE TABLE TABLE IF NOT EXISTS dbo.experimentcppns(
+	experiment_id UUID NOT NULL,
+	run_id UUID NOT NULL,
+	md5 VARCHAR(32) NOT NULL,
+	cppn_outputs bytea,
+	FOREIGN KEY (experiment_id)
+		REFERENCES dbo.experiments (experiment_id),
+	FOREIGN KEY (run_id)
+		REFERENCES dbo.experimentRuns(run_id),
+	PRIMARY KEY (experiment_id, run_id, md5)
+);
+
 INSERT INTO dbo.algorithms (algorithm_id, algorithm_name)
 VALUES
     (gen_random_uuid(), 'SO'),

@@ -1,5 +1,6 @@
 
 import os
+import pickle
 import numpy as np
 import pandas as pd
 from typing import List
@@ -14,25 +15,28 @@ from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
 from qd_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD
 from qd_pymoo.Problems.SingleObjectiveProblem import BaseSingleObjectiveProblem
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
-from utils.utils import getsize, readFromDill, readFromPickle, save_json, saveToDill, saveToPickle, timeit
+from utils.utils import readFromPickle, saveToPickle, timeit, flatten_cppn_outputs
 
 
 class QD_Analytics(IAnalytics):
-    def __init__(self, run_id, method, experiment_name, json_base_path, csv_base_path,
+    def __init__(self, run_id, method, experiment_name, experiment_id, json_base_path, csv_base_path,
                 un_archive : NoveltyEvaluatorKD, an_archive : NoveltyEvaluatorKD, 
                 f_me_archive : MAP_ElitesArchive, an_me_archive : MAP_ElitesArchive, 
                 genotypeDivEvaluator : GenotypeDiversityEvaluator,
-                dal : Dal):
+                dal : Dal,
+                stored_cppns_cache : set):
         super().__init__()
         self.run_id = run_id
         self.method = method
         self.init_paths(experiment_name, json_base_path, csv_base_path)
+        self.experiment_id = experiment_id
         self.un_archive = un_archive
         self.an_archive = an_archive
         self.f_me_archive = f_me_archive
         self.an_me_archive = an_me_archive
         self.genotypeDivEvaluator = genotypeDivEvaluator
         self.dal = dal
+        self.stored_cppns_cache = stored_cppns_cache
         # self.actual_generation = 1
 
         self.indicator_stats_set = [
@@ -112,6 +116,13 @@ class QD_Analytics(IAnalytics):
             "simplified_gene_div",
             "simplified_gene_ne_div",
             "simplified_gene_nws_div"]
+        
+        self.cppn_outputs_set = [
+            "experiment_id",
+            "run_id",
+            "md5",
+            "cppn_outputs"
+        ]
 
     def init_paths(self, experiment_name, json_base_path, csv_base_path):
         self.json_base_path = json_base_path
@@ -278,6 +289,8 @@ class QD_Analytics(IAnalytics):
 
         self.genotypeDivEvaluator.evaluate(pop)
 
+        cppn_outputs = dict(zip(self.cppn_outputs_set, [[] for _ in self.cppn_outputs_set]))
+
         for i, ind in enumerate(pop):
             endpoint = self.extract_endpoint(ind)
             inipoint = self.extract_initpoint(ind)
@@ -332,7 +345,14 @@ class QD_Analytics(IAnalytics):
                                                 self.indicator_mapping["control_cppn_edges"][-1],
                                                 self.indicator_mapping["morpho_cppn_nodes"][-1],
                                                 self.indicator_mapping["morpho_cppn_edges"][-1]]]
-            
+            if ind.md5 not in self.stored_cppns_cache:
+                self.stored_cppns_cache.add(ind.md5)
+                cppn_outputs["experiment_id"]+=[self.experiment_id]
+                cppn_outputs["run_id"]+=[self.run_id]
+                cppn_outputs["md5"] += [ind.md5]
+                cppn_outputs["cppn_outputs"]+=[pickle.dumps(flatten_cppn_outputs(ind, self.genotypeDivEvaluator.genotypeDistanceEvaluator.output_tags))]
+
+        
 
         self.indicator_mapping["morpho_div"]= list(np.mean(distance_matrix(self.indicator_mapping["morphology"], self.indicator_mapping["morphology"]), axis=1))
         self.indicator_mapping["endpoint_div"] = list(np.mean(distance_matrix(self.indicator_mapping["endpoint"], self.indicator_mapping["endpoint"]), axis=1))
@@ -352,6 +372,8 @@ class QD_Analytics(IAnalytics):
 
         self.dal.insert_indicators(self.indicator_mapping, self.indicator_set)
         self.dal.insert_indicator_stats(self.indicator_stats(actual_generation))
+        if cppn_outputs["md5"]:
+            self.dal.insert_cppns(cppn_outputs)
 
         self.genotypeDivEvaluator.genotypeDistanceEvaluator.distance_cache = {}
 

@@ -83,6 +83,14 @@ def insert_list(conn_params, table_name, **kwargs):
             # close communication with the database
             conn.close()
 
+def iter_row(cursor, size=10):
+    while True:
+        rows = cursor.fetchmany(size)
+        if not rows:
+            break
+        for row in rows:
+            yield row
+
 class Dal:
     def __init__(self):
         # read database configuration
@@ -90,6 +98,9 @@ class Dal:
 
     def insert_indicators(self, indicator_mapping, indicator_set):
         insert_list(self.params, "dbo.experimentIndicators", **{k : indicator_mapping[k] for k in indicator_set})
+    
+    def insert_cppns(self, cppns_output_dict):
+        insert_list(self.params, "dbo.experimentcppns", **cppns_output_dict)
     
     def insert_indicator_stats(self, stats_dict):
         insert_list(self.params, "dbo.experimentIndicatorStats", **stats_dict)
@@ -138,9 +149,9 @@ class Dal:
         for xun in un_archive.novelty_archive:
             archives["novelty_archive_un"] += [[xun.md5, xun.id, xun.fitness, xun.unaligned_novelty, xun.aligned_novelty]]
 
-        archives_row = self.get_archives(run_id)
+        archives_row = self.get_archives([run_id])
 
-        if archives_row:
+        if archives_row["run_id"]:
             self.update_archives(run_id, generation, pickle.dumps(archives_pickle), archives)
         else:
             insert(self.params, "dbo.experimentarchives", run_id = run_id, generation = generation, archives = pickle.dumps(archives_pickle), archives_json = archives)
@@ -175,26 +186,58 @@ class Dal:
 
         return updated_rows
 
-    def get_archives(self, run_id):
+    def get_archives(self, run_ids):
         """ query archives row from the dbo.experimentarchives table """
-        sql = "SELECT run_id, generation, archives, archives_json FROM dbo.experimentarchives WHERE run_id = %s"
+        sql = "SELECT run_id, generation, archives, archives_json FROM dbo.experimentarchives WHERE run_id IN ({placeholders})"\
+            .format(placeholders = ','.join(["%s"]*len(run_ids)))
         conn = None
-        archives = None
+        archives = {"run_id" : [], "generation" : [], "archives" : [],  "archives_json" : []} 
         try:
             conn = psycopg2.connect(**self.params)
             cur = conn.cursor()
-            cur.execute(sql, (run_id,))
-            row = cur.fetchone()
+            cur.execute(sql, tuple(run_ids))
+            rows = cur.fetchall()
             if cur.rowcount > 0:
-                archives = {"run_id" : row[0], "generation" : row[1], "archives" : pickle.loads(row[2]),  "archives_json" : row[3]} 
+                for row in rows:
+                    archives["run_id"]+=[row[0]]
+                    archives["generation"]+=[row[1]] 
+                    archives["archives"]+=[pickle.loads(row[2])]  
+                    archives["archives_json"]+=[row[3]] 
 
             cur.close()
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
+            raise error
         finally:
             if conn is not None:
                 conn.close()
         return archives
+
+    def get_archives_json(self, run_ids):
+        """ query archives row from the dbo.experimentarchives table """
+        sql = "SELECT run_id, generation, archives_json FROM dbo.experimentarchives WHERE run_id IN ({placeholders})"\
+            .format(placeholders = ','.join(["%s"]*len(run_ids)))
+        conn = None
+        archives = {"run_id" : [], "generation" : [], "archives_json" : []} 
+        try:
+            conn = psycopg2.connect(**self.params)
+            cur = conn.cursor()
+            cur.execute(sql, tuple(run_ids))
+            rows = cur.fetchall()
+            if cur.rowcount > 0:
+                for row in rows:
+                    for column_index, column in enumerate(archives.keys()):
+                        archives[column]+=[row[column_index]]
+
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+            raise error
+        finally:
+            if conn is not None:
+                conn.close()
+        return archives
+
 
     def get_algorithm(self, name):
         """ query algorithm row from the dbo.algorithms table """
@@ -259,4 +302,178 @@ class Dal:
                 conn.close()
         return experiment_run
 
+    def get_experiment_runs(self, experiment_id):
+        """ query experiment rows of a particular experiment from the dbo.experimentRuns table """
+        sql = "SELECT run_id, run_number, seed, experiment_id FROM dbo.experimentruns WHERE experiment_id = %s"
+        conn = None
+        experiment_runs = {"run_id" : [], "run_number" : [], "seed" : [], "experiment_id" : []}
+        try:
+            conn = psycopg2.connect(**self.params)
+            cur = conn.cursor()
+            cur.execute(sql, (experiment_id, ))
+            rows = cur.fetchall()
+            if cur.rowcount > 0:
+                for row in rows:
+                    for column_index, column in enumerate(experiment_runs.keys()):
+                        experiment_runs[column]+=[row[column_index]]
+
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+            raise error
+        finally:
+            if conn is not None:
+                conn.close()
+        return experiment_runs
+
+    def get_experiment_indicator_stats(self, run_id_list, indicator):
+        """ query experiment indicator stats of all runs of an experiments from the dbo.experimentindicatorstats table """
+        
+        sql = """SELECT eis.best, eis.worst, eis.average, eis.std, eis.median, eis.generation, er.run_number 
+                 FROM dbo.experimentindicatorstats as eis
+                 INNER JOIN dbo.experimentruns as er
+                 ON eis.run_id = er.run_id
+                 WHERE eis.run_id IN ({placeholders}) AND eis.indicator = %s
+                 ORDER BY eis.generation"""\
+                    .format(placeholders = ",".join(["%s"]*len(run_id_list)))
+        conn = None
+        res_dict = {"best":[], "worst":[], "average":[], "std":[], "median":[], "generation":[], "run_number":[]}
+
+        try:
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**self.params)
+            cur = conn.cursor()
+            cur.execute(sql, tuple(run_id_list + [indicator]))
+            for row in iter_row(cur, 1000):
+                for column_index, column in enumerate(res_dict.keys()):
+                    res_dict[column]+=[row[column_index]]
+
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+            raise error
+        finally:
+            if conn is not None:
+                conn.close()
+        return res_dict
+
+    def get_experiment_stats(self, run_id_list):
+        """ query experiment indicator stats of all runs of an experiments from the dbo.experimentindicatorstats table """
+        sql = """SELECT eis.indicator, eis.best, eis.worst, eis.average, eis.std, eis.median, eis.generation, er.run_number
+                 FROM dbo.experimentindicatorstats as eis
+                 INNER JOIN dbo.experimentruns as er
+                 ON eis.run_id = er.run_id
+                 WHERE eis.run_id IN ({placeholders})
+                 ORDER BY eis.generation"""\
+                    .format(placeholders = ",".join(["%s"]*len(run_id_list)))
+        conn = None
+        res_dict = {"indicator":[], "best":[], "worst":[], "average":[], "std":[], "median":[], "generation":[], "run_number":[]}
+
+        try:
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**self.params)
+            cur = conn.cursor()
+            # for run_id in run_id_list:
+            cur.execute(sql, tuple(run_id_list))
+            for row in iter_row(cur, 1000):
+                for column_index, column in enumerate(res_dict.keys()):
+                    res_dict[column]+=[row[column_index]]
+
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+            raise error
+        finally:
+            if conn is not None:
+                conn.close()
+        return res_dict
+
+    def get_experiment_indicator_run_stats(self, run_id, indicator):
+        """ query experiment indicator stats of all runs of an experiments from the dbo.experimentindicatorstats table """
+        sql = """SELECT eis.best, eis.worst, eis.average, eis.std, eis.median, eis.generation, er.run_number 
+                 FROM dbo.experimentindicatorstats as eis
+                 INNER JOIN dbo.experimentruns as er
+                 ON eis.run_id = er.run_id
+                 WHERE eis.run_id = %s AND eis.indicator = %s
+                 ORDER BY eis.generation"""
+        conn = None
+        res_dict = {"best":[], "worst":[], "average":[], "std":[], "median":[], "generation":[], "run_number":[]}
+
+        try:
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**self.params)
+            cur = conn.cursor()
+            cur.execute(sql, (run_id, indicator))
+            for row in iter_row(cur, 1000):
+                for column_index, column in enumerate(res_dict.keys()):
+                    res_dict[column]+=[row[column_index]]
+
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+            raise error
+        finally:
+            if conn is not None:
+                conn.close()
+        return res_dict
+
+    def get_experiment_run_stats(self, run_id):
+        """ query experiment indicator stats of all runs of an experiments from the dbo.experimentindicatorstats table """
+        sql = """SELECT eis.indicator, eis.best, eis.worst, eis.average, eis.std, eis.median, eis.generation, er.run_number 
+                 FROM dbo.experimentindicatorstats as eis
+                 INNER JOIN dbo.experimentruns as er
+                 ON eis.run_id = er.run_id
+                 WHERE eis.run_id = %s
+                 ORDER BY eis.generation"""
+        conn = None
+        res_dict = {"indicator":[], "best":[], "worst":[], "average":[], "std":[], "median":[], "generation":[], "run_number":[]}
+
+        try:
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**self.params)
+            cur = conn.cursor()
+            cur.execute(sql, (run_id, ))
+            for row in iter_row(cur, 1000):
+                for column_index, column in enumerate(res_dict.keys()):
+                    res_dict[column]+=[row[column_index]]
+
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+            raise error
+        finally:
+            if conn is not None:
+                conn.close()
+        return res_dict
+
+    def get_experiment_cppns(self, experiment_id_list):
+        """ query experiment indicator stats of all runs of an experiments from the dbo.experimentindicatorstats table """
+        sql = """SELECT experiment_id, run_id, md5, cppn_outputs
+                 FROM dbo.experimentcppns
+                 WHERE experiment_id IN ({placeholders})"""\
+                    .format(placeholders = ",".join(["%s"]*len(experiment_id_list)))
+        conn = None
+        res_dict = {"experiment_id":[], "run_id":[], "md5":[], "cppn_output":[]}
+
+        try:
+            # connect to the PostgreSQL database
+            conn = psycopg2.connect(**self.params)
+            cur = conn.cursor()
+            # for run_id in run_id_list:
+            cur.execute(sql, tuple(experiment_id_list))
+            for row in iter_row(cur, 1000):
+                for column_index, column in enumerate(res_dict.keys()):
+                    if column != "cppn_output":
+                        res_dict[column]+=[row[column_index]]
+                    else:
+                        res_dict[column]+=[pickle.loads(row[column_index])]
+
+            cur.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+            raise error
+        finally:
+            if conn is not None:
+                conn.close()
+        return res_dict
     

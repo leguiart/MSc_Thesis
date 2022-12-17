@@ -45,6 +45,19 @@ def timeit(method):
 
     return wrapper
 
+def flatten_cppn_outputs(ind, output_tags):
+    matrix = []
+    gene_length = len(ind.genotype)
+    # Distances between all chromosomes
+    for gene_index in range(gene_length):
+        g1 = ind.genotype[gene_index].graph
+
+
+        for output_name in output_tags[gene_index]:
+            matrix += [g1.nodes[output_name]["state"].flatten()]
+    return matrix
+    
+
 
 def setRandomSeed(seed):
     random.seed(seed)  # Initializing the random number generator for reproducibility
