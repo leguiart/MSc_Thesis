@@ -1,21 +1,25 @@
-import json
+
+from abc import abstractmethod
 import os
-import sys
 import time
 import logging
+from typing import List
 import numpy as np
 import subprocess as sub
 from lxml import etree
+from concurrent.futures import ThreadPoolExecutor
 
-#sys.path.append(os.getcwd() + "/../..")
+from qd_pymoo.Evaluators.IEvaluator import IEvaluationFunction
 from evosoro.tools.read_write_voxelyze import read_voxlyze_results, write_voxelyze_file, get_vxd
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
-from common.Utils import readFromJson, readFromPickle, saveToPickle, timeit, writeToJson
+from utils.utils import readFromJson, readFromPickle, saveToPickle, timeit
 from evosoro_pymoo.common.ICheckpoint import ICheckpoint
 from evosoro_pymoo.common.IRecoverFromFile import IFileRecovery
 from evosoro_pymoo.common.IStart import IStarter
+from evosoro.softbot import Population as SoftBot
 
 logger = logging.getLogger(f"__main__.{__name__}")
+
 
 
 def folder_heirarchy_creation_helper(run_directory, save_networks, save_all_individual_data, save_lineages, resuming_run = False):
@@ -44,7 +48,6 @@ def folder_heirarchy_creation_helper(run_directory, save_networks, save_all_indi
         if save_lineages:
             sub.call("mkdir " + run_directory + "/ancestors 2> /dev/null", shell=True)
 
-
 def initialize_folder_heirarchy(run_directory, save_networks, save_all_individual_data=True,
                        save_lineages=True, resuming_run = False):
 
@@ -57,8 +60,6 @@ def initialize_folder_heirarchy(run_directory, save_networks, save_all_individua
         sub.call("mkdir " + run_directory + "/" + " 2>/dev/null", shell=True)
         folder_heirarchy_creation_helper(run_directory, save_networks, 
                                 save_all_individual_data, save_lineages)
-
-
 
 def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
 
@@ -75,7 +76,7 @@ def create_gen_directories(gen, run_directory, save_vxa_every, save_networks):
         sub.call("mkdir " + run_directory + "/network_gml/Gen_%04i" % gen, shell=True)
 
 
-class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecovery):
+class BaseSoftBotPhysicsEvaluator(IEvaluationFunction, IEvaluator, ICheckpoint, IStarter, IFileRecovery):
     def __init__(self, sim, env, save_vxa_every, run_directory, run_name, 
                 objective_dict, max_gens, num_env_cycles = 0, max_eval_time=60, 
                 time_to_try_again=10, save_lineages = True, save_nets = False):
@@ -147,7 +148,8 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecove
         usePhysicsCache = kwargs["usePhysicsCache"]
         if not resuming_run:
             if usePhysicsCache:
-                self.already_evaluated = readFromJson('experiments/physics_evaluator_cache.json')
+                print("Using existing physics cache from json file")
+                self.already_evaluated = readFromJson('physics_evaluator_cache.json')
         initialize_folder_heirarchy(self.run_directory, self.save_nets, save_lineages=self.save_lineages, resuming_run=resuming_run)
 
     def backup(self, *args, **kwargs):
@@ -171,6 +173,10 @@ class BaseSoftBotPhysicsEvaluator(IEvaluator, ICheckpoint, IStarter, IFileRecove
         self.update_env()        
         return pop
 
+    @abstractmethod
+    def evaluation_fn(self, X: List[SoftBot], *args, **kwargs) -> List[SoftBot]:
+        pass
+
 
 
 class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
@@ -188,7 +194,7 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
     def start(self, **kwargs):
         super().start(**kwargs)
-        sub.call(f"cp {self.sim_path}/voxelyzeMain/voxelyze {self.experiments_path}", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
+        sub.call(f"cp {self.sim_path}/voxelyze {self.experiments_path}", shell=True)  # Making sure to have the most up-to-date version of the Voxelyze physics engine
 
     @timeit
     def evaluate(self, pop, *args, **kwargs):
@@ -221,7 +227,7 @@ class VoxelyzePhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                     if goal["tag"] is not None:
                         setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
-                logger.debug("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
+                # logger.debug("Individual already evaluated:  cached fitness is {}".format(ind.fitness))
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
                     sub.call("cp " + self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind.id +
@@ -384,16 +390,13 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
         sub.call(f"cp {self.sim_path}/build/vx3_node_worker .", shell=True)
         sub.call(f"cp {self.sim_path}/demos/voxelyze/base.vxa {self.run_directory}/voxelyzeFiles/", shell=True)
 
-    @timeit
-    def evaluate(self, pop, *args, **kwargs):
-        pop_size = kwargs['pop_size']
-        self.n_batch = kwargs['n_gen']
+    def _evaluate(self, pop, pop_size, n_gen):
+        self.n_batch = n_gen
 
         if len(pop) == pop_size:
             start_indx = 0
         elif len(pop) > pop_size:
             start_indx = len(pop) - pop_size
-
         start_time = time.time()
         num_evaluated_this_gen = 0
         # ids_to_analyze = []
@@ -402,11 +405,11 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
         create_gen_directories(self.n_batch, self.run_directory, self.save_vxa_every, self.save_nets)
         logger.info("Starting voxcraft physics evaluation")
 
-            
-        for ind in pop[start_indx:]:
+        def md5_func(ind : SoftBot):
             # write the phenotype of a SoftBot to a file so that VoxCad can access for self.sim.
             ind.md5, root = get_vxd(self.sim, self.env[self.curr_env_idx], ind)
             write_voxelyze_file(self.sim, self.env[self.curr_env_idx], ind, self.run_directory, self.run_name)
+
             # don't evaluate if invalid
             if not ind.phenotype.is_valid():
                 logger.info("Skipping invalid individual")
@@ -415,8 +418,6 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             elif self.env[self.curr_env_idx].actuation_variance == 0 and ind.md5 in self.already_evaluated:
                 
                 for rank, goal in self.objective_dict.items():
-                    #if goal["name"] == "fitness":
-                        #logger.info(f"Individual with id->{ind.id} and hash->{ind.md5}... has already been evaluated with fitness->{self.already_evaluated[ind.md5][rank]}")
                     setattr(ind, goal["name"], self.already_evaluated[ind.md5][rank])
 
                 if self.n_batch% self.save_vxa_every == 0 and self.save_vxa_every > 0:
@@ -426,21 +427,24 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                         sub.call("mv " + source_file +
                                 " " + dest_file, shell=True)
                         
-
             # otherwise evaluate with voxcraft
             else:
 
                 if ind.id not in ids_softbot_map:
-                    num_evaluated_this_gen += 1
                     ids_softbot_map[ind.id] = ind
                     with open(self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind.id, "w", encoding='utf-8') as vxd:
                         root_str = etree.tostring(root)
                         vxd.write(root_str.decode('utf-8'))
 
+
+        with ThreadPoolExecutor() as executor:
+            for individual in pop[start_indx:]:
+                future = executor.submit(md5_func, individual)
+                future.result()
+
+        num_evaluated_this_gen = len(ids_softbot_map) 
         all_done = len(ids_softbot_map) == 0
         fitness_eval_start_time = time.time()
-
-
 
         while not all_done:
             time_waiting_for_fitness = time.time() - fitness_eval_start_time
@@ -485,17 +489,12 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                 return int(num)
             return num
 
-        for ind_id, ind in ids_softbot_map.items():
-            
-            # results = {rank: None for rank in range(len(self.objective_dict))}
+        def md5_func2(ind_id : int, ind : SoftBot):
             for _, details in self.objective_dict.items():
                 tag = details["tag"]
                 if tag is not None:
                     tag = tag.lstrip('<').rstrip('>')
                     tag_ocurrences = fitness_report.findall("./detail/" + self.run_name + "--id_%05i" % ind_id + "/" + tag)
-                    #if details["name"] == "fitness":
-                        #logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{tag_ocurrences[0].text}")
-                    # results[rank] = float(tag_ocurrences[0].text)
                     setattr(ind, details["name"], float(tag_ocurrences[0].text))
                 else:
                     for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
@@ -503,26 +502,12 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
                             state = details_phenotype["state"]
                             setattr(ind, details["name"], details["node_func"](state))
 
-            # for rank, details in self.objective_dict.items():
-            #     if results[rank] is not None:
-            #         if details["name"] == "fitness":
-            #             logger.info(f"Individual with id->{ind.id} and hash->{ind.md5} was evaluated with fitness->{results[rank]}")
-            #         setattr(ind, details["name"], results[rank])
-            #     else:
-            #         for name, details_phenotype in ind.genotype.to_phenotype_mapping.items():
-            #             if name == details["output_node_name"]:
-            #                 state = details_phenotype["state"]
-            #                 setattr(ind, details["name"], details["node_func"](state))
-
-
 
             self.already_evaluated[ind.md5] = [int64Convertion(getattr(ind, details["name"]))
                                                 for _, details in
                                                 self.objective_dict.items()]
 
 
-        # for ind in pop[start_indx:]:
-        #     ind_id = ind.id
             ind_filename_vxd = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxd" % ind_id
             ind_filename_vxa = self.run_directory + "/voxelyzeFiles/" + self.run_name + "--id_%05i.vxa" % ind_id
             if os.path.exists(ind_filename_vxd):
@@ -545,6 +530,12 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
             else:
                 sub.call("rm " + ind_filename_vxa, shell=True)
 
+        with ThreadPoolExecutor() as executor:
+            for ind_id, ind in ids_softbot_map.items():
+                future = executor.submit(md5_func2, ind_id, ind)
+                future.result()
+    
+
         if not all_done:
             logger.warning("Couldn't get a fitness value in time for some individuals. "
                             "The min fitness was assigned for these individuals")
@@ -554,4 +545,14 @@ class VoxcraftPhysicsEvaluator(BaseSoftBotPhysicsEvaluator):
 
         logger.info("Finished voxcraft physics evaluation")
 
+    @timeit
+    def evaluation_fn(self, X: List[SoftBot], *args, **kwargs) -> List[float]:
+        self._evaluate(X, kwargs['pop_size'], kwargs['n_gen'])
+        return -np.array([ind.fitness for ind in X])
+
+    @timeit
+    def evaluate(self, pop, *args, **kwargs):
+        self._evaluate(pop, kwargs['pop_size'], kwargs['n_gen'])
         return super().evaluate(pop)
+        
+

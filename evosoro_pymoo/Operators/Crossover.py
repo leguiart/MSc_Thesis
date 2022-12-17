@@ -1,11 +1,7 @@
-import copy
-import random
-import os
-import sys
-import inspect
+
 import numpy as np
 
-from pymoo.core.crossover import ElementwiseCrossover, Crossover
+from pymoo.core.crossover import Crossover
 
 
 class DummySoftbotCrossover(Crossover):

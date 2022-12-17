@@ -1,10 +1,9 @@
 
-import concurrent.futures
 import logging
 from typing import Dict, List, Set, Tuple
 from matplotlib.pyplot import axis
 import numpy as np
-from common.Utils import timeit
+from utils.utils import timeit
 from evosoro.softbot import SoftBot
 
 from evosoro_pymoo.Evaluators.IEvaluator import IEvaluator
@@ -43,9 +42,15 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
         return (__o[0], __o[1]) not in self.distance_cache and (__o[1], __o[0]) not in self.distance_cache
 
     @timeit
-    def evaluate(self, X : List[SoftBot], *args, **kwargs) -> List[SoftBot]:
-        if not self.io_tags_cached:            
-            for net in X[0].genotype:
+    def evaluate(self, X : List[SoftBot], *args, **kwargs):
+        if not self.io_tags_cached:
+            if type(X[0]) is np.ndarray:
+                softbot = X[0][0]
+            elif type(X[0]) is SoftBot:
+                softbot = X[0]
+            else:
+                raise TypeError()
+            for net in softbot.genotype:
                 self.input_tags += [set()]
                 self.output_tags += [set()]
                 for name in net.graph.nodes:
@@ -61,14 +66,6 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
                         self.output_tags[-1].add(name)
             self.io_tags_cached = True
 
-        logger.debug("Starting vector field distance calculation...")
-
-        dxdydz = self.dx*self.dy*self.dz
-        for i in range(len(X)):              
-            for j in range(i + 1, len(X)):
-                row_id, col_id = X[i].id, X[j].id
-                if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
-                    self[(row_id, col_id)] = vector_field_distance(X[i], X[j], self.output_tags, dxdydz)
         # with concurrent.futures.ProcessPoolExecutor() as executor:
         #     future_to_indexes = {}
         #     for i in range(len(X)):              
@@ -81,9 +78,28 @@ class GenotypeDistanceEvaluator(IEvaluator, IStateCleaning, dict):
         #         row_id, col_id = future_to_indexes[future]
         #         self[(row_id, col_id)] = future.result()
 
+        logger.debug("Starting vector field distance calculation...")
+
+        dxdydz = self.dx*self.dy*self.dz
+        for i in range(len(X)):              
+            for j in range(i + 1, len(X)):
+                if type(X[i]) is np.ndarray:
+                    row_id, col_id = X[i][0].id, X[j][0].id
+                elif type(X[i]) is SoftBot:
+                    row_id, col_id = X[i].id, X[j].id
+                else:
+                    raise TypeError()
+                if row_id != col_id and ((row_id, col_id) not in self.distance_cache or (col_id, row_id) not in self.distance_cache):
+                    if type(X[i]) is np.ndarray:
+                        dist = vector_field_distance(X[i][0], X[j][0], self.output_tags, dxdydz)
+                    elif type(X[i]) is SoftBot:
+                        dist = vector_field_distance(X[i], X[j], self.output_tags, dxdydz)
+                    else:
+                        raise TypeError()
+                    self[(row_id, col_id)] = dist
+
         logger.debug("Finished vector field distance calculation...")
 
-        return X
 
     def clean(self, X : List[SoftBot], pop_size : int):
         new_dist_dict = {}

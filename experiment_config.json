@@ -1,0 +1,28 @@
+{
+    "population_size" : 10,
+    "generations" : 10,
+    "physics" : "GPU",
+    "IND_SIZE" : [5, 5, 5],
+    "SIM_TIME" : 5,
+    "INIT_TIME" : 1,
+    "DT_FRAC" : 0.95,
+    "LATTICE_DIM" : 0.015,
+    "aligned_novelty_evaluator" : {
+        "k_neighbors" : 300,
+        "novelty_floor" : 1.0,
+        "novelty_threshold" : 12.0,
+        "max_novelty_archive_size" : 1500
+    },
+    "unaligned_novelty_evaluator" : {
+        "k_neighbors" : 300,
+        "novelty_floor" : 1.0,
+        "novelty_threshold" : 12.0,
+        "max_novelty_archive_size" : 1500
+    },
+    "me_evaluator" : {
+        "bpd" : [25, 25]
+    },
+    "an_me_evaluator" : {
+        "bpd" : [25, 25]
+    }
+}

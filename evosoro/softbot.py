@@ -1,17 +1,12 @@
 
-import operator
-import logging
 import math
-import os
 import pickle
+import logging
+import operator
 import numpy as np
 from copy import deepcopy
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-
 
 from evosoro.networks import Network
-from evosoro.tools.logging import PrintLog
-from evosoro.tools.mutation import create_new_children_through_mutation
 from evosoro.tools.utils import sigmoid, xml_format, dominates
 from evosoro_pymoo.common.IStart import IStarter
 

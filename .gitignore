@@ -137,3 +137,9 @@ dmypy.json
 /workspace
 /*_elites
 /experiments/*_elites
+
+database.ini
+*_seeds.json
+*_cache.json
+
+/*Data[0-9]*

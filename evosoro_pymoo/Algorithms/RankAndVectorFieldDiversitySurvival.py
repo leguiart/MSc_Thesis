@@ -7,7 +7,8 @@ from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 from pymoo.util.randomized_argsort import randomized_argsort
 
 
-from common.Utils import timeit
+from utils.utils import timeit
+from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
 
 
 logger = logging.getLogger(f"__main__.{__name__}")
@@ -18,8 +19,9 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class RankAndVectorFieldDiversitySurvival(Survival):
 
-    def __init__(self, nds=None, orig_size_xyz = (6,6,6)) -> None:
+    def __init__(self, genotypeDiversityEvaluator : GenotypeDiversityEvaluator, nds=None) -> None:
         super().__init__(filter_infeasible=True)
+        self.genotypeDiversityEvaluator = genotypeDiversityEvaluator
         self.nds = nds if nds is not None else NonDominatedSorting()
         self.input_tags = []
         self.output_tags = []
@@ -49,9 +51,9 @@ class RankAndVectorFieldDiversitySurvival(Survival):
         population_of_fronts = [pop[indx].X for indx in fronts_indxs]
         population_parent_and_child = [individual.X for individual in pop]
 
-        problem.evaluators["genotype_diversity_evaluator"].genotypeDistanceEvaluator.evaluate(population_of_fronts)
-        dist_dict = problem.evaluators["genotype_diversity_evaluator"].genotypeDistanceEvaluator
-
+        dist_dict = self.genotypeDiversityEvaluator.genotypeDistanceEvaluator
+        dist_dict.evaluate(population_of_fronts)
+        
         for k, front in enumerate(fronts):
             
             idxs = []
@@ -89,8 +91,8 @@ def vector_field_diversity(front_indxs, fronts_indxs, pop, dist_dict):
         distance_sum = 0
         for indx2 in fronts_indxs:
             if indx1 != indx2:
-                ind1_id = pop[indx1].id
-                ind2_id = pop[indx2].id
+                ind1_id = pop[indx1][0].id
+                ind2_id = pop[indx2][0].id
                 distance_sum += dist_dict[(ind1_id, ind2_id)][2]
 
         front_diversity += [distance_sum/len(fronts_indxs)]
