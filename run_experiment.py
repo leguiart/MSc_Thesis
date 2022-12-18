@@ -351,7 +351,7 @@ def main(parser : argparse.ArgumentParser):
             saveToPickle(os.path.join(run_path, "results_set.pickle"), results)
             # Save physics sim backup regardless of checkpoints being activated or not,
             # in case of recovery of physics sim cache being done later on.
-            physics_sim.backup()
+            # physics_sim.backup()
             physics_evaluator_cache = physics_sim.already_evaluated
             writeToJson('physics_evaluator_cache.json', physics_evaluator_cache)
             analytics.save_archives(algorithm.n_gen)
