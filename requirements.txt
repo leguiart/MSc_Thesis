@@ -1,6 +1,5 @@
 autograd==1.4
 dill==0.3.5.1
-experiments==0.1.0
 lxml==4.8.0
 matplotlib==3.3.4
 networkx==2.8.5
