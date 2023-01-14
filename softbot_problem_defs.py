@@ -11,6 +11,7 @@ from evosoro_pymoo.Evaluators.PhysicsEvaluator import BaseSoftBotPhysicsEvaluato
 from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
 from qd_pymoo.Problems.FitnessNoveltyProblem import BaseFitnessNoveltyProblem
 from qd_pymoo.Problems.NSLC_Problem import BaseNSLCProblem
+from qd_pymoo.Problems.MNSLC_Problem import BaseMNSLCProblem
 from qd_pymoo.Evaluators.NoveltyEvaluator import NSLCEvaluator, NoveltyEvaluatorKD
 from qd_pymoo.Problems.SingleObjectiveProblem import BaseSingleObjectiveProblem
 from qd_pymoo.Problems.ME_Problem import BaseMEProblem
@@ -88,3 +89,14 @@ class SoftBotProblemME(BaseMEProblem):
     def _evaluate(self, x, out, *args, **kwargs):
         softBotPop = [vec[0] for vec in x]
         super()._evaluate(softBotPop, out, *args, **kwargs)
+
+class SoftBotProblemMNSLC(BaseMNSLCProblem):
+    def __init__(self, physics_evaluator : BaseSoftBotPhysicsEvaluator, nslc_archive : NSLCEvaluator, an_archive : NoveltyEvaluatorKD):
+        super().__init__(n_var=1, fitness_evaluator=physics_evaluator, nslc_archive=nslc_archive, aligned_novelty_archive=an_archive)
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        softBotPop = [vec[0] for vec in x]
+        super()._evaluate(softBotPop, out, *args, **kwargs)
+        for i, bot in enumerate(softBotPop):
+            bot.unaligned_novelty = -out["F"][i,1]
+            bot.aligned_novelty = -out["F"][i,2]
