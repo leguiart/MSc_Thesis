@@ -30,7 +30,7 @@ from constants import *
 from analytics.analytics import QD_Analytics
 from utils.utils import readFromJson,  saveToPickle, writeToJson
 from genotypes import BodyBrainGenotypeIndirect, SimplePhenotypeIndirect
-from softbot_problem_defs import SoftBotProblemFitness, SoftBotProblemFitnessNovelty, SoftBotProblemME, SoftBotProblemNSLC
+from softbot_problem_defs import SoftBotProblemFitness, SoftBotProblemFitnessNovelty, SoftBotProblemME, SoftBotProblemNSLC, SoftBotProblemMNSLC
 
 from qd_pymoo.Algorithm.ME_Survival import MESurvival
 from qd_pymoo.Algorithm.ME_Selection import MESelection
@@ -73,7 +73,8 @@ def aligned_vector(a : SoftBot):
     return np.array([a.finalX - a.initialX, a.finalY - a.initialY, a.finalZ - a.initialZ])
 
 def preconfig_objects(algorithm : str, physics_sim : BaseSoftBotPhysicsEvaluator, unaligned_novelty_evaluator : NoveltyEvaluatorKD, 
-                      me_evaluator : MAP_ElitesArchive, genotypeDiversityEvaluator : GenotypeDiversityEvaluator):
+                      aligned_novelty_evaluator : NoveltyEvaluatorKD, me_evaluator : MAP_ElitesArchive, 
+                      genotypeDiversityEvaluator : GenotypeDiversityEvaluator):
     ga_survival = RankAndCrowdingSurvival()
     ga_selection = TournamentSelection(func_comp=binary_tournament)
     if algorithm == "SO":
@@ -88,11 +89,18 @@ def preconfig_objects(algorithm : str, physics_sim : BaseSoftBotPhysicsEvaluator
                                           vector_extractor=extract_morpho)
         ga_survival = RankAndVectorFieldDiversitySurvival(genotypeDiversityEvaluator=genotypeDiversityEvaluator)
         softbot_problem = SoftBotProblemNSLC(physics_evaluator=physics_sim, nslc_archive=unaligned_novelty_evaluator)
-
     elif algorithm == "MAP-ELITES":
         ga_selection = MESelection(me_archive=me_evaluator)
         ga_survival = MESurvival()
         softbot_problem = SoftBotProblemME(physics_evaluator=physics_sim, me_archive=me_evaluator)
+    elif algorithm == "MNSLC":
+        unaligned_novelty_evaluator = NSLCEvaluator("unaligned_nslc_softbot", novelty_threshold=12., k_neighbors=300, 
+                                          novelty_floor=1., max_novelty_archive_size=1500, 
+                                          vector_extractor=extract_morpho)
+        ga_survival = RankAndVectorFieldDiversitySurvival(genotypeDiversityEvaluator=genotypeDiversityEvaluator)
+        softbot_problem = SoftBotProblemMNSLC(physics_evaluator=physics_sim, nslc_archive=unaligned_novelty_evaluator, 
+                                              an_archive=aligned_novelty_evaluator)
+
 
     return softbot_problem, ga_survival, ga_selection, unaligned_novelty_evaluator
 
@@ -317,7 +325,9 @@ def main(parser : argparse.ArgumentParser):
                                             save_lineages= SAVE_LINEAGES)
             physics_sim.start(usePhysicsCache = usePhysicsCache, resuming_run = resume_run)
             # Setting up Softbot optimization problem
-            softbot_problem, ga_survival, ga_selection, unaligned_novelty_evaluator = preconfig_objects(algo, physics_sim, unaligned_novelty_evaluator, me_evaluator, genotypeDiversityEvaluator)
+            softbot_problem, ga_survival, ga_selection, unaligned_novelty_evaluator = preconfig_objects(algo, physics_sim, unaligned_novelty_evaluator, 
+                                                                                                        aligned_novelty_evaluator, me_evaluator, 
+                                                                                                        genotypeDiversityEvaluator)
 
             # Setting up optimization algorithm
             softbot_mutation = SoftbotMutation(pop_size, objective_dict)

@@ -11,9 +11,10 @@ from data.dal import Dal
 from qd_pymoo.Algorithm.ME_Survival import MESurvival
 from evosoro_pymoo.common.IAnalytics import IAnalytics
 from qd_pymoo.Problems.ME_Problem import BaseMEProblem
+from qd_pymoo.Problems.MNSLC_Problem import BaseMNSLCProblem
+from qd_pymoo.Problems.SingleObjectiveProblem import BaseSingleObjectiveProblem
 from qd_pymoo.Algorithm.ME_Archive import MAP_ElitesArchive
 from qd_pymoo.Evaluators.NoveltyEvaluator import NoveltyEvaluatorKD
-from qd_pymoo.Problems.SingleObjectiveProblem import BaseSingleObjectiveProblem
 from evosoro_pymoo.Evaluators.GenotypeDiversityEvaluator import GenotypeDiversityEvaluator
 from utils.utils import readFromPickle, saveToPickle, timeit, flatten_cppn_outputs
 
@@ -248,10 +249,11 @@ class QD_Analytics(IAnalytics):
         self.init_indicator_mapping()
 
         # Compute aligned novelty scores
-        an_scores = self.an_archive.evaluation_fn(pop, **kwargs)
-        # Assign aligned novelty scores
-        for i, individual in enumerate(pop):
-            individual.aligned_novelty = -an_scores[i]
+        if not issubclass(type(problem), BaseMNSLCProblem):
+            an_scores = self.an_archive.evaluation_fn(pop, **kwargs)
+            # Assign aligned novelty scores
+            for i, individual in enumerate(pop):
+                individual.aligned_novelty = -an_scores[i]
         if issubclass(type(problem), BaseSingleObjectiveProblem) or issubclass(type(problem), BaseMEProblem):
             # Compute unaligned novelty scores
             un_scores = self.un_archive.evaluation_fn(pop, **kwargs)
