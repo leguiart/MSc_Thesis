@@ -8,13 +8,13 @@
     "DT_FRAC" : 0.95,
     "LATTICE_DIM" : 0.015,
     "aligned_novelty_evaluator" : {
-        "k_neighbors" : 300,
+        "k_neighbors" : 200,
         "novelty_floor" : 1.0,
         "novelty_threshold" : 12.0,
         "max_novelty_archive_size" : 1500
     },
     "unaligned_novelty_evaluator" : {
-        "k_neighbors" : 300,
+        "k_neighbors" : 200,
         "novelty_floor" : 1.0,
         "novelty_threshold" : 12.0,
         "max_novelty_archive_size" : 1500
