@@ -92,8 +92,13 @@ class BodyBrainGenotypeIndirect(Genotype):
         # Let's map this CPPN output to a VXA tag named <PhaseOffset>
         self.to_phenotype_mapping.add_map(name="phase_offset", tag="<PhaseOffset>", 
                                           func=partial(rescaled_positive_sigmoid, x_min=0, x_max=2*math.pi))
-
-        self.to_phenotype_mapping.add_map(name="frequency", tag="<TempPeriod>", env_kws={"frequency": frequency_func})  # tag actually doesn't do anything here
+        guard_activation_function = lambda x : np.where(x <= -1, x, np.zeros_like(x)) +\
+                                                np.where(x >= 1, x, np.zeros_like(x)) +\
+                                                np.where(x > -1 and x < 0, -np.ones_like(x), np.zeros_like(x)) +\
+                                                np.where(x >= 0 and x < 1, np.ones_like(x), np.zeros_like(x))
+        self.to_phenotype_mapping.add_map(name="frequency", tag="<TempPeriod>", 
+                                          func = guard_activation_function, 
+                                          env_kws={"frequency": frequency_func})  # tag actually doesn't do anything here
 
         # Now adding a second CPPN, with three outputs. "shape" the geometry of the robot
         # (i.e. whether a particular voxel is empty or full),
