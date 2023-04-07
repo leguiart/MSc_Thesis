@@ -21,6 +21,13 @@ MAX_FREQUENCY = 4.0  # We also evolve a global actuation frequency, max frequenc
 def frequency_func(x):
     return MAX_FREQUENCY * 2.5 / (np.mean(1/x) + 1.5)  # SAM: inverse the additional inverse in read_write_voxelyze.py
 
+def linear_guarded(x, x_lower, x_upper):
+    x_mid = (x_lower + x_upper)/2
+    return np.where(x <= x_lower, x, np.zeros_like(x)) +\
+            np.where(x >= x_upper, x, np.zeros_like(x)) +\
+            np.where((x > x_lower) & (x < x_mid), -np.ones_like(x), np.zeros_like(x)) +\
+            np.where((x >= x_mid) & (x < x_upper), np.ones_like(x), np.zeros_like(x))
+
 # Defining a custom genotype, inheriting from base class Genotype
 class SimpleGenotypeIndirect(Genotype):
     def __init__(self):
@@ -92,8 +99,9 @@ class BodyBrainGenotypeIndirect(Genotype):
         # Let's map this CPPN output to a VXA tag named <PhaseOffset>
         self.to_phenotype_mapping.add_map(name="phase_offset", tag="<PhaseOffset>", 
                                           func=partial(rescaled_positive_sigmoid, x_min=0, x_max=2*math.pi))
-
-        self.to_phenotype_mapping.add_map(name="frequency", tag="<TempPeriod>", env_kws={"frequency": frequency_func})  # tag actually doesn't do anything here
+        self.to_phenotype_mapping.add_map(name="frequency", tag="<TempPeriod>", 
+                                          func = partial(linear_guarded, -1, 1), 
+                                          env_kws={"frequency": frequency_func})  # tag actually doesn't do anything here
 
         # Now adding a second CPPN, with three outputs. "shape" the geometry of the robot
         # (i.e. whether a particular voxel is empty or full),
